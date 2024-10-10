@@ -1,0 +1,150 @@
+{
+	"name": "PL_CareBlox_Download",
+	"properties": {
+		"activities": [
+			{
+				"name": "Download bak files from FTP",
+				"description": "Download the zipped bak files from FTP",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox-bak-Files",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Copy Bak files to Fileshare",
+				"description": "Copy today's downloaded bak files",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Wait 15",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox-Fileshare",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Wait 15",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Download bak files from FTP",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 15
+				}
+			},
+			{
+				"name": "Copy Bak files to Fileshare Failure",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Copy Bak files to Fileshare",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": "Pipeline failed",
+						"Colour": {
+							"value": "Red",
+							"type": "Expression"
+						},
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "Copy Bak files to Fileshare"
+					}
+				}
+			},
+			{
+				"name": "Download bak files from FTP Failure",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Download bak files from FTP",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": "Pipeline failed",
+						"Colour": {
+							"value": "Red",
+							"type": "Expression"
+						},
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "Download bak files from FTP"
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "Careblox"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-10-01T10:23:31Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

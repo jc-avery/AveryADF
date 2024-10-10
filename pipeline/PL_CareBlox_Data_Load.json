@@ -1,0 +1,122 @@
+{
+	"name": "PL_CareBlox_Data_Load",
+	"properties": {
+		"description": "Copies the Parquet files from the Azure file share to Azure blob storage. Then copies data from the files and loads into the TRANSFROM_DB",
+		"activities": [
+			{
+				"name": "Copy Files to Blob Storage",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Clear Stage Tables_copy1",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox-parquet-copy",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Import data to Stage tables",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Copy Files to Blob Storage",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox-parquet-load-STG",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Upsert to tables",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Import data to Stage tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox-SQL-upsert",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Clear Stage Tables",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Upsert to tables",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox_Clear_STGTables",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Clear Stage Tables_copy1",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_CareBlox_Clear_STGTables",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "Careblox"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-09-26T11:05:27Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

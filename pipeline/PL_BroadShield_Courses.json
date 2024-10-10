@@ -1,0 +1,171 @@
+{
+	"name": "PL_BroadShield_Courses",
+	"properties": {
+		"activities": [
+			{
+				"name": "Download Courses Data",
+				"description": "Connects to Myrus API Courses end point and downloads data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set Courses File Name",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "RestSource",
+						"httpRequestTimeout": "00:01:40",
+						"requestInterval": "00.00:00:00.010",
+						"requestMethod": "GET",
+						"paginationRules": {
+							"supportRFC5988": "true"
+						}
+					},
+					"sink": {
+						"type": "JsonSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "JsonWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_BroadShield_Live_API",
+						"type": "DatasetReference",
+						"parameters": {
+							"Date": {
+								"value": "@variables('API_Date')",
+								"type": "Expression"
+							},
+							"Endpoint": "courses"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_BroadShield_JSON",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": {
+								"value": "@variables('UsersFileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Set Courses File Name",
+				"description": "Sets the name of the file to be used in the sink data set",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set Date for API Call",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "UsersFileName",
+					"value": {
+						"value": "@concat('Courses', '$', formatDateTime(utcNow(), 'dd-MM-yyyy'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set Date for API Call",
+				"description": "Sets the API query date to previous day at 11:59:59 to capture any changes made since",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "API_Date",
+					"value": {
+						"value": "@concat(formatDateTime(subtractFromTime(utcNow(), 1, 'Day'), 'yyyyMMdd'), '115959')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Download Failure",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Download Courses Data",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": {
+							"value": "@activity('Download Courses Data').output.errors[0].Message",
+							"type": "Expression"
+						},
+						"Colour": "Red",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "Download Courses Data"
+					}
+				}
+			}
+		],
+		"variables": {
+			"UsersFileName": {
+				"type": "String"
+			},
+			"API_Date": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Broadshield/Child Pipelines"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-10-03T15:30:34Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
