@@ -13,6 +13,1951 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download bak files from FTP",
+						"description": "Download the zipped bak files from FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-bak-Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Copy Bak files to Fileshare",
+						"description": "Copy today's downloaded bak files",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 15",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-Fileshare",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 15",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Download bak files from FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 15
+						}
+					},
+					{
+						"name": "Copy Bak files to Fileshare Failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Copy Bak files to Fileshare",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "Pipeline failed",
+								"Colour": {
+									"value": "Red",
+									"type": "Expression"
+								},
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Copy Bak files to Fileshare"
+							}
+						}
+					},
+					{
+						"name": "Download bak files from FTP Failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Download bak files from FTP",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "Pipeline failed",
+								"Colour": {
+									"value": "Red",
+									"type": "Expression"
+								},
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Download bak files from FTP"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Careblox"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-01T10:23:31Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyAccessAudit')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Transfer File to Blob Storage",
+						"description": "Copies the file generated on the VM from the file share to container in Blob Storage",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Fileshare",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Load CSV file to DB table",
+						"description": "Inserts the records in the csv file to the Avery DB on AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Transfer File to Blob Storage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Insert_ExchequerCompanyAccess",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-27T14:27:51Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Homes')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies Homes table from AH1 to AH2 and also updates HomesID's in TRANSFORM_DB Avery.HomeID",
+				"activities": [
+					{
+						"name": "Copy AH1 data to AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_AH1_Homes-AH2_Homes",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update HomeID table",
+						"description": "Updates Avery.HomeDetails table in the TRANSFORM_DB with latest data ",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Copy AH1 data to AH2",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Transform_HomeDetails",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update Occupancy on AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Update HomeID table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_AH1_Occupancy",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T09:35:49Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Pricing')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline to update Pricing tables outside GRG refresh Window",
+				"activities": [
+					{
+						"name": "Upsert Coldharbour Rooms",
+						"description": "Updates the ColdHarbour.Rooms table from the Polestar DB. Polestar DB is a replication of the GRG database (CH reporting suite/DB)",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ColdHarbour_Rooms",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update Occupancy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Upsert Coldharbour Rooms",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ColdHarbour_RoomsWithInHomeResidents",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T09:35:49Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Softworks_JSON_SQL')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy Employee JSON Data to SQL",
+						"description": "Copies data from the JSON file exported from the API to the Softworks.Employee_JSON table. All stored as String data.",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set EmployeeList File",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE SoftWorks.Employee_JSON",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['department']"
+										},
+										"sink": {
+											"name": "department",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clockNumber']"
+										},
+										"sink": {
+											"name": "clockNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clocking']"
+										},
+										"sink": {
+											"name": "clocking",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['dateOfBirth']"
+										},
+										"sink": {
+											"name": "dateOfBirth",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['dateStarted']"
+										},
+										"sink": {
+											"name": "dateStarted",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['dateTerminated']"
+										},
+										"sink": {
+											"name": "dateTerminated",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['firstname']"
+										},
+										"sink": {
+											"name": "firstname",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['surname']"
+										},
+										"sink": {
+											"name": "surname",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeName']"
+										},
+										"sink": {
+											"name": "employeeName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeNumber']"
+										},
+										"sink": {
+											"name": "employeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeEmail']"
+										},
+										"sink": {
+											"name": "employeeEmail",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeStatus']"
+										},
+										"sink": {
+											"name": "employeeStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['salary']"
+										},
+										"sink": {
+											"name": "salary",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['roster']"
+										},
+										"sink": {
+											"name": "roster",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['hourlyRate']"
+										},
+										"sink": {
+											"name": "hourlyRate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['payType']"
+										},
+										"sink": {
+											"name": "payType",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['payNumber']"
+										},
+										"sink": {
+											"name": "payNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['masterPolicy']"
+										},
+										"sink": {
+											"name": "masterPolicy",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['supervisorName']"
+										},
+										"sink": {
+											"name": "supervisorName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeCostCentre']"
+										},
+										"sink": {
+											"name": "employeeCostCentre",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['allocationGroup']"
+										},
+										"sink": {
+											"name": "allocationGroup",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shiftlessPattern']"
+										},
+										"sink": {
+											"name": "shiftlessPattern",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['defaultBalanceCategory']"
+										},
+										"sink": {
+											"name": "defaultBalanceCategory",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeGender']"
+										},
+										"sink": {
+											"name": "employeeGender",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['healthcareBankGroup']"
+										},
+										"sink": {
+											"name": "healthcareBankGroup",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['healthcareBankStatus']"
+										},
+										"sink": {
+											"name": "healthcareBankStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['selfRosteringGroup']"
+										},
+										"sink": {
+											"name": "selfRosteringGroup",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['nextofKinContact']"
+										},
+										"sink": {
+											"name": "nextofKinContact",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['nextofKinTel.Number']"
+										},
+										"sink": {
+											"name": "nextofKinTel.Number",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['nextofKinRelationship']"
+										},
+										"sink": {
+											"name": "nextofKinRelationship",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['telephoneNo']"
+										},
+										"sink": {
+											"name": "telephoneNo",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['username']"
+										},
+										"sink": {
+											"name": "username",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['nameAsSupervisor']"
+										},
+										"sink": {
+											"name": "nameAsSupervisor",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['address1']"
+										},
+										"sink": {
+											"name": "address1",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['address2']"
+										},
+										"sink": {
+											"name": "address2",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['address3']"
+										},
+										"sink": {
+											"name": "address3",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['address4']"
+										},
+										"sink": {
+											"name": "address4",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['postcode']"
+										},
+										"sink": {
+											"name": "postcode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['nINumber']"
+										},
+										"sink": {
+											"name": "nINumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['accountName']"
+										},
+										"sink": {
+											"name": "accountName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sortCode']"
+										},
+										"sink": {
+											"name": "sortCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['accountNumber']"
+										},
+										"sink": {
+											"name": "accountNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['item']"
+										},
+										"sink": {
+											"name": "item",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['notes']"
+										},
+										"sink": {
+											"name": "notes",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['documentReference']"
+										},
+										"sink": {
+											"name": "documentReference",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['documentName']"
+										},
+										"sink": {
+											"name": "documentName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['jobTitle']"
+										},
+										"sink": {
+											"name": "jobTitle",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sickLeaveEntitlement']"
+										},
+										"sink": {
+											"name": "sickLeaveEntitlement",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['holidayEntitlement']"
+										},
+										"sink": {
+											"name": "holidayEntitlement",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['modeofTransport']"
+										},
+										"sink": {
+											"name": "modeofTransport",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['homeLegalName']"
+										},
+										"sink": {
+											"name": "homeLegalName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['reviewDate']"
+										},
+										"sink": {
+											"name": "reviewDate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['isSupervisor']"
+										},
+										"sink": {
+											"name": "isSupervisor",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['salaried']"
+										},
+										"sink": {
+											"name": "salaried",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['costCentre']"
+										},
+										"sink": {
+											"name": "costCentre",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['deptExportCode']"
+										},
+										"sink": {
+											"name": "deptExportCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['deptImportCode']"
+										},
+										"sink": {
+											"name": "deptImportCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['comments']"
+										},
+										"sink": {
+											"name": "comments",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['softworksID']"
+										},
+										"sink": {
+											"name": "softworksID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName"
+										}
+									}
+								],
+								"collectionReference": "$['Employees']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('EmployeeListFile')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB_SoftWorks_Employee_JSON",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Upsert to Tables",
+						"description": "Upsert data from Softworks.Employee_JSON table to the Softworks.Employee table, converting several of the data types in the process. Uses the EmployeeNumber as the Key Field.",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Copy Employee JSON Data to SQL",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_SoftWorks_JSON_Employee",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"EmployeeJSONTable": {},
+									"ClockingsJSONTable": {},
+									"EmployeeTable": {},
+									"ClockingsTable": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "Copy Clockings JSON data to SQL",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Clockings File",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE SoftWorks.Clockings_JSON",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['empNo']"
+										},
+										"sink": {
+											"name": "empNo",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clockId']"
+										},
+										"sink": {
+											"name": "clockId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['absId']"
+										},
+										"sink": {
+											"name": "absId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['deptId']"
+										},
+										"sink": {
+											"name": "deptId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['jobId']"
+										},
+										"sink": {
+											"name": "jobId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['projId']"
+										},
+										"sink": {
+											"name": "projId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['absoluteClockTime']"
+										},
+										"sink": {
+											"name": "absoluteClockTime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clockType']"
+										},
+										"sink": {
+											"name": "clockType",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clocDate']"
+										},
+										"sink": {
+											"name": "clocDate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clockTime']"
+										},
+										"sink": {
+											"name": "clockTime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['seconds']"
+										},
+										"sink": {
+											"name": "seconds",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['effectiveDate']"
+										},
+										"sink": {
+											"name": "effectiveDate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clockDuration']"
+										},
+										"sink": {
+											"name": "clockDuration",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['application']"
+										},
+										"sink": {
+											"name": "application",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sourceType']"
+										},
+										"sink": {
+											"name": "sourceType",
+											"type": "Int64"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sourceData']"
+										},
+										"sink": {
+											"name": "sourceData",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sourceEdit']"
+										},
+										"sink": {
+											"name": "sourceEdit",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sourceClockingType']"
+										},
+										"sink": {
+											"name": "sourceClockingType",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['longitude']"
+										},
+										"sink": {
+											"name": "longitude",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['latitude']"
+										},
+										"sink": {
+											"name": "latitude",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['accuracy']"
+										},
+										"sink": {
+											"name": "accuracy",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['decision']"
+										},
+										"sink": {
+											"name": "decision",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['delCode']"
+										},
+										"sink": {
+											"name": "delCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['userId']"
+										},
+										"sink": {
+											"name": "userId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['dateEntered']"
+										},
+										"sink": {
+											"name": "dateEntered",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['deleted']"
+										},
+										"sink": {
+											"name": "deleted",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['duplicate']"
+										},
+										"sink": {
+											"name": "duplicate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['ignore']"
+										},
+										"sink": {
+											"name": "ignore",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['inOut']"
+										},
+										"sink": {
+											"name": "inOut",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['inClocking']"
+										},
+										"sink": {
+											"name": "inClocking",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['outClocking']"
+										},
+										"sink": {
+											"name": "outClocking",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['isActive']"
+										},
+										"sink": {
+											"name": "isActive",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['new']"
+										},
+										"sink": {
+											"name": "new",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['standard']"
+										},
+										"sink": {
+											"name": "standard",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['overtime']"
+										},
+										"sink": {
+											"name": "overtime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['callIn']"
+										},
+										"sink": {
+											"name": "callIn",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['clockFlag']"
+										},
+										"sink": {
+											"name": "clockFlag",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['edited']"
+										},
+										"sink": {
+											"name": "edited",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['calcInsert']"
+										},
+										"sink": {
+											"name": "calcInsert",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['infringe']"
+										},
+										"sink": {
+											"name": "infringe",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['previous']"
+										},
+										"sink": {
+											"name": "previous",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['problem']"
+										},
+										"sink": {
+											"name": "problem",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['twUser']"
+										},
+										"sink": {
+											"name": "twUser",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shiftMove']"
+										},
+										"sink": {
+											"name": "shiftMove",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['showFlags']"
+										},
+										"sink": {
+											"name": "showFlags",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['showLongFlags']"
+										},
+										"sink": {
+											"name": "showLongFlags",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['isOverMidnight']"
+										},
+										"sink": {
+											"name": "isOverMidnight",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['deviceTime']"
+										},
+										"sink": {
+											"name": "deviceTime",
+											"type": "Int64"
+										}
+									},
+									{
+										"source": {
+											"path": "[['TimeZone']"
+										},
+										"sink": {
+											"name": "TimeZone",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['TimeZoneCod']"
+										},
+										"sink": {
+											"name": "TimeZoneCod",
+											"type": "Int64"
+										}
+									},
+									{
+										"source": {
+											"path": "[['PrevAbsTime']"
+										},
+										"sink": {
+											"name": "PrevAbsTime",
+											"type": "Int64"
+										}
+									},
+									{
+										"source": {
+											"path": "[['ReasonId']"
+										},
+										"sink": {
+											"name": "ReasonId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['Comments']"
+										},
+										"sink": {
+											"name": "Comments",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['ApprovalState']"
+										},
+										"sink": {
+											"name": "ApprovalState",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['ApprovalStateCaption']"
+										},
+										"sink": {
+											"name": "ApprovalStateCaption",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['PrevApprovalState']"
+										},
+										"sink": {
+											"name": "PrevApprovalState",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['LocationText']"
+										},
+										"sink": {
+											"name": "LocationText",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['LocationEditText']"
+										},
+										"sink": {
+											"name": "LocationEditText",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['LocationTextExtended']"
+										},
+										"sink": {
+											"name": "LocationTextExtended",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['Offline']"
+										},
+										"sink": {
+											"name": "Offline",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['AttachedDocumentId']"
+										},
+										"sink": {
+											"name": "AttachedDocumentId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['AssumedId']"
+										},
+										"sink": {
+											"name": "AssumedId",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['Clockings']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('ClockingsFile')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Set EmployeeList File",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Copy Clockings JSON data to SQL",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EmployeeListFile",
+							"value": {
+								"value": "@concat('EmployeeList$', formatDateTime(utcNow(), 'dd-MM-yyyy'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Clockings File",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ClockingsFile",
+							"value": {
+								"value": "@concat('Clockings$', formatDateTime(subtractFromTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 6, 'Day'), 'dd-MM-yyyy'), '$', formatDateTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 'dd-MM-yyyy'))",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EmployeeListFile": {
+						"type": "String"
+					},
+					"ClockingsFile": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Softworks/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-10T11:21:25Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Weekly_Mon_6AM')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Once a week, Monday at 6am",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_ColdHarbour_Rooms",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2024-09-06T10:38:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								6
+							],
+							"weekDays": [
+								"Monday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_10-15pm')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Scheduled to trigger once at 10:15pm, Everyday",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_AEMS_BackupToAveryTables",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					},
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Hydra_Output_File",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2024-05-30T11:15:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								15
+							],
+							"hours": [
+								22
+							],
+							"weekDays": [
+								"Sunday",
+								"Monday",
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday",
+								"Saturday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Softworks')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Employees",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_SoftWorks_API_Employee",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Clockings",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Employees",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_SoftWorks_API_Clockings",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Load data to TRANSFORM_DB",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Clockings",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Softworks_JSON_SQL",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Softworks"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-05T14:58:56Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Softworks_JSON_SQL')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_1-30am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Every day at 1:30 AM",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_AEMS_Pre_Transfer_Clear",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					},
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Broadshield_Process_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2024-04-09T11:51:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								1
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_11-45pm')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -83,7 +2028,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_CareBlox_Download')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_3am')]",
@@ -164,7 +2111,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Pricing')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_10pm')]",
@@ -236,7 +2185,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Homes')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_9pm')]",
@@ -320,7 +2271,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Exchequer_CompanyAccessAudit')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_5am')]",
@@ -363,7 +2316,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Softworks')]"
+			]
 		}
 	]
 }
