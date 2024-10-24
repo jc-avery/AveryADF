@@ -13,6 +13,200 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Broadshield_Process_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Uses the daily Json files from Broadshield API to update the Current table with an Upsert operation. And add new/updated records to the History tables.",
+				"activities": [
+					{
+						"name": "Update Current data",
+						"description": "Upserts data from the JSON files to the current tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_BroadShield_JSON_SQL_Current",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Create History records",
+						"description": "Inserts any new or updated records into the history tables.",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Update Current data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_BroadShield_JSON_SQL_History",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Broadshield"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-08T10:01:01Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Data_Load')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies the Parquet files from the Azure file share to Azure blob storage. Then copies data from the files and loads into the TRANSFROM_DB",
+				"activities": [
+					{
+						"name": "Copy Files to Blob Storage",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Clear Stage Tables_copy1",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-parquet-copy",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Import data to Stage tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Copy Files to Blob Storage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-parquet-load-STG",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Upsert to tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Import data to Stage tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-SQL-upsert",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Clear Stage Tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Upsert to tables",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox_Clear_STGTables",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Clear Stage Tables_copy1",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox_Clear_STGTables",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Careblox"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-09-26T11:05:27Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1955,7 +2149,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Broadshield_Process_Data')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_11-45pm')]",
@@ -2067,7 +2263,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_CareBlox_Data_Load')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_6AM')]",

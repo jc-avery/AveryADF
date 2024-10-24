@@ -13,6 +13,404 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_Courses')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Courses Data",
+						"description": "Connects to Myrus API Courses end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Courses File Name",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API",
+								"type": "DatasetReference",
+								"parameters": {
+									"Date": {
+										"value": "@variables('API_Date')",
+										"type": "Expression"
+									},
+									"Endpoint": "courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('UsersFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Courses File Name",
+						"description": "Sets the name of the file to be used in the sink data set",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Date for API Call",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "UsersFileName",
+							"value": {
+								"value": "@concat('Courses', '$', formatDateTime(utcNow(), 'dd-MM-yyyy'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Date for API Call",
+						"description": "Sets the API query date to previous day at 11:59:59 to capture any changes made since",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "API_Date",
+							"value": {
+								"value": "@concat(formatDateTime(subtractFromTime(utcNow(), 1, 'Day'), 'yyyyMMdd'), '115959')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Download Failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Download Courses Data",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": {
+									"value": "@activity('Download Courses Data').output.errors[0].Message",
+									"type": "Expression"
+								},
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Download Courses Data"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"UsersFileName": {
+						"type": "String"
+					},
+					"API_Date": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-03T15:30:34Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_Download_AllData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Coursesdata",
+						"description": "Connects to Myrus API Courses end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": "courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllCoursesData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Download Users data",
+						"description": "Connects to Myrus API user end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Download Coursesdata",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": "users"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUsersData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Download User Course data",
+						"description": "Connects to Myrus API user-course end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Date for Usercourse endpoint",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:08:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API",
+								"type": "DatasetReference",
+								"parameters": {
+									"Date": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									},
+									"Endpoint": "user-courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUser_CoursesData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Date for Usercourse endpoint",
+						"description": "Sets the date to be the 1st of the current year and assigns it to the API dataset",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Download Users data",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": "20210401090000"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-02T09:31:21Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_AllData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3243,7 +3641,7 @@
 			"properties": {
 				"activities": [
 					{
-						"name": "Create-update file",
+						"name": "Create-update Locations file",
 						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
@@ -3296,7 +3694,7 @@
 						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Create-update file",
+								"activity": "Create-update Locations file",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -3349,7 +3747,7 @@
 						]
 					},
 					{
-						"name": "Copy custom schema to fileshare",
+						"name": "Copy custom Location schema to fileshare",
 						"type": "Copy",
 						"dependsOn": [
 							{
@@ -3392,7 +3790,177 @@
 						},
 						"inputs": [
 							{
-								"referenceName": "DS_CQC_CustomJSONSchema",
+								"referenceName": "DS_CQC_CustomLocationJSONSchema",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestaStorageAcc_Fileshare_Json",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Create-update Provider file",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy custom Location schema to fileshare",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT DISTINCT provider_id AS providerID FROM reports.cqc_rating ORDER BY 1",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings",
+									"filePattern": "arrayOfObjects"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_CQC_ProviderList",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Copy Provider file to fileshare",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Create-update Provider file",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_CQC_ProviderList",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestaStorageAcc_Fileshare_Json",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Copy Custom Provider schema to to fileshare",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy Provider file to fileshare",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_CQC_CustomProviderJSONSchema",
 								"type": "DatasetReference",
 								"parameters": {}
 							}
@@ -7662,7 +8230,7 @@
 							}
 						],
 						"policy": {
-							"timeout": "0.00:10:00",
+							"timeout": "0.00:15:00",
 							"retry": 0,
 							"retryIntervalInSeconds": 30,
 							"secureOutput": false,
@@ -11541,392 +12109,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-09-05T11:40:20Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_RoomsWithInHomeResidents')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies data from the view in Polestar to Avery DB. Lists all rooms in CH and the active resident record assigned to that home",
-				"activities": [
-					{
-						"name": "Refresh Data",
-						"description": "Truncates table in Avery DB and Inserts data from Polestar DB using the view.",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    [ROOM_REF]\n    ,[ROOM_CODE]\n    ,[ROOM_DESC]\n    ,[USEFLAG]\n    ,[HOME_REF]\n    ,[RES_REF]\n    ,[RES_CODE]\n    ,[ResidentStatus]\n    ,[Firstname]\n    ,[Surname]\n    ,[AdmissionAnalysis]\n    ,[AdmissionType]\n    ,[ResidentAdmissionReason]\n    ,[AnalysisGroup]\n    ,ResidentsAssigned\nFROM \n    [dbo].[vRoomsWithInHomeResidentDetails]\nORDER BY\n    Home_Ref ASC,\n    ROOM_Ref ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE ColdHarbour.RoomsWithInHomeResidentDetails",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ResidentStatus",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ResidentStatus",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Firstname",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Firstname",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AdmissionAnalysis",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AdmissionAnalysis",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AdmissionType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AdmissionType",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ResidentAdmissionReason",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ResidentAdmissionReason",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AnalysisGroup",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AnalysisGroup",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ResidentsAssigned",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ResidentsAssigned",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_Polestar",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "RoomsWithInHomeResidentDetails"
-								}
-							}
-						]
-					},
-					{
-						"name": "Update Room Occupancy",
-						"description": "Updates the Pricing.Room tables occupancy using the refreshed data",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [
-							{
-								"activity": "Refresh Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[Pricing].[Update$RoomOccupancyFromCH]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_Avery",
-							"type": "LinkedServiceReference"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery/Children Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-10T09:21:26Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Fileshare')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Moves the exported csv file from the Azure File Share to Azure Storage Container. The file contains list of Exchequer companies and the users with access to it",
-				"activities": [
-					{
-						"name": "Copy CSV",
-						"description": "Copy CSV file to Exchequer Azure Container",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureFileStorageReadSettings",
-									"recursive": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Fileshare_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Delete File from File Share",
-						"type": "Delete",
-						"dependsOn": [
-							{
-								"activity": "Copy CSV",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_PolestarStorageAcc_Fileshare_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {}
-							},
-							"enableLogging": false,
-							"storeSettings": {
-								"type": "AzureFileStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer/Child Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-06-26T11:47:51Z"
 			},
 			"dependsOn": []
 		}

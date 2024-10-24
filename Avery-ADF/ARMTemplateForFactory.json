@@ -27,6 +27,10 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'connectionString' of 'AH2_TRANSFORM_DB'"
 		},
+		"AH2_YardiStage_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'AH2_YardiStage'"
+		},
 		"AveryArtisan_Artisan_password": {
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'AveryArtisan_Artisan'"
@@ -59,10 +63,6 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'Softworks_API'"
 		},
-		"AH2_YardiStage_password": {
-			"type": "secureString",
-			"metadata": "Secure string for 'password' of 'AH2_YardiStage'"
-		},
 		"AH2_Agency_properties_typeProperties_server": {
 			"type": "string",
 			"defaultValue": "averyhealthcare2.database.windows.net"
@@ -84,6 +84,18 @@
 			"defaultValue": "Polestar"
 		},
 		"AH2_Polestar_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "ADF_User"
+		},
+		"AH2_YardiStage_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "averyhealthcare2.database.windows.net"
+		},
+		"AH2_YardiStage_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "YardiStage"
+		},
+		"AH2_YardiStage_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "ADF_User"
 		},
@@ -154,18 +166,6 @@
 		"Softworks_API_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "AHC23"
-		},
-		"AH2_YardiStage_properties_typeProperties_server": {
-			"type": "string",
-			"defaultValue": "averyhealthcare2.database.windows.net"
-		},
-		"AH2_YardiStage_properties_typeProperties_database": {
-			"type": "string",
-			"defaultValue": "YardiStage"
-		},
-		"AH2_YardiStage_properties_typeProperties_userName": {
-			"type": "string",
-			"defaultValue": "ADF_User"
 		}
 	},
 	"variables": {
@@ -13006,7 +13006,7 @@
 			"properties": {
 				"activities": [
 					{
-						"name": "Create-update file",
+						"name": "Create-update Locations file",
 						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
@@ -13059,7 +13059,7 @@
 						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Create-update file",
+								"activity": "Create-update Locations file",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -13112,7 +13112,7 @@
 						]
 					},
 					{
-						"name": "Copy custom schema to fileshare",
+						"name": "Copy custom Location schema to fileshare",
 						"type": "Copy",
 						"dependsOn": [
 							{
@@ -13155,7 +13155,177 @@
 						},
 						"inputs": [
 							{
-								"referenceName": "DS_CQC_CustomJSONSchema",
+								"referenceName": "DS_CQC_CustomLocationJSONSchema",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestaStorageAcc_Fileshare_Json",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Create-update Provider file",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy custom Location schema to fileshare",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT DISTINCT provider_id AS providerID FROM reports.cqc_rating ORDER BY 1",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings",
+									"filePattern": "arrayOfObjects"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_CQC_ProviderList",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Copy Provider file to fileshare",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Create-update Provider file",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_CQC_ProviderList",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestaStorageAcc_Fileshare_Json",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Copy Custom Provider schema to to fileshare",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy Provider file to fileshare",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_CQC_CustomProviderJSONSchema",
 								"type": "DatasetReference",
 								"parameters": {}
 							}
@@ -13181,7 +13351,9 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
 				"[concat(variables('factoryId'), '/datasets/DS_CQC_HomeLocationList')]",
 				"[concat(variables('factoryId'), '/datasets/DS_PolestaStorageAcc_Fileshare_Json')]",
-				"[concat(variables('factoryId'), '/datasets/DS_CQC_CustomJSONSchema')]"
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_CustomLocationJSONSchema')]",
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_ProviderList')]",
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_CustomProviderJSONSchema')]"
 			]
 		},
 		{
@@ -17450,7 +17622,7 @@
 							}
 						],
 						"policy": {
-							"timeout": "0.00:10:00",
+							"timeout": "0.00:15:00",
 							"retry": 0,
 							"retryIntervalInSeconds": 30,
 							"secureOutput": false,
@@ -22142,6 +22314,982 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_GRG_Residents')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy GRG Resident data",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ADANAL_DEC",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ADANAL_DEC",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ADDRESS1",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADDRESS1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADDRESS2",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADDRESS2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADDRESS3",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADDRESS3",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADDRESS4",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADDRESS4",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADMSN_ANAL",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADMSN_ANAL",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADMSN_TYPE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADMSN_TYPE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADM_REASON",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ADM_REASON",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ADTYP_DEC",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ADTYP_DEC",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ANAL_GROUP",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ANAL_GROUP",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AUTHORITY",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AUTHORITY",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AmendDateTime",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "AmendDateTime",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "BIRTHDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "BIRTHDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "CARECAT",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CARECAT",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CONTSIGNED",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "CONTSIGNED",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "CreateDateTime",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "CreateDateTime",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "DISABILITY",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DISABILITY",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ENQ_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ENQ_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HOME",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HOME",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "LASTADDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "LASTADDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "LASTDIDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "LASTDIDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "LOC_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "LOC_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "LOC_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "LOC_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "MARKETING",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "MARKETING",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "NINUMBER",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "NINUMBER",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "OCC_IGNORE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "OCC_IGNORE",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "ORES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ORES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ORIGADDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ORIGADDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "POSTCODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "POSTCODE",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "RELIGION",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RELIGION",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RESPAYINT",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RESPAYINT",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_FNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RES_FNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "RES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_SNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RES_SNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "ROOM",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOMCAT",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOMCAT",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_TYPE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "ROOM_TYPE",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "SEX",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "SEX",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "STATUS",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "STATUS",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TEL_NO1",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TEL_NO1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TEL_NO2",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TEL_NO2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TITLE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TITLE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "USERDEF",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "USERDEF",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AUTHCODE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AUTHCODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DOUBLEINS",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "DOUBLEINS",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "FIRSTAWARE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "FIRSTAWARE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "FIRSTVISIT",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "FIRSTVISIT",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "REAL_FNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "REAL_FNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "REAL_SNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "REAL_SNAME",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "REAL_TITLE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "REAL_TITLE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "SIGIND",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "SIGIND",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "THIRDPARTY",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "THIRDPARTY",
+											"type": "String",
+											"physicalType": "char"
+										}
+									},
+									{
+										"source": {
+											"name": "USERFIELD1",
+											"type": "String",
+											"physicalType": "text"
+										},
+										"sink": {
+											"name": "USERFIELD1",
+											"type": "String",
+											"physicalType": "text"
+										}
+									},
+									{
+										"source": {
+											"name": "USERFIELD2",
+											"type": "String",
+											"physicalType": "text"
+										},
+										"sink": {
+											"name": "USERFIELD2",
+											"type": "String",
+											"physicalType": "text"
+										}
+									},
+									{
+										"source": {
+											"name": "USERFIELD3",
+											"type": "String",
+											"physicalType": "text"
+										},
+										"sink": {
+											"name": "USERFIELD3",
+											"type": "String",
+											"physicalType": "text"
+										}
+									},
+									{
+										"source": {
+											"name": "NHSNUMBER",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "NHSNUMBER",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ALTCOMMS",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ALTCOMMS",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ALTCOMMS_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ALTCOMMS_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ASS_ACTBY",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ASS_ACTBY",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ASS_ACTBY_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ASS_ACTBY_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ASS_ACTDT",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ASS_ACTDT",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "CONNECTION",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CONNECTION",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CONNECTIONDET",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CONNECTIONDET",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CONNECTION_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "CONNECTION_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "FUNDERREF",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "FUNDERREF",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "LANGUAGE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "LANGUAGE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "LANGUAGE_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "LANGUAGE_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "MOVEDINFROM",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "MOVEDINFROM",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "MOVEDINFROM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "MOVEDINFROM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "PATIENTREF",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "PATIENTREF",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "PICID",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "PICID",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "PREVCODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "PREVCODE",
+											"type": "String",
+											"physicalType": "char"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Polestar",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Resident"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "GRG",
+									"Table": "Resident"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Yardi"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_Polestar')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Homes')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -22967,6 +24115,659 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_CareBlox_Container')]",
 				"[concat(variables('factoryId'), '/datasets/DS_CareBlox_Container_SubFolder')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Res_Forms')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy Res Forms Data",
+						"description": "AH1 Avery - AH2 YardiStage",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "SET IDENTITY_INSERT dbo.Res_Forms ON",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ID",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 18
+										},
+										"sink": {
+											"name": "ID",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 18
+										}
+									},
+									{
+										"source": {
+											"name": "res_no",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "res_no",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "forename",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "forename",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "surname",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "surname",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "intranet",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "intranet",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "change_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "change_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "admitted_from",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "admitted_from",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tested_prior_last",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "tested_prior_last",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tested_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "tested_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "tested_where",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "tested_where",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tested_result",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "tested_result",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "symptomatic",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "symptomatic",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "symptomatic_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "symptomatic_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "isolation_Date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "isolation_Date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "isolation_end_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "isolation_end_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "days_isolated",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "days_isolated",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "protocol_followed",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "protocol_followed",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "hospital_prior",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "hospital_prior",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Hospital_lastdate",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "Hospital_lastdate",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "hospital_duration",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "hospital_duration",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "hospital_tested",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "hospital_tested",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "hospital_tested_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "hospital_tested_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "hospital_rest_result",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "hospital_rest_result",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "form_type",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "form_type",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "status",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "status",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "room_no",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "room_no",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "funding_change",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "funding_change",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "dilaps_charge",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "dilaps_charge",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "comp_by",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "comp_by",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "comp_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "comp_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "SL_Chk_by",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "SL_Chk_by",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "SL_chk_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "SL_chk_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "discharge_reason",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "discharge_reason",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "comments",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "comments",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "dob",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "dob",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "SL_comments",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "SL_comments",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "NHS_No",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "NHS_No",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Nurs_res",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "Nurs_res",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Resp_Perm",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "Resp_Perm",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "disch_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "disch_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "paymentonadm",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 18
+										},
+										"sink": {
+											"name": "paymentonadm",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 18
+										}
+									},
+									{
+										"source": {
+											"name": "NSHIDno",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "NSHIDno",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "fee",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 7
+										},
+										"sink": {
+											"name": "fee",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 7
+										}
+									},
+									{
+										"source": {
+											"name": "Date_Complete",
+											"type": "DateTimeOffset",
+											"physicalType": "datetimeoffset"
+										},
+										"sink": {
+											"name": "Date_Complete",
+											"type": "DateTimeOffset",
+											"physicalType": "datetimeoffset"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Res_Forms"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Res_Forms"
+								}
+							}
+						]
+					},
+					{
+						"name": "SET IDENTITY INSERT OF",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Copy Res Forms Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_YardiStage",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "SET IDENTITY_INSERT dbo.Res_Forms OFF"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Yardi"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_YardiStage')]"
 			]
 		},
 		{
@@ -30464,6 +32265,44 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_AH2_YardiStage')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AH2_YardiStage",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Schema": {
+						"type": "string"
+					},
+					"Table": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "YardiStage"
+				},
+				"annotations": [],
+				"type": "AzureSqlTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AH2_YardiStage')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_AZStorage_careblox_parquet')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -30904,7 +32743,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/DS_CQC_CustomJSONSchema')]",
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_CustomLocationJSONSchema')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -30920,7 +32759,294 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureBlobStorageLocation",
-						"fileName": "CustomJsonSchema.json",
+						"fileName": "CustomLocationJsonSchema.json",
+						"folderPath": "customjsonschema",
+						"container": "cqc"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"locationId": {
+							"type": "string"
+						},
+						"providerId": {
+							"type": "string"
+						},
+						"organisationType": {
+							"type": "string"
+						},
+						"type": {
+							"type": "string"
+						},
+						"name": {
+							"type": "string"
+						},
+						"brandId": {
+							"type": "string"
+						},
+						"brandName": {
+							"type": "string"
+						},
+						"onspdCcgCode": {
+							"type": "string"
+						},
+						"onspdCcgName": {
+							"type": "string"
+						},
+						"onspdIcbCode": {
+							"type": "string"
+						},
+						"onspdIcbName": {
+							"type": "string"
+						},
+						"odsCode": {
+							"type": "string"
+						},
+						"registrationStatus": {
+							"type": "string"
+						},
+						"registrationDate": {
+							"type": "string"
+						},
+						"dormancy": {
+							"type": "string"
+						},
+						"onspdLatitude": {
+							"type": "number"
+						},
+						"onspdLongitude": {
+							"type": "number"
+						},
+						"careHome": {
+							"type": "string"
+						},
+						"inspectionDirectorate": {
+							"type": "string"
+						},
+						"postalAddressLine1": {
+							"type": "string"
+						},
+						"postalAddressTownCity": {
+							"type": "string"
+						},
+						"postalAddressCounty": {
+							"type": "string"
+						},
+						"region": {
+							"type": "string"
+						},
+						"postalCode": {
+							"type": "string"
+						},
+						"uprn": {
+							"type": "string"
+						},
+						"mainPhoneNumber": {
+							"type": "string"
+						},
+						"registeredManagerAbsentDate": {
+							"type": "string"
+						},
+						"website": {
+							"type": "string"
+						},
+						"numberOfBeds": {
+							"type": "integer"
+						},
+						"constituency": {
+							"type": "string"
+						},
+						"localAuthority": {
+							"type": "string"
+						},
+						"lastInspection": {
+							"type": "object",
+							"properties": {
+								"date": {
+									"type": "string"
+								}
+							}
+						},
+						"lastReport": {
+							"type": "object",
+							"properties": {
+								"publicationDate": {
+									"type": "string"
+								}
+							}
+						},
+						"historicRatings": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"reportDate": {
+										"type": "string"
+									},
+									"reportLinkId": {
+										"type": "string"
+									},
+									"overall": {
+										"type": "object",
+										"properties": {
+											"rating": {
+												"type": "string"
+											},
+											"keyQuestionRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"name": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"currentRatings": {
+							"type": "object",
+							"properties": {
+								"overall": {
+									"type": "object",
+									"properties": {
+										"rating": {
+											"type": "string"
+										},
+										"reportDate": {
+											"type": "string"
+										},
+										"reportLinkId": {
+											"type": "string"
+										},
+										"keyQuestionRatings": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string"
+													},
+													"rating": {
+														"type": "string"
+													},
+													"reportDate": {
+														"type": "string"
+													},
+													"reportLinkId": {
+														"type": "string"
+													}
+												}
+											}
+										}
+									}
+								},
+								"reportDate": {
+									"type": "string"
+								}
+							}
+						},
+						"assessment": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"assessmentPlanPublishedDateTime": {
+										"type": "string"
+									},
+									"ratings": {
+										"type": "object",
+										"properties": {
+											"asgRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"assessmentPlanId": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														},
+														"assessmentDate": {
+															"type": "string"
+														},
+														"assessmentPlanStatus": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														},
+														"status": {
+															"type": "string"
+														},
+														"narrative": {
+															"type": "string"
+														},
+														"keyQuestionRatings": {
+															"type": "array",
+															"items": {
+																"type": "object",
+																"properties": {
+																	"name": {
+																		"type": "string"
+																	},
+																	"rating": {
+																		"type": "string"
+																	},
+																	"status": {
+																		"type": "string"
+																	},
+																	"narrative": {
+																		"type": "string"
+																	},
+																	"percentageScore": {
+																		"type": "string"
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_CustomProviderJSONSchema')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "CQC"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "CustomProviderJsonSchema.json",
 						"folderPath": "customjsonschema",
 						"container": "cqc"
 					}
@@ -31645,6 +33771,723 @@
 							"type": "Expression"
 						},
 						"container": "cqc"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_Merged_File')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "CQC"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('locationresponses', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd'), '/', 'merged')",
+							"type": "Expression"
+						},
+						"container": "cqc"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"locationId": {
+							"type": "string"
+						},
+						"providerId": {
+							"type": "string"
+						},
+						"organisationType": {
+							"type": "string"
+						},
+						"type": {
+							"type": "string"
+						},
+						"name": {
+							"type": "string"
+						},
+						"brandId": {
+							"type": "string"
+						},
+						"brandName": {
+							"type": "string"
+						},
+						"onspdCcgCode": {
+							"type": "string"
+						},
+						"onspdCcgName": {
+							"type": "string"
+						},
+						"onspdIcbCode": {
+							"type": "string"
+						},
+						"onspdIcbName": {
+							"type": "string"
+						},
+						"odsCode": {
+							"type": "string"
+						},
+						"registrationStatus": {
+							"type": "string"
+						},
+						"registrationDate": {
+							"type": "string"
+						},
+						"dormancy": {
+							"type": "string"
+						},
+						"onspdLatitude": {
+							"type": "number"
+						},
+						"onspdLongitude": {
+							"type": "number"
+						},
+						"careHome": {
+							"type": "string"
+						},
+						"inspectionDirectorate": {
+							"type": "string"
+						},
+						"postalAddressLine1": {
+							"type": "string"
+						},
+						"postalAddressTownCity": {
+							"type": "string"
+						},
+						"postalAddressCounty": {
+							"type": "string"
+						},
+						"region": {
+							"type": "string"
+						},
+						"postalCode": {
+							"type": "string"
+						},
+						"uprn": {
+							"type": "string"
+						},
+						"mainPhoneNumber": {
+							"type": "string"
+						},
+						"registeredManagerAbsentDate": {
+							"type": "string"
+						},
+						"website": {
+							"type": "string"
+						},
+						"numberOfBeds": {
+							"type": "integer"
+						},
+						"constituency": {
+							"type": "string"
+						},
+						"localAuthority": {
+							"type": "string"
+						},
+						"lastInspection": {
+							"type": "object",
+							"properties": {
+								"date": {
+									"type": "string"
+								}
+							}
+						},
+						"lastReport": {
+							"type": "object",
+							"properties": {
+								"publicationDate": {
+									"type": "string"
+								}
+							}
+						},
+						"historicRatings": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"reportDate": {
+										"type": "string"
+									},
+									"reportLinkId": {
+										"type": "string"
+									},
+									"overall": {
+										"type": "object",
+										"properties": {
+											"rating": {
+												"type": "string"
+											},
+											"keyQuestionRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"name": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"currentRatings": {
+							"type": "object",
+							"properties": {
+								"overall": {
+									"type": "object",
+									"properties": {
+										"rating": {
+											"type": "string"
+										},
+										"reportDate": {
+											"type": "string"
+										},
+										"reportLinkId": {
+											"type": "string"
+										},
+										"keyQuestionRatings": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string"
+													},
+													"rating": {
+														"type": "string"
+													},
+													"reportDate": {
+														"type": "string"
+													},
+													"reportLinkId": {
+														"type": "string"
+													}
+												}
+											}
+										}
+									}
+								},
+								"reportDate": {
+									"type": "string"
+								}
+							}
+						},
+						"assessment": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"assessmentPlanPublishedDateTime": {
+										"type": "string"
+									},
+									"ratings": {
+										"type": "object",
+										"properties": {
+											"asgRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"assessmentPlanId": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														},
+														"assessmentDate": {
+															"type": "string"
+														},
+														"assessmentPlanStatus": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														},
+														"status": {
+															"type": "string"
+														},
+														"narrative": {
+															"type": "string"
+														},
+														"keyQuestionRatings": {
+															"type": "array",
+															"items": {
+																"type": "object",
+																"properties": {
+																	"name": {
+																		"type": "string"
+																	},
+																	"rating": {
+																		"type": "string"
+																	},
+																	"status": {
+																		"type": "string"
+																	},
+																	"narrative": {
+																		"type": "string"
+																	},
+																	"percentageScore": {
+																		"type": "string"
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_ProviderList')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "CQC"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "ProviderIDs.json",
+						"folderPath": "providerlist",
+						"container": "cqc"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"locationId": {
+							"type": "string"
+						},
+						"providerId": {
+							"type": "string"
+						},
+						"organisationType": {
+							"type": "string"
+						},
+						"type": {
+							"type": "string"
+						},
+						"name": {
+							"type": "string"
+						},
+						"brandId": {
+							"type": "string"
+						},
+						"brandName": {
+							"type": "string"
+						},
+						"onspdCcgCode": {
+							"type": "string"
+						},
+						"onspdCcgName": {
+							"type": "string"
+						},
+						"onspdIcbCode": {
+							"type": "string"
+						},
+						"onspdIcbName": {
+							"type": "string"
+						},
+						"odsCode": {
+							"type": "string"
+						},
+						"registrationStatus": {
+							"type": "string"
+						},
+						"registrationDate": {
+							"type": "string"
+						},
+						"dormancy": {
+							"type": "string"
+						},
+						"onspdLatitude": {
+							"type": "number"
+						},
+						"onspdLongitude": {
+							"type": "number"
+						},
+						"careHome": {
+							"type": "string"
+						},
+						"inspectionDirectorate": {
+							"type": "string"
+						},
+						"postalAddressLine1": {
+							"type": "string"
+						},
+						"postalAddressTownCity": {
+							"type": "string"
+						},
+						"postalAddressCounty": {
+							"type": "string"
+						},
+						"region": {
+							"type": "string"
+						},
+						"postalCode": {
+							"type": "string"
+						},
+						"uprn": {
+							"type": "string"
+						},
+						"mainPhoneNumber": {
+							"type": "string"
+						},
+						"registeredManagerAbsentDate": {
+							"type": "string"
+						},
+						"website": {
+							"type": "string"
+						},
+						"numberOfBeds": {
+							"type": "integer"
+						},
+						"constituency": {
+							"type": "string"
+						},
+						"localAuthority": {
+							"type": "string"
+						},
+						"lastInspection": {
+							"type": "object",
+							"properties": {
+								"date": {
+									"type": "string"
+								}
+							}
+						},
+						"lastReport": {
+							"type": "object",
+							"properties": {
+								"publicationDate": {
+									"type": "string"
+								}
+							}
+						},
+						"relationships": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"relatedLocationId": {
+										"type": "string"
+									},
+									"relatedLocationName": {
+										"type": "string"
+									},
+									"type": {
+										"type": "string"
+									},
+									"reason": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"locationTypes": {
+							"type": "array"
+						},
+						"regulatedActivities": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string"
+									},
+									"code": {
+										"type": "string"
+									},
+									"contacts": {
+										"type": "array"
+									}
+								}
+							}
+						},
+						"gacServiceTypes": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string"
+									},
+									"description": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"specialisms": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"name": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"inspectionCategories": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"code": {
+										"type": "string"
+									},
+									"primary": {
+										"type": "string"
+									},
+									"name": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"inspectionAreas": {
+							"type": "array"
+						},
+						"historicRatings": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"reportDate": {
+										"type": "string"
+									},
+									"reportLinkId": {
+										"type": "string"
+									},
+									"overall": {
+										"type": "object",
+										"properties": {
+											"rating": {
+												"type": "string"
+											},
+											"keyQuestionRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"name": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"reports": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"linkId": {
+										"type": "string"
+									},
+									"reportDate": {
+										"type": "string"
+									},
+									"firstVisitDate": {
+										"type": "string"
+									},
+									"reportUri": {
+										"type": "string"
+									},
+									"reportType": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"assessmentServiceGroup": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"assessmentServiceId": {
+										"type": "string"
+									},
+									"assessmentServiceName": {
+										"type": "string"
+									},
+									"status": {
+										"type": "string"
+									}
+								}
+							}
+						},
+						"assessment": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"assessmentPlanPublishedDateTime": {
+										"type": "string"
+									},
+									"ratings": {
+										"type": "object",
+										"properties": {
+											"asgRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"assessmentPlanId": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														},
+														"assessmentDate": {
+															"type": "string"
+														},
+														"assessmentPlanStatus": {
+															"type": "string"
+														},
+														"name": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														},
+														"status": {
+															"type": "string"
+														},
+														"commentary": {
+															"type": "string"
+														},
+														"commentaryDate": {
+															"type": "string"
+														},
+														"narrative": {
+															"type": "string"
+														},
+														"overallPeopleExperience": {
+															"type": "string"
+														},
+														"overallPeopleExperienceDate": {
+															"type": "string"
+														},
+														"keyQuestionRatings": {
+															"type": "array",
+															"items": {
+																"type": "object",
+																"properties": {
+																	"name": {
+																		"type": "string"
+																	},
+																	"rating": {
+																		"type": "string"
+																	},
+																	"status": {
+																		"type": "string"
+																	},
+																	"commentary": {
+																		"type": "string"
+																	},
+																	"commentaryDate": {
+																		"type": "string"
+																	},
+																	"narrative": {
+																		"type": "string"
+																	},
+																	"percentageScore": {
+																		"type": "string"
+																	},
+																	"topicareas": {
+																		"type": "array",
+																		"items": {
+																			"type": "object",
+																			"properties": {
+																				"name": {
+																					"type": "string"
+																				},
+																				"qualityStatementId": {
+																					"type": "string"
+																				},
+																				"status": {
+																					"type": "string"
+																				},
+																				"evidenceCategory": {
+																					"type": "array",
+																					"items": {
+																						"type": "object",
+																						"properties": {
+																							"evidenceCategoryId": {
+																								"type": "string"
+																							},
+																							"commentary": {
+																								"type": "string"
+																							},
+																							"commentaryDate": {
+																								"type": "string"
+																							}
+																						}
+																					}
+																				},
+																				"qualityStatementscore": {
+																					"type": "string"
+																				}
+																			}
+																		}
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			},
@@ -32500,6 +35343,28 @@
 				"type": "AzureSqlDatabase",
 				"typeProperties": {
 					"connectionString": "[parameters('AH2_TRANSFORM_DB_connectionString')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AH2_YardiStage')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('AH2_YardiStage_properties_typeProperties_server')]",
+					"database": "[parameters('AH2_YardiStage_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('AH2_YardiStage_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('AH2_YardiStage_password')]"
+					}
 				}
 			},
 			"dependsOn": []
@@ -33728,1984 +36593,6 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Employee')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Res_Forms')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy Res Forms Data",
-						"description": "AH1 Avery - AH2 YardiStage",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "SET IDENTITY_INSERT dbo.Res_Forms ON",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ID",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 18
-										},
-										"sink": {
-											"name": "ID",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 18
-										}
-									},
-									{
-										"source": {
-											"name": "res_no",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "res_no",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "forename",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "forename",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "surname",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "surname",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "intranet",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "intranet",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "change_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "change_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "admitted_from",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "admitted_from",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_prior_last",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "tested_prior_last",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_where",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "tested_where",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_result",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "tested_result",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "symptomatic",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "symptomatic",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "symptomatic_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "symptomatic_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "isolation_Date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "isolation_Date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "isolation_end_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "isolation_end_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "days_isolated",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "days_isolated",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "protocol_followed",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "protocol_followed",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_prior",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "hospital_prior",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Hospital_lastdate",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "Hospital_lastdate",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_duration",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "hospital_duration",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_tested",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "hospital_tested",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "hospital_tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_rest_result",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "hospital_rest_result",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "form_type",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "form_type",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "status",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "status",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "room_no",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "room_no",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "funding_change",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "funding_change",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "dilaps_charge",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "dilaps_charge",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comp_by",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "comp_by",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comp_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "comp_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "SL_Chk_by",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "SL_Chk_by",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SL_chk_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "SL_chk_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "discharge_reason",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "discharge_reason",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comments",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "comments",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "dob",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "dob",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "SL_comments",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "SL_comments",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "NHS_No",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "NHS_No",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Nurs_res",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "Nurs_res",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Resp_Perm",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "Resp_Perm",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "disch_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "disch_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "paymentonadm",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 18
-										},
-										"sink": {
-											"name": "paymentonadm",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 18
-										}
-									},
-									{
-										"source": {
-											"name": "NSHIDno",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "NSHIDno",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "fee",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 7
-										},
-										"sink": {
-											"name": "fee",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 7
-										}
-									},
-									{
-										"source": {
-											"name": "Date_Complete",
-											"type": "DateTimeOffset",
-											"physicalType": "datetimeoffset"
-										},
-										"sink": {
-											"name": "Date_Complete",
-											"type": "DateTimeOffset",
-											"physicalType": "datetimeoffset"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH1_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Res_Forms"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Res_Forms"
-								}
-							}
-						]
-					},
-					{
-						"name": "SET IDENTITY INSERT OF",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Copy Res Forms Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_YardiStage",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "SET IDENTITY_INSERT dbo.Res_Forms OFF"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]",
-				"[concat(variables('factoryId'), '/linkedServices/AH2_YardiStage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AH2_YardiStage')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureSqlDatabase",
-				"typeProperties": {
-					"server": "[parameters('AH2_YardiStage_properties_typeProperties_server')]",
-					"database": "[parameters('AH2_YardiStage_properties_typeProperties_database')]",
-					"encrypt": "mandatory",
-					"trustServerCertificate": false,
-					"authenticationType": "SQL",
-					"userName": "[parameters('AH2_YardiStage_properties_typeProperties_userName')]",
-					"password": {
-						"type": "SecureString",
-						"value": "[parameters('AH2_YardiStage_password')]"
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_AH2_YardiStage')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "AH2_YardiStage",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Schema": {
-						"type": "string"
-					},
-					"Table": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "YardiStage"
-				},
-				"annotations": [],
-				"type": "AzureSqlTable",
-				"schema": [],
-				"typeProperties": {
-					"schema": {
-						"value": "@dataset().Schema",
-						"type": "Expression"
-					},
-					"table": {
-						"value": "@dataset().Table",
-						"type": "Expression"
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AH2_YardiStage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_GRG_Residents')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy GRG Resident data",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ADANAL_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ADANAL_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS1",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS3",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS3",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS4",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS4",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADMSN_ANAL",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADMSN_ANAL",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADMSN_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADMSN_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADM_REASON",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADM_REASON",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADTYP_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ADTYP_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ANAL_GROUP",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ANAL_GROUP",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AUTHORITY",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AUTHORITY",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "BIRTHDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "BIRTHDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "CARECAT",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CARECAT",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CONTSIGNED",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "CONTSIGNED",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "DISABILITY",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "DISABILITY",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ENQ_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ENQ_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "HOME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "LASTADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LASTADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LASTDIDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LASTDIDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LOC_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LOC_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LOC_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "LOC_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "MARKETING",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "MARKETING",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "NINUMBER",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "NINUMBER",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "OCC_IGNORE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "OCC_IGNORE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "ORES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ORES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ORIGADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ORIGADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "POSTCODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "POSTCODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "RELIGION",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RELIGION",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RESPAYINT",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RESPAYINT",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RES_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RES_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOMCAT",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOMCAT",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "SEX",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "SEX",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "STATUS",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "STATUS",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TEL_NO1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TEL_NO1",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TEL_NO2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TEL_NO2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "USERDEF",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "USERDEF",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AUTHCODE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AUTHCODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "DOUBLEINS",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "DOUBLEINS",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "FIRSTAWARE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "FIRSTAWARE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "FIRSTVISIT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "FIRSTVISIT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "REAL_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "REAL_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "REAL_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "REAL_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "REAL_TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "REAL_TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SIGIND",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "SIGIND",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "THIRDPARTY",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "THIRDPARTY",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "USERFIELD1",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "USERFIELD1",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "USERFIELD2",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "USERFIELD2",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "USERFIELD3",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "USERFIELD3",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "NHSNUMBER",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "NHSNUMBER",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ALTCOMMS",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ALTCOMMS",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ALTCOMMS_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ALTCOMMS_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ASS_ACTBY",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ASS_ACTBY",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ASS_ACTBY_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ASS_ACTBY_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ASS_ACTDT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ASS_ACTDT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "CONNECTION",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CONNECTION",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CONNECTIONDET",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CONNECTIONDET",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CONNECTION_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "CONNECTION_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "FUNDERREF",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "FUNDERREF",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LANGUAGE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LANGUAGE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LANGUAGE_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "LANGUAGE_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "MOVEDINFROM",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "MOVEDINFROM",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "MOVEDINFROM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "MOVEDINFROM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "PATIENTREF",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PATIENTREF",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PICID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PICID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PREVCODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "PREVCODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_Polestar",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Resident"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "GRG",
-									"Table": "Resident"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_Polestar')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_CQC_Merged_File')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageAcc",
-					"type": "LinkedServiceReference"
-				},
-				"folder": {
-					"name": "CQC"
-				},
-				"annotations": [],
-				"type": "Json",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"folderPath": {
-							"value": "@concat('locationresponses', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd'), '/', 'merged')",
-							"type": "Expression"
-						},
-						"container": "cqc"
-					}
-				},
-				"schema": {
-					"type": "object",
-					"properties": {
-						"locationId": {
-							"type": "string"
-						},
-						"providerId": {
-							"type": "string"
-						},
-						"organisationType": {
-							"type": "string"
-						},
-						"type": {
-							"type": "string"
-						},
-						"name": {
-							"type": "string"
-						},
-						"brandId": {
-							"type": "string"
-						},
-						"brandName": {
-							"type": "string"
-						},
-						"onspdCcgCode": {
-							"type": "string"
-						},
-						"onspdCcgName": {
-							"type": "string"
-						},
-						"onspdIcbCode": {
-							"type": "string"
-						},
-						"onspdIcbName": {
-							"type": "string"
-						},
-						"odsCode": {
-							"type": "string"
-						},
-						"registrationStatus": {
-							"type": "string"
-						},
-						"registrationDate": {
-							"type": "string"
-						},
-						"dormancy": {
-							"type": "string"
-						},
-						"onspdLatitude": {
-							"type": "number"
-						},
-						"onspdLongitude": {
-							"type": "number"
-						},
-						"careHome": {
-							"type": "string"
-						},
-						"inspectionDirectorate": {
-							"type": "string"
-						},
-						"postalAddressLine1": {
-							"type": "string"
-						},
-						"postalAddressTownCity": {
-							"type": "string"
-						},
-						"postalAddressCounty": {
-							"type": "string"
-						},
-						"region": {
-							"type": "string"
-						},
-						"postalCode": {
-							"type": "string"
-						},
-						"uprn": {
-							"type": "string"
-						},
-						"mainPhoneNumber": {
-							"type": "string"
-						},
-						"registeredManagerAbsentDate": {
-							"type": "string"
-						},
-						"website": {
-							"type": "string"
-						},
-						"numberOfBeds": {
-							"type": "integer"
-						},
-						"constituency": {
-							"type": "string"
-						},
-						"localAuthority": {
-							"type": "string"
-						},
-						"lastInspection": {
-							"type": "object",
-							"properties": {
-								"date": {
-									"type": "string"
-								}
-							}
-						},
-						"lastReport": {
-							"type": "object",
-							"properties": {
-								"publicationDate": {
-									"type": "string"
-								}
-							}
-						},
-						"historicRatings": {
-							"type": "array",
-							"items": {
-								"type": "object",
-								"properties": {
-									"reportDate": {
-										"type": "string"
-									},
-									"reportLinkId": {
-										"type": "string"
-									},
-									"overall": {
-										"type": "object",
-										"properties": {
-											"rating": {
-												"type": "string"
-											},
-											"keyQuestionRatings": {
-												"type": "array",
-												"items": {
-													"type": "object",
-													"properties": {
-														"name": {
-															"type": "string"
-														},
-														"rating": {
-															"type": "string"
-														}
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						},
-						"currentRatings": {
-							"type": "object",
-							"properties": {
-								"overall": {
-									"type": "object",
-									"properties": {
-										"rating": {
-											"type": "string"
-										},
-										"reportDate": {
-											"type": "string"
-										},
-										"reportLinkId": {
-											"type": "string"
-										},
-										"keyQuestionRatings": {
-											"type": "array",
-											"items": {
-												"type": "object",
-												"properties": {
-													"name": {
-														"type": "string"
-													},
-													"rating": {
-														"type": "string"
-													},
-													"reportDate": {
-														"type": "string"
-													},
-													"reportLinkId": {
-														"type": "string"
-													}
-												}
-											}
-										}
-									}
-								},
-								"reportDate": {
-									"type": "string"
-								}
-							}
-						},
-						"assessment": {
-							"type": "array",
-							"items": {
-								"type": "object",
-								"properties": {
-									"assessmentPlanPublishedDateTime": {
-										"type": "string"
-									},
-									"ratings": {
-										"type": "object",
-										"properties": {
-											"asgRatings": {
-												"type": "array",
-												"items": {
-													"type": "object",
-													"properties": {
-														"assessmentPlanId": {
-															"type": "string"
-														},
-														"title": {
-															"type": "string"
-														},
-														"assessmentDate": {
-															"type": "string"
-														},
-														"assessmentPlanStatus": {
-															"type": "string"
-														},
-														"rating": {
-															"type": "string"
-														},
-														"status": {
-															"type": "string"
-														},
-														"narrative": {
-															"type": "string"
-														},
-														"keyQuestionRatings": {
-															"type": "array",
-															"items": {
-																"type": "object",
-																"properties": {
-																	"name": {
-																		"type": "string"
-																	},
-																	"rating": {
-																		"type": "string"
-																	},
-																	"status": {
-																		"type": "string"
-																	},
-																	"narrative": {
-																		"type": "string"
-																	},
-																	"percentageScore": {
-																		"type": "string"
-																	}
-																}
-															}
-														}
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
 			]
 		}
 	]
