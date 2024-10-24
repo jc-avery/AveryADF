@@ -4,7 +4,7 @@
 		"description": "Copies the API responses from the file share",
 		"activities": [
 			{
-				"name": "Copy merged files",
+				"name": "Copy merged location files",
 				"type": "Copy",
 				"dependsOn": [],
 				"policy": {
@@ -22,7 +22,7 @@
 							"type": "AzureFileStorageReadSettings",
 							"recursive": true,
 							"wildcardFileName": {
-								"value": "@Concat('Merged_originalAPIfile', '*', '.json')",
+								"value": "@Concat('Merged_LocationAPIfile', '*', '.json')",
 								"type": "Expression"
 							},
 							"deleteFilesAfterCompletion": false
@@ -47,7 +47,7 @@
 				],
 				"outputs": [
 					{
-						"referenceName": "DS_CQC_Merged_API_file_Binary",
+						"referenceName": "DS_CQC_locationresponses_file_Binary",
 						"type": "DatasetReference",
 						"parameters": {
 							"FileType": "merged"
@@ -56,13 +56,13 @@
 				]
 			},
 			{
-				"name": "Copy Original API files",
+				"name": "Copy Original location API files",
 				"type": "Copy",
 				"dependsOn": [
 					{
-						"activity": "Copy merged files",
+						"activity": "Copy merged location files",
 						"dependencyConditions": [
-							"Succeeded"
+							"Completed"
 						]
 					}
 				],
@@ -81,7 +81,7 @@
 							"type": "AzureFileStorageReadSettings",
 							"recursive": true,
 							"wildcardFileName": {
-								"value": "@Concat('originalAPIfile_', '*', '.json')",
+								"value": "@Concat('LocationAPIfile_', '*', '.json')",
 								"type": "Expression"
 							},
 							"deleteFilesAfterCompletion": false
@@ -106,7 +106,7 @@
 				],
 				"outputs": [
 					{
-						"referenceName": "DS_CQC_Merged_API_file_Binary",
+						"referenceName": "DS_CQC_locationresponses_file_Binary",
 						"type": "DatasetReference",
 						"parameters": {
 							"FileType": "original"
@@ -117,9 +117,11 @@
 			{
 				"name": "Remove json files from fileshare",
 				"type": "Delete",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
-						"activity": "Copy Original API files",
+						"activity": "Copy Original provider API files",
 						"dependencyConditions": [
 							"Completed"
 						]
@@ -146,6 +148,124 @@
 						"enablePartitionDiscovery": false
 					}
 				}
+			},
+			{
+				"name": "Copy merged provider files",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Copy Original location API files",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "BinarySource",
+						"storeSettings": {
+							"type": "AzureFileStorageReadSettings",
+							"recursive": true,
+							"wildcardFileName": {
+								"value": "@Concat('Merged_ProviderAPIfile', '*', '.json')",
+								"type": "Expression"
+							},
+							"deleteFilesAfterCompletion": false
+						},
+						"formatSettings": {
+							"type": "BinaryReadSettings"
+						}
+					},
+					"sink": {
+						"type": "BinarySink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_PolestarStorageAcc_Fileshare",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_CQC_providerresponses_file_Binary",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileType": "merged"
+						}
+					}
+				]
+			},
+			{
+				"name": "Copy Original provider API files",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Copy merged provider files",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "BinarySource",
+						"storeSettings": {
+							"type": "AzureFileStorageReadSettings",
+							"recursive": true,
+							"wildcardFileName": {
+								"value": "@Concat('ProviderAPIfile_', '*', '.json')",
+								"type": "Expression"
+							},
+							"deleteFilesAfterCompletion": false
+						},
+						"formatSettings": {
+							"type": "BinaryReadSettings"
+						}
+					},
+					"sink": {
+						"type": "BinarySink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_PolestarStorageAcc_Fileshare",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_CQC_providerresponses_file_Binary",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileType": "original"
+						}
+					}
+				]
 			}
 		],
 		"folder": {
