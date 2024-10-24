@@ -12839,7 +12839,7 @@
 				"description": "Copies the API responses from the file share",
 				"activities": [
 					{
-						"name": "Copy merged files",
+						"name": "Copy merged location files",
 						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
@@ -12857,7 +12857,7 @@
 									"type": "AzureFileStorageReadSettings",
 									"recursive": true,
 									"wildcardFileName": {
-										"value": "@Concat('Merged_originalAPIfile', '*', '.json')",
+										"value": "@Concat('Merged_LocationAPIfile', '*', '.json')",
 										"type": "Expression"
 									},
 									"deleteFilesAfterCompletion": false
@@ -12883,7 +12883,7 @@
 						],
 						"outputs": [
 							{
-								"referenceName": "DS_CQC_Merged_API_file_Binary",
+								"referenceName": "DS_CQC_locationresponses_file_Binary",
 								"type": "DatasetReference",
 								"parameters": {
 									"FileType": "merged"
@@ -12892,13 +12892,13 @@
 						]
 					},
 					{
-						"name": "Copy Original API files",
+						"name": "Copy Original location API files",
 						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Copy merged files",
+								"activity": "Copy merged location files",
 								"dependencyConditions": [
-									"Succeeded"
+									"Completed"
 								]
 							}
 						],
@@ -12917,7 +12917,7 @@
 									"type": "AzureFileStorageReadSettings",
 									"recursive": true,
 									"wildcardFileName": {
-										"value": "@Concat('originalAPIfile_', '*', '.json')",
+										"value": "@Concat('LocationAPIfile_', '*', '.json')",
 										"type": "Expression"
 									},
 									"deleteFilesAfterCompletion": false
@@ -12943,7 +12943,7 @@
 						],
 						"outputs": [
 							{
-								"referenceName": "DS_CQC_Merged_API_file_Binary",
+								"referenceName": "DS_CQC_locationresponses_file_Binary",
 								"type": "DatasetReference",
 								"parameters": {
 									"FileType": "original"
@@ -12954,9 +12954,11 @@
 					{
 						"name": "Remove json files from fileshare",
 						"type": "Delete",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
-								"activity": "Copy Original API files",
+								"activity": "Copy Original provider API files",
 								"dependencyConditions": [
 									"Completed"
 								]
@@ -12984,6 +12986,126 @@
 								"enablePartitionDiscovery": false
 							}
 						}
+					},
+					{
+						"name": "Copy merged provider files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy Original location API files",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"wildcardFileName": {
+										"value": "@Concat('Merged_ProviderAPIfile', '*', '.json')",
+										"type": "Expression"
+									},
+									"deleteFilesAfterCompletion": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_CQC_providerresponses_file_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": "merged"
+								}
+							}
+						]
+					},
+					{
+						"name": "Copy Original provider API files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy merged provider files",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"wildcardFileName": {
+										"value": "@Concat('ProviderAPIfile_', '*', '.json')",
+										"type": "Expression"
+									},
+									"deleteFilesAfterCompletion": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_CQC_providerresponses_file_Binary",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": "original"
+								}
+							}
+						]
 					}
 				],
 				"policy": {
@@ -12996,7 +13118,8 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_PolestarStorageAcc_Fileshare')]",
-				"[concat(variables('factoryId'), '/datasets/DS_CQC_Merged_API_file_Binary')]"
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_locationresponses_file_Binary')]",
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_providerresponses_file_Binary')]"
 			]
 		},
 		{
@@ -13361,6 +13484,7 @@
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Using the location files to add assessment details.",
 				"activities": [
 					{
 						"name": "Set DateTime",
@@ -13400,7 +13524,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"dataset": {
-								"referenceName": "DS_CQC_Merged_File",
+								"referenceName": "DS_CQC_Merged_Location_File",
 								"type": "DatasetReference",
 								"parameters": {}
 							},
@@ -13852,7 +13976,7 @@
 									},
 									"inputs": [
 										{
-											"referenceName": "DS_CQC_Merged_File",
+											"referenceName": "DS_CQC_Merged_Location_File",
 											"type": "DatasetReference",
 											"parameters": {}
 										}
@@ -13914,7 +14038,7 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_CQC_Merged_File')]",
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_Merged_Location_File')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
 			]
@@ -33745,7 +33869,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/DS_CQC_Merged_API_file_Binary')]",
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_locationresponses_file_Binary')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -33779,7 +33903,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/DS_CQC_Merged_File')]",
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_Merged_Location_File')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -36593,6 +36717,601 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Employee')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_providerresponses_file_Binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FileType": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "CQC"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('providerresponses', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd'), '/', dataset().FileType)",
+							"type": "Expression"
+						},
+						"container": "cqc"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CQC_Upsert_Provider')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Set DateTime",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Set DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_CQC_Merged_Provider_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For Each File",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Upsert to Provider Table",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"wildcardFileName": "@item().Name",
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"ProviderID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['providerId']"
+													},
+													"sink": {
+														"name": "ProviderID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['name']"
+													},
+													"sink": {
+														"name": "ProviderName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['brandId']"
+													},
+													"sink": {
+														"name": "BrandID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['brandName']"
+													},
+													"sink": {
+														"name": "BrandName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['registrationStatus']"
+													},
+													"sink": {
+														"name": "RegistrationStatus",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['registrationDate']"
+													},
+													"sink": {
+														"name": "RegistrationDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['companiesHouseNumber']"
+													},
+													"sink": {
+														"name": "CompaniesHouseNo",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressLine1']"
+													},
+													"sink": {
+														"name": "Address1",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressLine2']"
+													},
+													"sink": {
+														"name": "Address2",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressTownCity']"
+													},
+													"sink": {
+														"name": "City",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressCounty']"
+													},
+													"sink": {
+														"name": "County",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalCode']"
+													},
+													"sink": {
+														"name": "Postcode",
+														"type": "String"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_CQC_Merged_Provider_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "cqc",
+												"Table": "Provider"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "CQC/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_CQC_Merged_Provider_File')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_CQC_Merged_Provider_File')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "CQC"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('providerresponses', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd'), '/', 'merged')",
+							"type": "Expression"
+						},
+						"container": "cqc"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"locationId": {
+							"type": "string"
+						},
+						"providerId": {
+							"type": "string"
+						},
+						"organisationType": {
+							"type": "string"
+						},
+						"type": {
+							"type": "string"
+						},
+						"name": {
+							"type": "string"
+						},
+						"brandId": {
+							"type": "string"
+						},
+						"brandName": {
+							"type": "string"
+						},
+						"onspdCcgCode": {
+							"type": "string"
+						},
+						"onspdCcgName": {
+							"type": "string"
+						},
+						"onspdIcbCode": {
+							"type": "string"
+						},
+						"onspdIcbName": {
+							"type": "string"
+						},
+						"odsCode": {
+							"type": "string"
+						},
+						"registrationStatus": {
+							"type": "string"
+						},
+						"registrationDate": {
+							"type": "string"
+						},
+						"dormancy": {
+							"type": "string"
+						},
+						"onspdLatitude": {
+							"type": "number"
+						},
+						"onspdLongitude": {
+							"type": "number"
+						},
+						"careHome": {
+							"type": "string"
+						},
+						"inspectionDirectorate": {
+							"type": "string"
+						},
+						"postalAddressLine1": {
+							"type": "string"
+						},
+						"postalAddressTownCity": {
+							"type": "string"
+						},
+						"postalAddressCounty": {
+							"type": "string"
+						},
+						"region": {
+							"type": "string"
+						},
+						"postalCode": {
+							"type": "string"
+						},
+						"uprn": {
+							"type": "string"
+						},
+						"mainPhoneNumber": {
+							"type": "string"
+						},
+						"registeredManagerAbsentDate": {
+							"type": "string"
+						},
+						"website": {
+							"type": "string"
+						},
+						"numberOfBeds": {
+							"type": "integer"
+						},
+						"constituency": {
+							"type": "string"
+						},
+						"localAuthority": {
+							"type": "string"
+						},
+						"lastInspection": {
+							"type": "object",
+							"properties": {
+								"date": {
+									"type": "string"
+								}
+							}
+						},
+						"lastReport": {
+							"type": "object",
+							"properties": {
+								"publicationDate": {
+									"type": "string"
+								}
+							}
+						},
+						"historicRatings": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"reportDate": {
+										"type": "string"
+									},
+									"reportLinkId": {
+										"type": "string"
+									},
+									"overall": {
+										"type": "object",
+										"properties": {
+											"rating": {
+												"type": "string"
+											},
+											"keyQuestionRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"name": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"currentRatings": {
+							"type": "object",
+							"properties": {
+								"overall": {
+									"type": "object",
+									"properties": {
+										"rating": {
+											"type": "string"
+										},
+										"reportDate": {
+											"type": "string"
+										},
+										"reportLinkId": {
+											"type": "string"
+										},
+										"keyQuestionRatings": {
+											"type": "array",
+											"items": {
+												"type": "object",
+												"properties": {
+													"name": {
+														"type": "string"
+													},
+													"rating": {
+														"type": "string"
+													},
+													"reportDate": {
+														"type": "string"
+													},
+													"reportLinkId": {
+														"type": "string"
+													}
+												}
+											}
+										}
+									}
+								},
+								"reportDate": {
+									"type": "string"
+								}
+							}
+						},
+						"assessment": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"assessmentPlanPublishedDateTime": {
+										"type": "string"
+									},
+									"ratings": {
+										"type": "object",
+										"properties": {
+											"asgRatings": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"assessmentPlanId": {
+															"type": "string"
+														},
+														"title": {
+															"type": "string"
+														},
+														"assessmentDate": {
+															"type": "string"
+														},
+														"assessmentPlanStatus": {
+															"type": "string"
+														},
+														"rating": {
+															"type": "string"
+														},
+														"status": {
+															"type": "string"
+														},
+														"narrative": {
+															"type": "string"
+														},
+														"keyQuestionRatings": {
+															"type": "array",
+															"items": {
+																"type": "object",
+																"properties": {
+																	"name": {
+																		"type": "string"
+																	},
+																	"rating": {
+																		"type": "string"
+																	},
+																	"status": {
+																		"type": "string"
+																	},
+																	"narrative": {
+																		"type": "string"
+																	},
+																	"percentageScore": {
+																		"type": "string"
+																	}
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
 			]
 		}
 	]
