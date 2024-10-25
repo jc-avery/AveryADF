@@ -1,6 +1,7 @@
 {
-	"name": "PL_CQC_Upsert_Provider",
+	"name": "PL_CQC_Upsert_Location",
 	"properties": {
+		"description": "Using the location files to add location details.",
 		"activities": [
 			{
 				"name": "Set DateTime",
@@ -40,7 +41,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"dataset": {
-						"referenceName": "DS_CQC_Merged_Provider_File",
+						"referenceName": "DS_CQC_Merged_Location_File",
 						"type": "DatasetReference"
 					},
 					"fieldList": [
@@ -75,7 +76,7 @@
 					},
 					"activities": [
 						{
-							"name": "Upsert to Provider Table",
+							"name": "Upsert to Location",
 							"type": "Copy",
 							"dependsOn": [],
 							"policy": {
@@ -89,6 +90,22 @@
 							"typeProperties": {
 								"source": {
 									"type": "JsonSource",
+									"additionalColumns": [
+										{
+											"name": "SourceFileName",
+											"value": {
+												"value": "@item().Name",
+												"type": "Expression"
+											}
+										},
+										{
+											"name": "RowTimeStamp",
+											"value": {
+												"value": "@variables('DateTime')",
+												"type": "Expression"
+											}
+										}
+									],
 									"storeSettings": {
 										"type": "AzureBlobStorageReadSettings",
 										"recursive": true,
@@ -108,7 +125,7 @@
 									"upsertSettings": {
 										"useTempDB": true,
 										"keys": [
-											"ProviderID"
+											"LocationID"
 										]
 									},
 									"sqlWriterUseTableLock": false,
@@ -118,6 +135,15 @@
 								"translator": {
 									"type": "TabularTranslator",
 									"mappings": [
+										{
+											"source": {
+												"path": "$['locationId']"
+											},
+											"sink": {
+												"name": "LocationID",
+												"type": "String"
+											}
+										},
 										{
 											"source": {
 												"path": "$['providerId']"
@@ -132,25 +158,7 @@
 												"path": "$['name']"
 											},
 											"sink": {
-												"name": "ProviderName",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['brandId']"
-											},
-											"sink": {
-												"name": "BrandID",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['brandName']"
-											},
-											"sink": {
-												"name": "BrandName",
+												"name": "LocationName",
 												"type": "String"
 											}
 										},
@@ -180,60 +188,6 @@
 												"name": "DeregistrationDate",
 												"type": "DateTime"
 											}
-										},
-										{
-											"source": {
-												"path": "$['companiesHouseNumber']"
-											},
-											"sink": {
-												"name": "CompaniesHouseNo",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['postalAddressLine1']"
-											},
-											"sink": {
-												"name": "Address1",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['postalAddressLine2']"
-											},
-											"sink": {
-												"name": "Address2",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['postalAddressTownCity']"
-											},
-											"sink": {
-												"name": "City",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['postalAddressCounty']"
-											},
-											"sink": {
-												"name": "County",
-												"type": "String"
-											}
-										},
-										{
-											"source": {
-												"path": "$['postalCode']"
-											},
-											"sink": {
-												"name": "Postcode",
-												"type": "String"
-											}
 										}
 									],
 									"collectionReference": ""
@@ -241,7 +195,7 @@
 							},
 							"inputs": [
 								{
-									"referenceName": "DS_CQC_Merged_Provider_File",
+									"referenceName": "DS_CQC_Merged_Location_File",
 									"type": "DatasetReference"
 								}
 							],
@@ -251,12 +205,40 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"Schema": "cqc",
-										"Table": "Provider"
+										"Table": "Location"
 									}
 								}
 							]
 						}
 					]
+				}
+			},
+			{
+				"name": "Post Upsert proc",
+				"description": "Executes a procedure that tidies a few of the columns. Sets them to Null where blank",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "For Each File",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[cqc].[PostUpdate$HomeCurrentRating]"
+				},
+				"linkedServiceName": {
+					"referenceName": "AH2_TRANSFORM_DB",
+					"type": "LinkedServiceReference"
 				}
 			}
 		],
