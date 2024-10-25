@@ -13,6 +13,118 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox-parquet-copy')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies Parquet files from file share to azure blob storage. Then deletes the files on the file share.",
+				"activities": [
+					{
+						"name": "Copy Careblox Parquet files",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "ParquetSource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true,
+									"wildcardFileName": "*.parquet",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "ParquetReadSettings"
+								}
+							},
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare_Parquet",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AZStorage_careblox_parquet",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Delete1",
+						"type": "Delete",
+						"dependsOn": [
+							{
+								"activity": "Copy Careblox Parquet files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_PolestarStorageAcc_Fileshare_Parquet",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureFileStorageReadSettings",
+								"recursive": true,
+								"wildcardFileName": "*.parquet",
+								"enablePartitionDiscovery": false
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Careblox/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-09-26T11:05:26Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CareBlox-parquet-load-STG')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -8618,275 +8730,6 @@
 						"     )) ~> ClockingsTable"
 					]
 				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CQC_Upsert_Provider')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Set DateTime",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "DateTime",
-							"value": {
-								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Get File List",
-						"type": "GetMetadata",
-						"dependsOn": [
-							{
-								"activity": "Set DateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_CQC_Merged_Provider_File",
-								"type": "DatasetReference",
-								"parameters": {}
-							},
-							"fieldList": [
-								"childItems"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "JsonReadSettings"
-							}
-						}
-					},
-					{
-						"name": "For Each File",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get File List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get File List').output.childItems",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Upsert to Provider Table",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "JsonSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": true,
-												"wildcardFileName": "@item().Name",
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "JsonReadSettings"
-											}
-										},
-										"sink": {
-											"type": "AzureSqlSink",
-											"writeBehavior": "upsert",
-											"upsertSettings": {
-												"useTempDB": true,
-												"keys": [
-													"ProviderID"
-												]
-											},
-											"sqlWriterUseTableLock": false,
-											"disableMetricsCollection": false
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"mappings": [
-												{
-													"source": {
-														"path": "$['providerId']"
-													},
-													"sink": {
-														"name": "ProviderID",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['name']"
-													},
-													"sink": {
-														"name": "ProviderName",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['brandId']"
-													},
-													"sink": {
-														"name": "BrandID",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['brandName']"
-													},
-													"sink": {
-														"name": "BrandName",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['registrationStatus']"
-													},
-													"sink": {
-														"name": "RegistrationStatus",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['registrationDate']"
-													},
-													"sink": {
-														"name": "RegistrationDate",
-														"type": "DateTime"
-													}
-												},
-												{
-													"source": {
-														"path": "$['companiesHouseNumber']"
-													},
-													"sink": {
-														"name": "CompaniesHouseNo",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['postalAddressLine1']"
-													},
-													"sink": {
-														"name": "Address1",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['postalAddressLine2']"
-													},
-													"sink": {
-														"name": "Address2",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['postalAddressTownCity']"
-													},
-													"sink": {
-														"name": "City",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['postalAddressCounty']"
-													},
-													"sink": {
-														"name": "County",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['postalCode']"
-													},
-													"sink": {
-														"name": "Postcode",
-														"type": "String"
-													}
-												}
-											],
-											"collectionReference": ""
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_CQC_Merged_Provider_File",
-											"type": "DatasetReference",
-											"parameters": {}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_AH2_TRANSFORM_DB",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "cqc",
-												"Table": "Provider"
-											}
-										}
-									]
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"DateTime": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "CQC/Child Pipelines"
-				},
-				"annotations": []
 			},
 			"dependsOn": []
 		}
