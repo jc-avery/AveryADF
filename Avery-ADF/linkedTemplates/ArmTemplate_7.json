@@ -13,6 +13,294 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_MCM_Communities')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Community list",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Communities",
+								"type": "DatasetReference",
+								"parameters": {
+									"APIKey": "93ec8bc7-159f4e-1045a6-209d40-2491100be4f6e2",
+									"Query": "/OrganisationApi/Communities"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "Communities"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_MCM_Get_Generic')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Get data from the supplied endpoint (query/report) for the supplied community ID",
+				"activities": [
+					{
+						"name": "Download Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Get_Generic",
+								"type": "DatasetReference",
+								"parameters": {
+									"APIKey": "93ec8bc7-159f4e-1045a6-209d40-2491100be4f6e2",
+									"Query": {
+										"value": "@variables('Query')",
+										"type": "Expression"
+									},
+									"CommunityID": {
+										"value": "@variables('CommunityID')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('Filename')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Query",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set CommunityID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Query",
+							"value": "/ReportsAndChartsApi/Get/CareNotesReport"
+						}
+					},
+					{
+						"name": "Set CommunityID",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "CommunityID",
+							"value": "b1961c38-5b2f-4c4f-b60c-fabc3cdf7498"
+						}
+					},
+					{
+						"name": "Set Filename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Query",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Filename",
+							"value": {
+								"value": "@last(split(variables('Query'), '/'))",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Query": {
+						"type": "String"
+					},
+					"CommunityID": {
+						"type": "String"
+					},
+					"Filename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Pricing_CreateOrAlter_Views')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Executes procedures that create or alter views each day.",
+				"activities": [
+					{
+						"name": "Attributes",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Pricing_vRoomAttributes",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Addons",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Pricing_vRoomAddons",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Pricing"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-07-19T13:59:58Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Remove_Blob_Files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3155,6 +3443,42 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_GRG')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "OnPrem_Coldharbour",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Schema": {
+						"type": "string"
+					},
+					"Table": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "OnPrem"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3706,372 +4030,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-09-26T11:05:27Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Download bak files from FTP",
-						"description": "Download the zipped bak files from FTP",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CareBlox-bak-Files",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Copy Bak files to Fileshare",
-						"description": "Copy today's downloaded bak files",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 15",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CareBlox-Fileshare",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 15",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Download bak files from FTP",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 15
-						}
-					},
-					{
-						"name": "Copy Bak files to Fileshare Failure",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy Bak files to Fileshare",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": {
-									"value": "Red",
-									"type": "Expression"
-								},
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Copy Bak files to Fileshare"
-							}
-						}
-					},
-					{
-						"name": "Download bak files from FTP Failure",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Download bak files from FTP",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": {
-									"value": "Red",
-									"type": "Expression"
-								},
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Download bak files from FTP"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Careblox"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-01T10:23:31Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyAccessAudit')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Transfer File to Blob Storage",
-						"description": "Copies the file generated on the VM from the file share to container in Blob Storage",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Fileshare",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Load CSV file to DB table",
-						"description": "Inserts the records in the csv file to the Avery DB on AH2",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Transfer File to Blob Storage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Insert_ExchequerCompanyAccess",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-06-27T14:27:51Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Homes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies Homes table from AH1 to AH2 and also updates HomesID's in TRANSFORM_DB Avery.HomeID",
-				"activities": [
-					{
-						"name": "Copy AH1 data to AH2",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AH1_Homes-AH2_Homes",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update HomeID table",
-						"description": "Updates Avery.HomeDetails table in the TRANSFORM_DB with latest data ",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy AH1 data to AH2",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Transform_HomeDetails",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update Occupancy on AH2",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Update HomeID table",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AH1_Occupancy",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-10T09:35:49Z"
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Transform_HomeDetails')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Pricing')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Pipeline to update Pricing tables outside GRG refresh Window",
-				"activities": [
-					{
-						"name": "Upsert Coldharbour Rooms",
-						"description": "Updates the ColdHarbour.Rooms table from the Polestar DB. Polestar DB is a replication of the GRG database (CH reporting suite/DB)",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_ColdHarbour_Rooms",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update Occupancy",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Upsert Coldharbour Rooms",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_ColdHarbour_RoomsWithInHomeResidents",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-10T09:35:49Z"
 			},
 			"dependsOn": []
 		}

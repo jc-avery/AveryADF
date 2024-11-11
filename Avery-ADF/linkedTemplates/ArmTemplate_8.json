@@ -13,6 +13,370 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download bak files from FTP",
+						"description": "Download the zipped bak files from FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-bak-Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Copy Bak files to Fileshare",
+						"description": "Copy today's downloaded bak files",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 15",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-Fileshare",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 15",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Download bak files from FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 15
+						}
+					},
+					{
+						"name": "Copy Bak files to Fileshare Failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Copy Bak files to Fileshare",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "Pipeline failed",
+								"Colour": {
+									"value": "Red",
+									"type": "Expression"
+								},
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Copy Bak files to Fileshare"
+							}
+						}
+					},
+					{
+						"name": "Download bak files from FTP Failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Download bak files from FTP",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "Pipeline failed",
+								"Colour": {
+									"value": "Red",
+									"type": "Expression"
+								},
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Download bak files from FTP"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Careblox"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-01T10:23:31Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyAccessAudit')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Transfer File to Blob Storage",
+						"description": "Copies the file generated on the VM from the file share to container in Blob Storage",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Fileshare",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Load CSV file to DB table",
+						"description": "Inserts the records in the csv file to the Avery DB on AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Transfer File to Blob Storage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Insert_ExchequerCompanyAccess",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-27T14:27:51Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Homes')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies Homes table from AH1 to AH2 and also updates HomesID's in TRANSFORM_DB Avery.HomeID",
+				"activities": [
+					{
+						"name": "Copy AH1 data to AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_AH1_Homes-AH2_Homes",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update HomeID table",
+						"description": "Updates Avery.HomeDetails table in the TRANSFORM_DB with latest data ",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Copy AH1 data to AH2",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Transform_HomeDetails",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update Occupancy on AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Update HomeID table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_AH1_Occupancy",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T09:35:49Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Pricing')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline to update Pricing tables outside GRG refresh Window",
+				"activities": [
+					{
+						"name": "Upsert Coldharbour Rooms",
+						"description": "Updates the ColdHarbour.Rooms table from the Polestar DB. Polestar DB is a replication of the GRG database (CH reporting suite/DB)",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ColdHarbour_Rooms",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update Occupancy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Upsert Coldharbour Rooms",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ColdHarbour_RoomsWithInHomeResidents",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T09:35:49Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Softworks_JSON_SQL')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1505,6 +1869,162 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Extracts data Yardi require to csv files",
+				"activities": [
+					{
+						"name": "Export Rooms",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    AmendDateTime,\n    CreateDateTime,\n    HOME_REF,\n    OLOC_REF,\n    OROOM_REF,\n    ROOM_CAT,\n    ROOM_CAT_DESC,\n    ROOM_CODE,\n    ROOM_DESC,\n    ROOM_NO_BEDS,\n    ROOM_REF,\n    ROOM_TYPE,\n    ROOM_TYPE_DESC,\n    CHARGEPERIOD,\n    CURRENTRATE,\n    RATEDATE,\n    ROOM_UDF1,\n    ROOM_UDF2,\n    ROOM_UDF3,\n    ROOM_UDF4,\n    USEFLAG\nFROM \n    dbo.ROOMS\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Rooms -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Look up Home name",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set Filename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Look up Home name",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Filename",
+							"value": {
+								"value": "@activity('Look up Home name').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"Filename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Yardi/GRG"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Softworks')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1704,7 +2224,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_CareBlox_Download')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_3am')]",
@@ -1785,7 +2307,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Pricing')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_10pm')]",
@@ -1857,7 +2381,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Homes')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_9pm')]",
@@ -1981,7 +2507,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Exchequer_CompanyAccessAudit')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_5am')]",
