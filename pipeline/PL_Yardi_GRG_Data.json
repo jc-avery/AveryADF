@@ -1,0 +1,150 @@
+{
+	"name": "PL_Yardi_GRG_Data",
+	"properties": {
+		"description": "Extracts data Yardi require to csv files",
+		"activities": [
+			{
+				"name": "Export Rooms",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set Filename",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": {
+							"value": "SELECT\n    AmendDateTime,\n    CreateDateTime,\n    HOME_REF,\n    OLOC_REF,\n    OROOM_REF,\n    ROOM_CAT,\n    ROOM_CAT_DESC,\n    ROOM_CODE,\n    ROOM_DESC,\n    ROOM_NO_BEDS,\n    ROOM_REF,\n    ROOM_TYPE,\n    ROOM_TYPE_DESC,\n    CHARGEPERIOD,\n    CURRENTRATE,\n    RATEDATE,\n    ROOM_UDF1,\n    ROOM_UDF2,\n    ROOM_UDF3,\n    ROOM_UDF4,\n    USEFLAG\nFROM \n    dbo.ROOMS\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_OnPrem_CH_GRG",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Yardi_CSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"Filename": {
+								"value": "@concat(variables('Filename'), ' - Rooms -', utcNow('yyyy-MM-dd'), '.csv')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Look up Home name",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_Avery",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set Filename",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Look up Home name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "Filename",
+					"value": {
+						"value": "@activity('Look up Home name').output.firstRow.HomeName",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"variables": {
+			"Home_Ref": {
+				"type": "String",
+				"defaultValue": "611"
+			},
+			"Filename": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Yardi/GRG"
+		},
+		"annotations": []
+	}
+}
