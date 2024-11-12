@@ -43,6 +43,10 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'Hydra_FTP'"
 		},
+		"OnPrem_Coldharbour_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'OnPrem_Coldharbour'"
+		},
 		"PolestarStorageAcc_connectionString": {
 			"type": "secureString",
 			"metadata": "Secure string for 'connectionString' of 'PolestarStorageAcc'"
@@ -62,10 +66,6 @@
 		"Softworks_API_password": {
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'Softworks_API'"
-		},
-		"OnPrem_Coldharbour_password": {
-			"type": "secureString",
-			"metadata": "Secure string for 'password' of 'OnPrem_Coldharbour'"
 		},
 		"AH2_Agency_properties_typeProperties_server": {
 			"type": "string",
@@ -147,6 +147,18 @@
 			"type": "string",
 			"defaultValue": "https://myrus-uatnew.careshield.com/api/organisation/avery"
 		},
+		"OnPrem_Coldharbour_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "192.168.253.12\\COLDHNEW01"
+		},
+		"OnPrem_Coldharbour_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "AHC_GRG_FBWIN"
+		},
+		"OnPrem_Coldharbour_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "ADF"
+		},
 		"Radar_DB_properties_typeProperties_server": {
 			"type": "string",
 			"defaultValue": "integrationserver.radarhealthcare.net"
@@ -174,18 +186,6 @@
 		"Softworks_API_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "AHC23"
-		},
-		"OnPrem_Coldharbour_properties_typeProperties_server": {
-			"type": "string",
-			"defaultValue": "192.168.253.12\\COLDHNEW01"
-		},
-		"OnPrem_Coldharbour_properties_typeProperties_database": {
-			"type": "string",
-			"defaultValue": "AHC_GRG_FBWIN"
-		},
-		"OnPrem_Coldharbour_properties_typeProperties_userName": {
-			"type": "string",
-			"defaultValue": "ADF"
 		}
 	},
 	"variables": {
@@ -30753,6 +30753,166 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Extracts data Yardi require to csv files",
+				"activities": [
+					{
+						"name": "Export Rooms",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    AmendDateTime,\n    CreateDateTime,\n    HOME_REF,\n    OLOC_REF,\n    OROOM_REF,\n    ROOM_CAT,\n    ROOM_CAT_DESC,\n    ROOM_CODE,\n    ROOM_DESC,\n    ROOM_NO_BEDS,\n    ROOM_REF,\n    ROOM_TYPE,\n    ROOM_TYPE_DESC,\n    CHARGEPERIOD,\n    CURRENTRATE,\n    RATEDATE,\n    ROOM_UDF1,\n    ROOM_UDF2,\n    ROOM_UDF3,\n    ROOM_UDF4,\n    USEFLAG\nFROM \n    dbo.ROOMS\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Rooms -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Look up Home name",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set Filename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Look up Home name",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Filename",
+							"value": {
+								"value": "@activity('Look up Home name').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"Filename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Yardi/GRG"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Yardi_CSV')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/UT_Send_Email')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -38094,6 +38254,44 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_GRG')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "OnPrem_Coldharbour",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Schema": {
+						"type": "string"
+					},
+					"Table": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "OnPrem"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/OnPrem_Coldharbour')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_PolestaStorageAcc_Fileshare_Json')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -38694,6 +38892,49 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_Yardi_CSV')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Filename": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Yardi"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().Filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+							"type": "Expression"
+						},
+						"container": "yardi"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_softworks_EmployeeHoliday')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -38994,6 +39235,35 @@
 				}
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/OnPrem_Coldharbour')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "On prem SQL Server hosting Cold Harbour",
+				"annotations": [],
+				"type": "SqlServer",
+				"typeProperties": {
+					"server": "[parameters('OnPrem_Coldharbour_properties_typeProperties_server')]",
+					"database": "[parameters('OnPrem_Coldharbour_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": true,
+					"authenticationType": "SQL",
+					"userName": "[parameters('OnPrem_Coldharbour_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('OnPrem_Coldharbour_password')]"
+					}
+				},
+				"connectVia": {
+					"referenceName": "AveryonPrem",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/AveryonPrem')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PolestarStorageAcc')]",
@@ -40196,155 +40466,14 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/OnPrem_Coldharbour')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "On prem SQL Server hosting Cold Harbour",
-				"annotations": [],
-				"type": "SqlServer",
-				"typeProperties": {
-					"server": "[parameters('OnPrem_Coldharbour_properties_typeProperties_server')]",
-					"database": "[parameters('OnPrem_Coldharbour_properties_typeProperties_database')]",
-					"encrypt": "mandatory",
-					"trustServerCertificate": true,
-					"authenticationType": "SQL",
-					"userName": "[parameters('OnPrem_Coldharbour_properties_typeProperties_userName')]",
-					"password": {
-						"type": "SecureString",
-						"value": "[parameters('OnPrem_Coldharbour_password')]"
-					}
-				},
-				"connectVia": {
-					"referenceName": "AveryonPrem",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/integrationRuntimes/AveryonPrem')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_GRG')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "OnPrem_Coldharbour",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Schema": {
-						"type": "string"
-					},
-					"Table": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "OnPrem"
-				},
-				"annotations": [],
-				"type": "SqlServerTable",
-				"schema": [],
-				"typeProperties": {
-					"schema": {
-						"value": "@dataset().Schema",
-						"type": "Expression"
-					},
-					"table": {
-						"value": "@dataset().Table",
-						"type": "Expression"
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/OnPrem_Coldharbour')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_Debt')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Extracts data Yardi require to csv files",
 				"activities": [
 					{
-						"name": "Export Rooms",
+						"name": "Copy Pwrbi_Debt2",
 						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set Filename",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": {
-									"value": "SELECT\n    AmendDateTime,\n    CreateDateTime,\n    HOME_REF,\n    OLOC_REF,\n    OROOM_REF,\n    ROOM_CAT,\n    ROOM_CAT_DESC,\n    ROOM_CODE,\n    ROOM_DESC,\n    ROOM_NO_BEDS,\n    ROOM_REF,\n    ROOM_TYPE,\n    ROOM_TYPE_DESC,\n    CHARGEPERIOD,\n    CURRENTRATE,\n    RATEDATE,\n    ROOM_UDF1,\n    ROOM_UDF2,\n    ROOM_UDF3,\n    ROOM_UDF4,\n    USEFLAG\nFROM \n    dbo.ROOMS\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
-									"type": "Expression"
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_GRG",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat(variables('Filename'), ' - Rooms -', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Look up Home name",
-						"type": "Lookup",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -40357,109 +40486,280 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": {
-									"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
-									"type": "Expression"
-								},
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
-							"dataset": {
-								"referenceName": "DS_AH2_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ID",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 18
+										},
+										"sink": {
+											"name": "ID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Intranet",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "Intranet",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "resident_no",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "resident_no",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "resident_name",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "resident_name",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "account_no",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "account_no",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "funder",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "funder",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_location",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "transaction_location",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "transaction_date",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_type",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "transaction_type",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_ref1",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "transaction_ref1",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_ref2",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "transaction_ref2",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_value",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 10
+										},
+										"sink": {
+											"name": "transaction_value",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 10
+										}
+									},
+									{
+										"source": {
+											"name": "transaction_bal",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 10
+										},
+										"sink": {
+											"name": "transaction_bal",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 10
+										}
+									},
+									{
+										"source": {
+											"name": "res_status",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "res_status",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "res_lastdidate",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "res_lastdidate",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "month_end",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "month_end",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "IntranetNew",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetNew",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
 								}
 							}
-						}
-					},
-					{
-						"name": "Set Filename",
-						"type": "SetVariable",
-						"dependsOn": [
+						},
+						"inputs": [
 							{
-								"activity": "Look up Home name",
-								"dependencyConditions": [
-									"Succeeded"
-								]
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "vArtisanDebt"
+								}
 							}
 						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "Filename",
-							"value": {
-								"value": "@activity('Look up Home name').output.firstRow.HomeName",
-								"type": "Expression"
+						"outputs": [
+							{
+								"referenceName": "DS_AveryArtisan_Artisan",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Artisan",
+									"Table": "Pwrbi_Debt2"
+								}
 							}
-						}
+						]
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
-				"variables": {
-					"Home_Ref": {
-						"type": "String",
-						"defaultValue": "611"
-					},
-					"Filename": {
-						"type": "String"
-					}
-				},
 				"folder": {
-					"name": "Yardi/GRG"
+					"name": "Artisan/Child Pipelines"
 				},
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]",
-				"[concat(variables('factoryId'), '/datasets/DS_Yardi_CSV')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_Yardi_CSV')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageAcc",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Filename": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "Yardi"
-				},
-				"annotations": [],
-				"type": "DelimitedText",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"fileName": {
-							"value": "@dataset().Filename",
-							"type": "Expression"
-						},
-						"folderPath": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
-						"container": "yardi"
-					},
-					"columnDelimiter": ",",
-					"escapeChar": "\\",
-					"firstRowAsHeader": true,
-					"quoteChar": "\""
-				},
-				"schema": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AveryArtisan_Artisan')]"
 			]
 		}
 	]
