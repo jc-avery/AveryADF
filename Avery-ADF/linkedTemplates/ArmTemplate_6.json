@@ -13,6 +13,797 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_History')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Updates the Broadshield tables that store the history and changes from the API using files taken from previous Days. Data from the json files is inserted into staging tables, then compared to the history tables. When there is a change the record is inserted into history table. This is done this way as future dates/records appear in the JSON files. These future records would be inserted every day, even if there was no change.",
+				"activities": [
+					{
+						"name": "Users JSON data to Users Stage table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Users Filename",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "InsertDateTime",
+										"value": {
+											"value": "@variables('InsertDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['userID']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['forename']"
+										},
+										"sink": {
+											"name": "Forename",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['surname']"
+										},
+										"sink": {
+											"name": "Surname",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeNumber']"
+										},
+										"sink": {
+											"name": "EmployeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['location']"
+										},
+										"sink": {
+											"name": "UserLocation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['jobRole']"
+										},
+										"sink": {
+											"name": "JobRole",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "UserStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['createdDateTime']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['InsertDateTime']"
+										},
+										"sink": {
+											"name": "InsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['users']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_PrevDay",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('UsersFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "StgUsers"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Users Filename",
+						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set InsertDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "UsersFilename",
+							"value": {
+								"value": "@concat('Users', '$', variables('YesterdayDate'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Courses JSON data to Courses Stage table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Courses Filename",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "InsertDateTime",
+										"value": {
+											"value": "@variables('InsertDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['courseID']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseName']"
+										},
+										"sink": {
+											"name": "CourseName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseCode']"
+										},
+										"sink": {
+											"name": "CourseCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseMandation']"
+										},
+										"sink": {
+											"name": "CourseMandation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseExpiry']"
+										},
+										"sink": {
+											"name": "CourseExpiry",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "CourseStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['createdDateTime']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['InsertDateTime']"
+										},
+										"sink": {
+											"name": "InsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['courses']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_PrevDay",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('CoursesFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "StgCourse"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Courses Filename",
+						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Users JSON data to Users Stage table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "CoursesFilename",
+							"value": {
+								"value": "@concat('Courses', '$', variables('YesterdayDate'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "UserCourses JSON data to UserCourse Stage table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set UserCourses Filename",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "InsertDateTime",
+										"value": {
+											"value": "@variables('InsertDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"AssignmentID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['assignmentID']"
+										},
+										"sink": {
+											"name": "AssignmentID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['userID']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseID']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignmentStatus']"
+										},
+										"sink": {
+											"name": "AssignmentStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignmentMandation']"
+										},
+										"sink": {
+											"name": "AssignmentMandation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['startedDate']"
+										},
+										"sink": {
+											"name": "StartedDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assessmentStatus']"
+										},
+										"sink": {
+											"name": "AssessmentStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['completionDate']"
+										},
+										"sink": {
+											"name": "CompletionDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['expiryDate']"
+										},
+										"sink": {
+											"name": "ExpiryDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignedDate']"
+										},
+										"sink": {
+											"name": "AssignedDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['InsertDateTime']"
+										},
+										"sink": {
+											"name": "InsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['usercourses']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_PrevDay",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('UserCourseFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "StgUserCourses"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set UserCourses Filename",
+						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Courses JSON data to Courses Stage table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "UserCourseFilename",
+							"value": {
+								"value": "@concat('UserCourses', '$', variables('YesterdayDate'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Yesterday Date",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Clear Stg Tables Pre",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "YesterdayDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(utcNow(), 1, 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set InsertDateTime",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Yesterday Date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "InsertDateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Clear Stg Tables Pre",
+						"description": "Truncates the stage tables, resetting the Identity Column prior to staging to ensure tables are empty",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Broadshield].[ClearStgTables]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Create History Records",
+						"description": "Checks for any new records to be added to the history tables and any changes that need to be added. Records are inserted to keep a history",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "UserCourses JSON data to UserCourse Stage table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Broadshield].[CreateHistoryRecords]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Clear Stg Tables Post",
+						"description": "Clear Stg tables post ",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Create History Records",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Broadshield].[ClearStgTables]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"UsersFilename": {
+						"type": "String"
+					},
+					"CoursesFilename": {
+						"type": "String"
+					},
+					"UserCourseFilename": {
+						"type": "String"
+					},
+					"YesterdayDate": {
+						"type": "String"
+					},
+					"InsertDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-03T15:08:45Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_UAT_Courses')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -11923,979 +12714,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-06-26T11:47:51Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_GRG_Residents')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy GRG Resident data",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ADANAL_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ADANAL_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS1",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS3",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS3",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADDRESS4",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADDRESS4",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADMSN_ANAL",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADMSN_ANAL",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADMSN_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADMSN_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADM_REASON",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ADM_REASON",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ADTYP_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ADTYP_DEC",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ANAL_GROUP",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ANAL_GROUP",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AUTHORITY",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AUTHORITY",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "BIRTHDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "BIRTHDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "CARECAT",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CARECAT",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CONTSIGNED",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "CONTSIGNED",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "DISABILITY",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "DISABILITY",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ENQ_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ENQ_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "HOME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "LASTADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LASTADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LASTDIDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LASTDIDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LOC_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LOC_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LOC_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "LOC_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "MARKETING",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "MARKETING",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "NINUMBER",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "NINUMBER",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "OCC_IGNORE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "OCC_IGNORE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "ORES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ORES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ORIGADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ORIGADDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "POSTCODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "POSTCODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "RELIGION",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RELIGION",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RESPAYINT",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RESPAYINT",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RES_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RES_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOMCAT",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOMCAT",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "SEX",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "SEX",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "STATUS",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "STATUS",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TEL_NO1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TEL_NO1",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TEL_NO2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TEL_NO2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "USERDEF",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "USERDEF",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AUTHCODE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AUTHCODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "DOUBLEINS",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "DOUBLEINS",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "FIRSTAWARE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "FIRSTAWARE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "FIRSTVISIT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "FIRSTVISIT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "REAL_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "REAL_FNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "REAL_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "REAL_SNAME",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "REAL_TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "REAL_TITLE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SIGIND",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "SIGIND",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "THIRDPARTY",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "THIRDPARTY",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "USERFIELD1",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "USERFIELD1",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "USERFIELD2",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "USERFIELD2",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "USERFIELD3",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "USERFIELD3",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "NHSNUMBER",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "NHSNUMBER",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ALTCOMMS",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ALTCOMMS",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ALTCOMMS_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ALTCOMMS_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ASS_ACTBY",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ASS_ACTBY",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ASS_ACTBY_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ASS_ACTBY_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ASS_ACTDT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ASS_ACTDT",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "CONNECTION",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CONNECTION",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CONNECTIONDET",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CONNECTIONDET",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CONNECTION_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "CONNECTION_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "FUNDERREF",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "FUNDERREF",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LANGUAGE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LANGUAGE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LANGUAGE_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "LANGUAGE_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "MOVEDINFROM",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "MOVEDINFROM",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "MOVEDINFROM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "MOVEDINFROM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "PATIENTREF",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PATIENTREF",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PICID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PICID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PREVCODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "PREVCODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_Polestar",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Resident"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "GRG",
-									"Table": "Resident"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/YardiStage"
-				},
-				"annotations": []
 			},
 			"dependsOn": []
 		}

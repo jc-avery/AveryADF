@@ -8069,11 +8069,11 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Artisan_HomeDetails')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_Homes')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Copy Across Artisan Home details to the Artisan DB",
+				"description": "Copy Across Artisan Home details to the Artisan DB. (Uses the old AH1 table structure and data)",
 				"activities": [
 					{
 						"name": "Upsert Artisan Details",
@@ -9386,6 +9386,184 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-07-09T15:51:10Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_budget')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Budget",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ID",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 18
+										},
+										"sink": {
+											"name": "ID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Intranet",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 3
+										},
+										"sink": {
+											"name": "Intranet",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 3
+										}
+									},
+									{
+										"source": {
+											"name": "GLCODE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 5
+										},
+										"sink": {
+											"name": "GLCODE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 5
+										}
+									},
+									{
+										"source": {
+											"name": "Period",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "Period",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "Budget_desc",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "Budget_desc",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "amount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										},
+										"sink": {
+											"name": "amount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										}
+									},
+									{
+										"source": {
+											"name": "intranetnew",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "intranetnew",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "vArtisanBudget"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AveryArtisan_Artisan",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Artisan",
+									"Table": "Budget"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Artisan/Child Pipelines"
+				},
+				"annotations": []
 			},
 			"dependsOn": []
 		},
@@ -11279,797 +11457,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-03T09:24:53Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_History')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Updates the Broadshield tables that store the history and changes from the API using files taken from previous Days. Data from the json files is inserted into staging tables, then compared to the history tables. When there is a change the record is inserted into history table. This is done this way as future dates/records appear in the JSON files. These future records would be inserted every day, even if there was no change.",
-				"activities": [
-					{
-						"name": "Users JSON data to Users Stage table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set Users Filename",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									},
-									{
-										"name": "InsertDateTime",
-										"value": {
-											"value": "@variables('InsertDateTime')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['userID']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['forename']"
-										},
-										"sink": {
-											"name": "Forename",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['surname']"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employeeNumber']"
-										},
-										"sink": {
-											"name": "EmployeeNumber",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['location']"
-										},
-										"sink": {
-											"name": "UserLocation",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['jobRole']"
-										},
-										"sink": {
-											"name": "JobRole",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['status']"
-										},
-										"sink": {
-											"name": "UserStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['createdDateTime']"
-										},
-										"sink": {
-											"name": "CreatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['lastUpdatedDateTime']"
-										},
-										"sink": {
-											"name": "APILastUpdatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['SourceFileName']"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['InsertDateTime']"
-										},
-										"sink": {
-											"name": "InsertDateTime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": "$['users']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_PrevDay",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@variables('UsersFilename')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Broadshield",
-									"Table": "StgUsers"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Users Filename",
-						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set InsertDateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "UsersFilename",
-							"value": {
-								"value": "@concat('Users', '$', variables('YesterdayDate'))",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Courses JSON data to Courses Stage table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set Courses Filename",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									},
-									{
-										"name": "InsertDateTime",
-										"value": {
-											"value": "@variables('InsertDateTime')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['courseID']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseName']"
-										},
-										"sink": {
-											"name": "CourseName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseCode']"
-										},
-										"sink": {
-											"name": "CourseCode",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseMandation']"
-										},
-										"sink": {
-											"name": "CourseMandation",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseExpiry']"
-										},
-										"sink": {
-											"name": "CourseExpiry",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['status']"
-										},
-										"sink": {
-											"name": "CourseStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['createdDateTime']"
-										},
-										"sink": {
-											"name": "CreatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['lastUpdatedDateTime']"
-										},
-										"sink": {
-											"name": "APILastUpdatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['SourceFileName']"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['InsertDateTime']"
-										},
-										"sink": {
-											"name": "InsertDateTime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": "$['courses']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_PrevDay",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@variables('CoursesFilename')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Broadshield",
-									"Table": "StgCourse"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Courses Filename",
-						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Users JSON data to Users Stage table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "CoursesFilename",
-							"value": {
-								"value": "@concat('Courses', '$', variables('YesterdayDate'))",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "UserCourses JSON data to UserCourse Stage table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set UserCourses Filename",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									},
-									{
-										"name": "InsertDateTime",
-										"value": {
-											"value": "@variables('InsertDateTime')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AssignmentID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['assignmentID']"
-										},
-										"sink": {
-											"name": "AssignmentID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['userID']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseID']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assignmentStatus']"
-										},
-										"sink": {
-											"name": "AssignmentStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assignmentMandation']"
-										},
-										"sink": {
-											"name": "AssignmentMandation",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['startedDate']"
-										},
-										"sink": {
-											"name": "StartedDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assessmentStatus']"
-										},
-										"sink": {
-											"name": "AssessmentStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['completionDate']"
-										},
-										"sink": {
-											"name": "CompletionDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['expiryDate']"
-										},
-										"sink": {
-											"name": "ExpiryDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assignedDate']"
-										},
-										"sink": {
-											"name": "AssignedDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['lastUpdatedDateTime']"
-										},
-										"sink": {
-											"name": "APILastUpdatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['SourceFileName']"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['InsertDateTime']"
-										},
-										"sink": {
-											"name": "InsertDateTime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": "$['usercourses']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_PrevDay",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@variables('UserCourseFilename')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Broadshield",
-									"Table": "StgUserCourses"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set UserCourses Filename",
-						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Courses JSON data to Courses Stage table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "UserCourseFilename",
-							"value": {
-								"value": "@concat('UserCourses', '$', variables('YesterdayDate'))",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set Yesterday Date",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Clear Stg Tables Pre",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "YesterdayDate",
-							"value": {
-								"value": "@formatDateTime(subtractFromTime(utcNow(), 1, 'Day'), 'dd-MM-yyyy')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set InsertDateTime",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set Yesterday Date",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "InsertDateTime",
-							"value": {
-								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Clear Stg Tables Pre",
-						"description": "Truncates the stage tables, resetting the Identity Column prior to staging to ensure tables are empty",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[Broadshield].[ClearStgTables]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						}
-					},
-					{
-						"name": "Create History Records",
-						"description": "Checks for any new records to be added to the history tables and any changes that need to be added. Records are inserted to keep a history",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [
-							{
-								"activity": "UserCourses JSON data to UserCourse Stage table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[Broadshield].[CreateHistoryRecords]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						}
-					},
-					{
-						"name": "Clear Stg Tables Post",
-						"description": "Clear Stg tables post ",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [
-							{
-								"activity": "Create History Records",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[Broadshield].[ClearStgTables]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"UsersFilename": {
-						"type": "String"
-					},
-					"CoursesFilename": {
-						"type": "String"
-					},
-					"UserCourseFilename": {
-						"type": "String"
-					},
-					"YesterdayDate": {
-						"type": "String"
-					},
-					"InsertDateTime": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Broadshield/Child Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-03T15:08:45Z"
 			},
 			"dependsOn": []
 		}

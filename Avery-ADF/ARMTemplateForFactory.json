@@ -6366,7 +6366,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Artisan_HomeDetails",
+								"referenceName": "PL_Artisan_Homes",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -6446,7 +6446,7 @@
 						}
 					},
 					{
-						"name": "Execute Pipeline1",
+						"name": "Artisan budget",
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
@@ -6468,6 +6468,54 @@
 							"waitOnCompletion": true,
 							"parameters": {}
 						}
+					},
+					{
+						"name": "Artisan HomeDetails",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Artisan budget",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Artisan_vHomeDetails",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Artisan RLS",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Artisan HomeDetails",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Artisan_vRLS",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
 					}
 				],
 				"policy": {
@@ -6480,11 +6528,13 @@
 				"lastPublishTime": "2024-07-02T10:33:39Z"
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_HomeDetails')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_Homes')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_AEMS_Enquiries')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_Occupancy')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_Debt')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_budget')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_budget')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_vHomeDetails')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Artisan_vRLS')]"
 			]
 		},
 		{
@@ -8550,11 +8600,11 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Artisan_HomeDetails')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_Homes')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Copy Across Artisan Home details to the Artisan DB",
+				"description": "Copy Across Artisan Home details to the Artisan DB. (Uses the old AH1 table structure and data)",
 				"activities": [
 					{
 						"name": "Upsert Artisan Details",
@@ -9870,6 +9920,187 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-07-09T15:51:10Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AveryArtisan_Artisan')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_budget')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Budget",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ID",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 18
+										},
+										"sink": {
+											"name": "ID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Intranet",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 3
+										},
+										"sink": {
+											"name": "Intranet",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 3
+										}
+									},
+									{
+										"source": {
+											"name": "GLCODE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 5
+										},
+										"sink": {
+											"name": "GLCODE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 5
+										}
+									},
+									{
+										"source": {
+											"name": "Period",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "Period",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "Budget_desc",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "Budget_desc",
+											"type": "String",
+											"physicalType": "nchar"
+										}
+									},
+									{
+										"source": {
+											"name": "amount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										},
+										"sink": {
+											"name": "amount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										}
+									},
+									{
+										"source": {
+											"name": "intranetnew",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "intranetnew",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "vArtisanBudget"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AveryArtisan_Artisan",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Artisan",
+									"Table": "Budget"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Artisan/Child Pipelines"
+				},
+				"annotations": []
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
@@ -41307,13 +41538,13 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Artisan_budget')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_vHomeDetails')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"activities": [
 					{
-						"name": "Budget",
+						"name": "Copy vArtisanHomeDetails",
 						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
@@ -41336,7 +41567,7 @@
 								"upsertSettings": {
 									"useTempDB": true,
 									"keys": [
-										"ID"
+										"HomeID"
 									]
 								},
 								"sqlWriterUseTableLock": false,
@@ -41348,100 +41579,278 @@
 								"mappings": [
 									{
 										"source": {
-											"name": "ID",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 18
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
 										},
 										"sink": {
-											"name": "ID",
+											"name": "HomeID",
 											"type": "Int32",
 											"physicalType": "int"
 										}
 									},
 									{
 										"source": {
-											"name": "Intranet",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 3
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
 										},
 										"sink": {
-											"name": "Intranet",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 3
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
 										}
 									},
 									{
 										"source": {
-											"name": "GLCODE",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 5
-										},
-										"sink": {
-											"name": "GLCODE",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 5
-										}
-									},
-									{
-										"source": {
-											"name": "Period",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "Period",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "Budget_desc",
+											"name": "HomeName",
 											"type": "String",
-											"physicalType": "nchar"
+											"physicalType": "varchar"
 										},
 										"sink": {
-											"name": "Budget_desc",
+											"name": "HomeName",
 											"type": "String",
-											"physicalType": "nchar"
+											"physicalType": "nvarchar"
 										}
 									},
 									{
 										"source": {
-											"name": "amount",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 12
+											"name": "HomeTypeName",
+											"type": "String",
+											"physicalType": "varchar"
 										},
 										"sink": {
-											"name": "amount",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 12
+											"name": "HomeTypeName",
+											"type": "String",
+											"physicalType": "nvarchar"
 										}
 									},
 									{
 										"source": {
-											"name": "intranetnew",
+											"name": "BedCount",
 											"type": "Int32",
 											"physicalType": "int"
 										},
 										"sink": {
-											"name": "intranetnew",
+											"name": "BedCount",
 											"type": "Int32",
 											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Group",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Group",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "SubGroup",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "SubGroup",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Division",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Division",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DivisionAltName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DivisionAltName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Postcode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Postcode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CHCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CHCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CareBloxHomeid",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CareBloxHomeid",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CBCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CBCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeManager",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeManager",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ManagerEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ManagerEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DeputyEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DeputyEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AdminEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AdminEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CSMEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CSMEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionalDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionalDirector",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionalDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionalDirectorEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "OpsDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "OpsDirector",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "OpsDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "OpsDirectorEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
 										}
 									}
 								],
@@ -41454,11 +41863,11 @@
 						},
 						"inputs": [
 							{
-								"referenceName": "DS_AH1_Avery",
+								"referenceName": "DS_AH2_Avery",
 								"type": "DatasetReference",
 								"parameters": {
-									"Schema": "dbo",
-									"Table": "vArtisanBudget"
+									"Schema": "Avery",
+									"Table": "vArtisanHomeDetails"
 								}
 							}
 						],
@@ -41468,7 +41877,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"Schema": "Artisan",
-									"Table": "Budget"
+									"Table": "HomeDetails"
 								}
 							}
 						]
@@ -41483,7 +41892,188 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AveryArtisan_Artisan')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_vRLS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Artisan RLS data",
+				"activities": [
+					{
+						"name": "Artisan vRLS",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    H.[HomeID]\n    ,H.[IntranetID]\n    ,H.[HomeName]\n    ,[HomeData]\n    ,[RegionData]\n    ,[DivisionData]\n    ,[HomeSubGroupData]\n    ,[AllData]\nFROM \n    [Avery].[vRLS] AS R\n  \n    INNER JOIN Avery.Home AS H\n        ON H.HomeID = R.HomeID\nWHERE\n    H.HomeSubGroupID = 2",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"HomeID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DivisionData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DivisionData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeSubGroupData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeSubGroupData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AllData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AllData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AveryArtisan_Artisan",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Artisan",
+									"Table": "RLS"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Artisan/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AveryArtisan_Artisan')]"
 			]
 		}
