@@ -13,6 +13,725 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_Current')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Updates the Broadshield tables that store the current status of the data from the API using files taken from previous Day",
+				"activities": [
+					{
+						"name": "Users JSON data to Current table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Users Filename",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "UpsertDateTime",
+										"value": {
+											"value": "@variables('UpsertDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"UserID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['userID']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['forename']"
+										},
+										"sink": {
+											"name": "Forename",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['surname']"
+										},
+										"sink": {
+											"name": "Surname",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeNumber']"
+										},
+										"sink": {
+											"name": "EmployeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['location']"
+										},
+										"sink": {
+											"name": "UserLocation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['jobRole']"
+										},
+										"sink": {
+											"name": "JobRole",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "UserStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['createdDateTime']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['UpsertDateTime']"
+										},
+										"sink": {
+											"name": "UpsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['users']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_PrevDay",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('UsersFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "Users"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Users Filename",
+						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set UpsertDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "UsersFilename",
+							"value": {
+								"value": "@concat('Users', '$', variables('YesterdayDate'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Courses JSON data to Current table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Courses Filename",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "UpsertDateTime",
+										"value": {
+											"value": "@variables('UpsertDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"CourseID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['courseID']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseName']"
+										},
+										"sink": {
+											"name": "CourseName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseCode']"
+										},
+										"sink": {
+											"name": "CourseCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseMandation']"
+										},
+										"sink": {
+											"name": "CourseMandation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseExpiry']"
+										},
+										"sink": {
+											"name": "CourseExpiry",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "CourseStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['createdDateTime']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['UpsertDateTime']"
+										},
+										"sink": {
+											"name": "UpsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['courses']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_PrevDay",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('CoursesFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "Course"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Courses Filename",
+						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Users JSON data to Current table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "CoursesFilename",
+							"value": {
+								"value": "@concat('Courses', '$', variables('YesterdayDate'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "UserCourses JSON data to Current table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set UserCourses Filename",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "UpsertDateTime",
+										"value": {
+											"value": "@variables('UpsertDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"AssignmentID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['assignmentID']"
+										},
+										"sink": {
+											"name": "AssignmentID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['userID']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseID']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignmentStatus']"
+										},
+										"sink": {
+											"name": "AssignmentStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignmentMandation']"
+										},
+										"sink": {
+											"name": "AssignmentMandation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['startedDate']"
+										},
+										"sink": {
+											"name": "StartedDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assessmentStatus']"
+										},
+										"sink": {
+											"name": "AssessmentStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['completionDate']"
+										},
+										"sink": {
+											"name": "CompletionDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['expiryDate']"
+										},
+										"sink": {
+											"name": "ExpiryDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignedDate']"
+										},
+										"sink": {
+											"name": "AssignedDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['UpsertDateTime']"
+										},
+										"sink": {
+											"name": "UpsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['usercourses']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_PrevDay",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('UserCourseFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "UserCourses"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set UserCourses Filename",
+						"description": "Used to set the filename for the file we want to connect to in the dataset (Source)",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Courses JSON data to Current table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "UserCourseFilename",
+							"value": {
+								"value": "@concat('UserCourses', '$', variables('YesterdayDate'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Yesterday Date",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "YesterdayDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(utcNow(), 1, 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set UpsertDateTime",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Yesterday Date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "UpsertDateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"UsersFilename": {
+						"type": "String"
+					},
+					"CoursesFilename": {
+						"type": "String"
+					},
+					"UserCourseFilename": {
+						"type": "String"
+					},
+					"YesterdayDate": {
+						"type": "String"
+					},
+					"UpsertDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-03T09:24:53Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_History')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -12615,105 +13334,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-10T09:21:26Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Fileshare')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Moves the exported csv file from the Azure File Share to Azure Storage Container. The file contains list of Exchequer companies and the users with access to it",
-				"activities": [
-					{
-						"name": "Copy CSV",
-						"description": "Copy CSV file to Exchequer Azure Container",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureFileStorageReadSettings",
-									"recursive": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Fileshare_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Delete File from File Share",
-						"type": "Delete",
-						"dependsOn": [
-							{
-								"activity": "Copy CSV",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_PolestarStorageAcc_Fileshare_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {}
-							},
-							"enableLogging": false,
-							"storeSettings": {
-								"type": "AzureFileStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer/Child Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-06-26T11:47:51Z"
 			},
 			"dependsOn": []
 		}
