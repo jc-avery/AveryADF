@@ -13,6 +13,826 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_Download_AllData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Coursesdata",
+						"description": "Connects to Myrus API Courses end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": "courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllCoursesData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Download Users data",
+						"description": "Connects to Myrus API user end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Download Coursesdata",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": "users"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUsersData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Download User Course data",
+						"description": "Connects to Myrus API user-course end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Date for Usercourse endpoint",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:08:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API",
+								"type": "DatasetReference",
+								"parameters": {
+									"Date": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									},
+									"Endpoint": "user-courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUser_CoursesData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Date for Usercourse endpoint",
+						"description": "Sets the date to be the 1st of the current year and assigns it to the API dataset",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Download Users data",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": "20210401090000"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-02T09:31:21Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_AllData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Users JSON data to SQL table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Upsert DateTime",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "UpsertDateTime",
+										"value": {
+											"value": "@variables('Upsert_UTCDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"UserID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['userID']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['forename']"
+										},
+										"sink": {
+											"name": "Forename",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['surname']"
+										},
+										"sink": {
+											"name": "Surname",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employeeNumber']"
+										},
+										"sink": {
+											"name": "EmployeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['location']"
+										},
+										"sink": {
+											"name": "UserLocation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['jobRole']"
+										},
+										"sink": {
+											"name": "JobRole",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "UserStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['createdDateTime']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['UpsertDateTime']"
+										},
+										"sink": {
+											"name": "UpsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['users']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUsersData$20241002"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "Users"
+								}
+							}
+						]
+					},
+					{
+						"name": "Courses JSON data to SQL table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Users JSON data to SQL table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "UpsertDateTime",
+										"value": {
+											"value": "@variables('Upsert_UTCDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"CourseID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['courseID']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseName']"
+										},
+										"sink": {
+											"name": "CourseName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseCode']"
+										},
+										"sink": {
+											"name": "CourseCode",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseMandation']"
+										},
+										"sink": {
+											"name": "CourseMandation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseExpiry']"
+										},
+										"sink": {
+											"name": "CourseExpiry",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "CourseStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['createdDateTime']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['UpsertDateTime']"
+										},
+										"sink": {
+											"name": "UpsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['courses']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllCoursesData$20241002"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "Course"
+								}
+							}
+						]
+					},
+					{
+						"name": "UserCourses JSON data to SQL table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Courses JSON data to SQL table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"additionalColumns": [
+									{
+										"name": "SourceFileName",
+										"value": "$$FILEPATH"
+									},
+									{
+										"name": "UpsertDateTime",
+										"value": {
+											"value": "@variables('Upsert_UTCDateTime')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"AssignmentID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['assignmentID']"
+										},
+										"sink": {
+											"name": "AssignmentID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['userID']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['courseID']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignmentStatus']"
+										},
+										"sink": {
+											"name": "AssignmentStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignmentMandation']"
+										},
+										"sink": {
+											"name": "AssignmentMandation",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['startedDate']"
+										},
+										"sink": {
+											"name": "StartedDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assessmentStatus']"
+										},
+										"sink": {
+											"name": "AssessmentStatus",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['completionDate']"
+										},
+										"sink": {
+											"name": "CompletionDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['expiryDate']"
+										},
+										"sink": {
+											"name": "ExpiryDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['assignedDate']"
+										},
+										"sink": {
+											"name": "AssignedDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastUpdatedDateTime']"
+										},
+										"sink": {
+											"name": "APILastUpdatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SourceFileName']"
+										},
+										"sink": {
+											"name": "SourceFileName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['UpsertDateTime']"
+										},
+										"sink": {
+											"name": "UpsertDateTime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": "$['usercourses']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUser-CoursesData$20241002"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Broadshield",
+									"Table": "UserCourses"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Upsert DateTime",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Upsert_UTCDateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Upsert_UTCDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-02T15:38:19Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_Current')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -12829,511 +13649,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-01T11:08:39Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Rooms')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Extracts the Rooms from the Polestar DB on AH2, to a table in Avery DB on AH2",
-				"activities": [
-					{
-						"name": "Rooms",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"ROOM_REF"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CAT",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_CAT",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CAT_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_CAT_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_NO_BEDS",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_NO_BEDS",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "CHARGEPERIOD",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CHARGEPERIOD",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CURRENTRATE",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 12
-										},
-										"sink": {
-											"name": "CURRENTRATE",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 12
-										}
-									},
-									{
-										"source": {
-											"name": "RATEDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "RATEDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_Polestar",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Rooms"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "Rooms"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery/Children Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-09-05T11:40:20Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_RoomsWithInHomeResidents')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies data from the view in Polestar to Avery DB. Lists all rooms in CH and the active resident record assigned to that home",
-				"activities": [
-					{
-						"name": "Refresh Data",
-						"description": "Truncates table in Avery DB and Inserts data from Polestar DB using the view.",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    [ROOM_REF]\n    ,[ROOM_CODE]\n    ,[ROOM_DESC]\n    ,[USEFLAG]\n    ,[HOME_REF]\n    ,[RES_REF]\n    ,[RES_CODE]\n    ,[ResidentStatus]\n    ,[Firstname]\n    ,[Surname]\n    ,[AdmissionAnalysis]\n    ,[AdmissionType]\n    ,[ResidentAdmissionReason]\n    ,[AnalysisGroup]\n    ,ResidentsAssigned\nFROM \n    [dbo].[vRoomsWithInHomeResidentDetails]\nORDER BY\n    Home_Ref ASC,\n    ROOM_Ref ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE ColdHarbour.RoomsWithInHomeResidentDetails",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RES_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "RES_CODE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ResidentStatus",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ResidentStatus",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Firstname",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Firstname",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AdmissionAnalysis",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AdmissionAnalysis",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AdmissionType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AdmissionType",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ResidentAdmissionReason",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ResidentAdmissionReason",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AnalysisGroup",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AnalysisGroup",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ResidentsAssigned",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ResidentsAssigned",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_Polestar",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "RoomsWithInHomeResidentDetails"
-								}
-							}
-						]
-					},
-					{
-						"name": "Update Room Occupancy",
-						"description": "Updates the Pricing.Room tables occupancy using the refreshed data",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [
-							{
-								"activity": "Refresh Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[Pricing].[Update$RoomOccupancyFromCH]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_Avery",
-							"type": "LinkedServiceReference"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery/Children Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-10T09:21:26Z"
 			},
 			"dependsOn": []
 		}

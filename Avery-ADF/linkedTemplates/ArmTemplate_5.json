@@ -7,6 +7,10 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "Avery-ADF"
 		},
+		"OnPrem_ColdHarbour_IP_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'OnPrem_ColdHarbour_IP'"
+		},
 		"OnPrem_Coldharbour_password": {
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'OnPrem_Coldharbour'"
@@ -15,9 +19,17 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'OnPrem_Exchequer'"
 		},
-		"OnPrem_ColdHarbour_IP_password": {
-			"type": "secureString",
-			"metadata": "Secure string for 'password' of 'OnPrem_ColdHarbour_IP'"
+		"OnPrem_ColdHarbour_IP_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "192.168.253.12\\COLDHNEW01"
+		},
+		"OnPrem_ColdHarbour_IP_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "LIVE_AVERY_FEES"
+		},
+		"OnPrem_ColdHarbour_IP_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "ADF"
 		},
 		"OnPrem_Coldharbour_properties_typeProperties_server": {
 			"type": "string",
@@ -42,24 +54,39 @@
 		"OnPrem_Exchequer_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "JonCrockett"
-		},
-		"OnPrem_ColdHarbour_IP_properties_typeProperties_server": {
-			"type": "string",
-			"defaultValue": "192.168.253.12\\COLDHNEW01"
-		},
-		"OnPrem_ColdHarbour_IP_properties_typeProperties_database": {
-			"type": "string",
-			"defaultValue": "LIVE_AVERY_FEES"
-		},
-		"OnPrem_ColdHarbour_IP_properties_typeProperties_userName": {
-			"type": "string",
-			"defaultValue": "ADF"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/OnPrem_ColdHarbour_IP')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Cold Harbour Invoice processing DB",
+				"annotations": [],
+				"type": "SqlServer",
+				"typeProperties": {
+					"server": "[parameters('OnPrem_ColdHarbour_IP_properties_typeProperties_server')]",
+					"database": "[parameters('OnPrem_ColdHarbour_IP_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": true,
+					"authenticationType": "SQL",
+					"userName": "[parameters('OnPrem_ColdHarbour_IP_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('OnPrem_ColdHarbour_IP_password')]"
+					}
+				},
+				"connectVia": {
+					"referenceName": "AveryonPrem",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/OnPrem_Coldharbour')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
@@ -104,33 +131,6 @@
 					"password": {
 						"type": "SecureString",
 						"value": "[parameters('OnPrem_Exchequer_password')]"
-					}
-				},
-				"connectVia": {
-					"referenceName": "AveryonPrem",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/OnPrem_ColdHarbour_IP')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Cold Harbour Invoice processing DB",
-				"annotations": [],
-				"type": "SqlServer",
-				"typeProperties": {
-					"server": "[parameters('OnPrem_ColdHarbour_IP_properties_typeProperties_server')]",
-					"database": "[parameters('OnPrem_ColdHarbour_IP_properties_typeProperties_database')]",
-					"encrypt": "mandatory",
-					"trustServerCertificate": true,
-					"authenticationType": "SQL",
-					"userName": "[parameters('OnPrem_ColdHarbour_IP_properties_typeProperties_userName')]",
-					"password": {
-						"type": "SecureString",
-						"value": "[parameters('OnPrem_ColdHarbour_IP_password')]"
 					}
 				},
 				"connectVia": {
@@ -9611,6 +9611,540 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_vHomeDetails')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy vArtisanHomeDetails",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"HomeID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeTypeName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeTypeName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BedCount",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "BedCount",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Group",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Group",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "SubGroup",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "SubGroup",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Division",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Division",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DivisionAltName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DivisionAltName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Postcode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Postcode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CHCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CHCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CareBloxHomeid",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CareBloxHomeid",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CBCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CBCode",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeManager",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeManager",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ManagerEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ManagerEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DeputyEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DeputyEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AdminEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AdminEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CSMEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CSMEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionalDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionalDirector",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionalDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionalDirectorEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "OpsDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "OpsDirector",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "OpsDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "OpsDirectorEmail",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Avery",
+									"Table": "vArtisanHomeDetails"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AveryArtisan_Artisan",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Artisan",
+									"Table": "HomeDetails"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Artisan/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Artisan_vRLS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Artisan RLS data",
+				"activities": [
+					{
+						"name": "Artisan vRLS",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    H.[HomeID]\n    ,H.[IntranetID]\n    ,H.[HomeName]\n    ,[HomeData]\n    ,[RegionData]\n    ,[DivisionData]\n    ,[HomeSubGroupData]\n    ,[AllData]\nFROM \n    [Avery].[vRLS] AS R\n  \n    INNER JOIN Avery.Home AS H\n        ON H.HomeID = R.HomeID\nWHERE\n    H.HomeSubGroupID = 2",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"HomeID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DivisionData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DivisionData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeSubGroupData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeSubGroupData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AllData",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AllData",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AveryArtisan_Artisan",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Artisan",
+									"Table": "RLS"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Artisan/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Avery_RLS_TRANSFORM')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -9961,826 +10495,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-03T15:30:34Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_Download_AllData')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Download Coursesdata",
-						"description": "Connects to Myrus API Courses end point and downloads data",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "RestSource",
-								"httpRequestTimeout": "00:01:40",
-								"requestInterval": "00.00:00:00.010",
-								"requestMethod": "GET",
-								"paginationRules": {
-									"supportRFC5988": "true"
-								}
-							},
-							"sink": {
-								"type": "JsonSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "JsonWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_Live_API_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"EndPoint": "courses"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "AllCoursesData$20241002"
-								}
-							}
-						]
-					},
-					{
-						"name": "Download Users data",
-						"description": "Connects to Myrus API user end point and downloads data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Download Coursesdata",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "RestSource",
-								"httpRequestTimeout": "00:01:40",
-								"requestInterval": "00.00:00:00.010",
-								"requestMethod": "GET",
-								"paginationRules": {
-									"supportRFC5988": "true"
-								}
-							},
-							"sink": {
-								"type": "JsonSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "JsonWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_Live_API_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"EndPoint": "users"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "AllUsersData$20241002"
-								}
-							}
-						]
-					},
-					{
-						"name": "Download User Course data",
-						"description": "Connects to Myrus API user-course end point and downloads data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set Date for Usercourse endpoint",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "RestSource",
-								"httpRequestTimeout": "00:08:00",
-								"requestInterval": "00.00:00:00.010",
-								"requestMethod": "GET",
-								"paginationRules": {
-									"supportRFC5988": "true"
-								}
-							},
-							"sink": {
-								"type": "JsonSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "JsonWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_Live_API",
-								"type": "DatasetReference",
-								"parameters": {
-									"Date": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									},
-									"Endpoint": "user-courses"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "AllUser_CoursesData$20241002"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Date for Usercourse endpoint",
-						"description": "Sets the date to be the 1st of the current year and assigns it to the API dataset",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Download Users data",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "DateString",
-							"value": "20210401090000"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"DateString": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Broadshield/Child Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-02T09:31:21Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_AllData')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Users JSON data to SQL table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set Upsert DateTime",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									},
-									{
-										"name": "UpsertDateTime",
-										"value": {
-											"value": "@variables('Upsert_UTCDateTime')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"UserID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['userID']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['forename']"
-										},
-										"sink": {
-											"name": "Forename",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['surname']"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employeeNumber']"
-										},
-										"sink": {
-											"name": "EmployeeNumber",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['location']"
-										},
-										"sink": {
-											"name": "UserLocation",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['jobRole']"
-										},
-										"sink": {
-											"name": "JobRole",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['status']"
-										},
-										"sink": {
-											"name": "UserStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['createdDateTime']"
-										},
-										"sink": {
-											"name": "CreatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['lastUpdatedDateTime']"
-										},
-										"sink": {
-											"name": "APILastUpdatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['SourceFileName']"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['UpsertDateTime']"
-										},
-										"sink": {
-											"name": "UpsertDateTime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": "$['users']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "AllUsersData$20241002"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Broadshield",
-									"Table": "Users"
-								}
-							}
-						]
-					},
-					{
-						"name": "Courses JSON data to SQL table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Users JSON data to SQL table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									},
-									{
-										"name": "UpsertDateTime",
-										"value": {
-											"value": "@variables('Upsert_UTCDateTime')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"CourseID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['courseID']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseName']"
-										},
-										"sink": {
-											"name": "CourseName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseCode']"
-										},
-										"sink": {
-											"name": "CourseCode",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseMandation']"
-										},
-										"sink": {
-											"name": "CourseMandation",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseExpiry']"
-										},
-										"sink": {
-											"name": "CourseExpiry",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['status']"
-										},
-										"sink": {
-											"name": "CourseStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['createdDateTime']"
-										},
-										"sink": {
-											"name": "CreatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['lastUpdatedDateTime']"
-										},
-										"sink": {
-											"name": "APILastUpdatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['SourceFileName']"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['UpsertDateTime']"
-										},
-										"sink": {
-											"name": "UpsertDateTime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": "$['courses']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "AllCoursesData$20241002"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Broadshield",
-									"Table": "Course"
-								}
-							}
-						]
-					},
-					{
-						"name": "UserCourses JSON data to SQL table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Courses JSON data to SQL table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									},
-									{
-										"name": "UpsertDateTime",
-										"value": {
-											"value": "@variables('Upsert_UTCDateTime')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AssignmentID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['assignmentID']"
-										},
-										"sink": {
-											"name": "AssignmentID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['userID']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['courseID']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assignmentStatus']"
-										},
-										"sink": {
-											"name": "AssignmentStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assignmentMandation']"
-										},
-										"sink": {
-											"name": "AssignmentMandation",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['startedDate']"
-										},
-										"sink": {
-											"name": "StartedDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assessmentStatus']"
-										},
-										"sink": {
-											"name": "AssessmentStatus",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['completionDate']"
-										},
-										"sink": {
-											"name": "CompletionDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['expiryDate']"
-										},
-										"sink": {
-											"name": "ExpiryDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['assignedDate']"
-										},
-										"sink": {
-											"name": "AssignedDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['lastUpdatedDateTime']"
-										},
-										"sink": {
-											"name": "APILastUpdatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['SourceFileName']"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['UpsertDateTime']"
-										},
-										"sink": {
-											"name": "UpsertDateTime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": "$['usercourses']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON_AllData",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "AllUser-CoursesData$20241002"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Broadshield",
-									"Table": "UserCourses"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Upsert DateTime",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "Upsert_UTCDateTime",
-							"value": {
-								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"Upsert_UTCDateTime": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Broadshield/Child Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-02T15:38:19Z"
 			},
 			"dependsOn": []
 		}
