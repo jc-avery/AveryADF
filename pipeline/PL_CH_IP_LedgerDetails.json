@@ -1,0 +1,227 @@
+{
+	"name": "PL_CH_IP_LedgerDetails",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy data1",
+				"type": "Copy",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_OnPrem_CH_IP",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				]
+			},
+			{
+				"name": "Lookup1",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TOP 1 SITE_REF FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_YardiStage",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Set variable1",
+				"type": "SetVariable",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Lookup1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "SITE_REF",
+					"value": {
+						"value": "@activity('Lookup1').output.firstRow.SITE_REF",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Lookup2",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_Avery",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "Set variable2",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Lookup2",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "SITE_REF",
+					"value": {
+						"value": "@activity('Lookup2').output.firstRow",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Look up Home name",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_Avery",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				}
+			},
+			{
+				"name": "Set Filename",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Look up Home name",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "FileName",
+					"value": {
+						"value": "@activity('Look up Home name').output.firstRow.HomeName",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"variables": {
+			"Home_Ref": {
+				"type": "String"
+			},
+			"SITE_REF": {
+				"type": "String"
+			},
+			"FileName": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Yardi/CHIP"
+		},
+		"annotations": []
+	}
+}
