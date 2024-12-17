@@ -27314,7 +27314,12 @@
 							{
 								"referenceName": "DS_Radar_AzureStorage",
 								"type": "DatasetReference",
-								"parameters": {}
+								"parameters": {
+									"Date": {
+										"value": "@variables('Date')",
+										"type": "Expression"
+									}
+								}
 							}
 						]
 					},
@@ -27322,7 +27327,14 @@
 						"name": "Remove Existing File",
 						"description": "Deletes any previous radar-output.xml file on the fileshare before copying the new one there.",
 						"type": "Delete",
-						"dependsOn": [],
+						"dependsOn": [
+							{
+								"activity": "Set Date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
 						"policy": {
 							"timeout": "0.12:00:00",
 							"retry": 0,
@@ -27341,7 +27353,7 @@
 							"storeSettings": {
 								"type": "AzureFileStorageReadSettings",
 								"recursive": false,
-								"wildcardFileName": "radar-output.xml",
+								"wildcardFileName": "radar-output*.xml",
 								"enablePartitionDiscovery": false
 							}
 						}
@@ -27389,7 +27401,12 @@
 							{
 								"referenceName": "DS_Radar_AzureStorage",
 								"type": "DatasetReference",
-								"parameters": {}
+								"parameters": {
+									"Date": {
+										"value": "@variables('Date')",
+										"type": "Expression"
+									}
+								}
 							}
 						],
 						"outputs": [
@@ -27399,10 +27416,32 @@
 								"parameters": {}
 							}
 						]
+					},
+					{
+						"name": "Set Date",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Date",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Date": {
+						"type": "String"
+					}
 				},
 				"folder": {
 					"name": "Radar"
@@ -41054,7 +41093,10 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureFileStorageLocation",
-						"fileName": "radar-output.xml"
+						"fileName": {
+							"value": "@concat('radar-output', ' - ', utcNow('yyyy-MM-dd'), '.xml')",
+							"type": "Expression"
+						}
 					}
 				}
 			},
@@ -41283,6 +41325,11 @@
 					"referenceName": "PolestarStorageAcc",
 					"type": "LinkedServiceReference"
 				},
+				"parameters": {
+					"Date": {
+						"type": "string"
+					}
+				},
 				"folder": {
 					"name": "Radar"
 				},
@@ -41291,9 +41338,12 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureBlobStorageLocation",
-						"fileName": "radar-output.xml",
+						"fileName": {
+							"value": "@concat('radar-output', ' - ', dataset().Date, '.xml')",
+							"type": "Expression"
+						},
 						"folderPath": {
-							"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(subtractFromTime(utcNow(), 1, 'Day'), 'dd'))",
+							"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/', formatDateTime(utcNow(), 'dd'))",
 							"type": "Expression"
 						},
 						"container": "radar"
@@ -42018,13 +42068,6 @@
 							"type": "PipelineReference"
 						},
 						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Hydra_Output_File",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
 					}
 				],
 				"type": "ScheduleTrigger",
@@ -42055,8 +42098,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_AEMS_BackupToAveryTables')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Hydra_Output_File')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_AEMS_BackupToAveryTables')]"
 			]
 		},
 		{
@@ -43019,6 +43061,45 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Employee')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_AfterMidnight')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Runs everyday just after midnight (00:05)",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Hydra_Output_File",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2024-12-17T15:55:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								5
+							],
+							"hours": [
+								0
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Hydra_Output_File')]"
 			]
 		}
 	]
