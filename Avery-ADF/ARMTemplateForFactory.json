@@ -32804,11 +32804,202 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_DependencyTool')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Extracts data Yardi require to csv files",
+				"activities": [
+					{
+						"name": "Look up Values",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set HomeName",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "HomeName",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set IntranetID",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IntranetID",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.IntranetID",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Export Dependency Records",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set HomeName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set IntranetID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\n    R.ID,\n    R.Assesment_Date,\n    R.Status,\n    R.Homename,\n    R.Intranet,\n    R.Res_No,\n    R.Res_First_Name,\n    R.Res_Surname,\n    R.Unit,\n    R.Room_No,\n    R.Type,\n    R.Total_Standard_Score AS Total_Service_Duration,\n\n    Q1.Service_Description AS Service1_Description,\n    r.Q1_Score AS Service1_Score,\n    r.Q1_Standard_Score AS Service1_MinutesRequired,\n    Q1.Support_Description AS Service1_SupportDescription,\n    \n    Q2.Service_Description AS Service2_Description,\n    r.Q2_Score AS Service2_Score,\n    r.Q2_Standard_Score AS Service2_MinutesRequired,\n    Q2.Support_Description AS Service2_SupportDescription,\n\n    Q3.Service_Description AS Service3_Description,\n    r.Q3_Score AS Service3_Score,\n    r.Q3_Standard_Score AS Service3_MinutesRequired,\n    Q3.Support_Description AS Service3_SupportDescription,\n\n    Q4.Service_Description AS Service4_Description,\n    r.Q4_Score AS Service4_Score,\n    r.Q4_Standard_Score AS Service4_MinutesRequired,\n    Q4.Support_Description AS Service4_SupportDescription,\n\n    Q5.Service_Description AS Service5_Description,\n    r.Q5_Score AS Service5_Score,\n    r.Q5_Standard_Score AS Service5_MinutesRequired,\n    Q5.Support_Description AS Service5_SupportDescription,\n\n    Q6.Service_Description AS Service6_Description,\n    r.Q6_Score AS Service6_Score,\n    r.Q6_Standard_Score AS Service6_MinutesRequired,\n    Q6.Support_Description AS Service6_SupportDescription,\n\n    Q7.Service_Description AS Service7_Description,\n    r.Q7_Score AS Service7_Score,\n    r.Q7_Standard_Score AS Service7_MinutesRequired,\n    Q7.Support_Description AS Service7_SupportDescription,\n\n    Q8.Service_Description AS Service8_Description,\n    r.Q8_Score AS Service8_Score,\n    r.Q8_Standard_Score AS Service8_MinutesRequired,\n    Q8.Support_Description AS Service8_SupportDescription,\n\n    Q9.Service_Description AS Service9_Description,\n    r.Q9_Score AS Service9_Score,\n    r.Q9_Standard_Score AS Service9_MinutesRequired,\n    Q9.Support_Description AS Service9_SupportDescription,\n\n    Q10.Service_Description AS Service10_Description,\n    r.Q10_Score AS Service10_Score,\n    r.Q10_Standard_Score AS Service10_MinutesRequired,\n    Q10.Support_Description AS Service10_SupportDescription,\n\n    Q11.Service_Description AS Service11_Description,\n    r.Q11_Score AS Service11_Score,\n    r.Q11_Standard_Score AS Service11_MinutesRequired,\n    Q11.Support_Description AS Service11_SupportDescription,\n\n    Q12.Service_Description AS Service12_Description,\n    r.Q12_Score AS Service12_Score,\n    r.Q12_Standard_Score AS Service12_MinutesRequired,\n    Q12.Support_Description AS Service12_SupportDescription,\n\n    Q13.Service_Description AS Service13_Description,\n    r.Q13_Score AS Service13_Score,\n    r.Q13_Standard_Score AS Service13_MinutesRequired,\n    Q13.Support_Description AS Service13_SupportDescription\nFROM \n    Dependency_Tool_Responses AS R\n\n    LEFT JOIN Dependency_Tool AS Q1\n        ON Q1.Support_Level = R.Q1_Score\n        AND Q1.Service_Number = 1\n\n    LEFT JOIN Dependency_Tool AS Q2\n        ON Q2.Support_Level = R.Q2_Score\n        AND Q2.Service_Number = 2\n\n    LEFT JOIN Dependency_Tool AS Q3\n        ON Q3.Support_Level = R.Q3_Score\n        AND Q3.Service_Number = 3\n\n    LEFT JOIN Dependency_Tool AS Q4\n        ON Q4.Support_Level = R.Q4_Score\n        AND Q4.Service_Number = 4\n\n    LEFT JOIN Dependency_Tool AS Q5\n        ON Q5.Support_Level = R.Q5_Score\n        AND Q5.Service_Number = 5\n\n    LEFT JOIN Dependency_Tool AS Q6\n        ON Q6.Support_Level = R.Q6_Score\n        AND Q6.Service_Number = 6\n\n    LEFT JOIN Dependency_Tool AS Q7\n        ON Q7.Support_Level = R.Q7_Score\n        AND Q7.Service_Number = 7\n\n    LEFT JOIN Dependency_Tool AS Q8\n        ON Q8.Support_Level = R.Q8_Score\n        AND Q8.Service_Number = 8\n\n    LEFT JOIN Dependency_Tool AS Q9\n        ON Q9.Support_Level = R.Q9_Score\n        AND Q9.Service_Number = 9\n\n    LEFT JOIN Dependency_Tool AS Q10\n        ON Q10.Support_Level = R.Q10_Score\n        AND Q10.Service_Number = 10\n\n    LEFT JOIN Dependency_Tool AS Q11\n        ON Q11.Support_Level = R.Q11_Score\n        AND Q11.Service_Number = 11\n\n    LEFT JOIN Dependency_Tool AS Q12\n        ON Q12.Support_Level = R.Q12_Score\n        AND Q12.Service_Number = 12\n\n    LEFT JOIN Dependency_Tool AS Q13\n        ON Q13.Support_Level = R.Q13_Score\n        AND Q13.Service_Number = 13\nWHERE \n    R.Status = 'Active' \n    AND R.Intranet IN (\n        84,\n        7573,\n        7574,\n        7575,\n        7576,\n        7577,\n        78  ,\n        79  ,\n        7578,\n        7561,\n        7562,\n        7579,\n        7580,\n        7581,\n        7582,\n        7583,\n        7584,\n        96  ,\n        7585,\n        7586,\n        7587,\n        7588,\n        7589,\n        7603,\n        7568,\n        7590,\n        7566,\n        81  ,\n        7563,\n        7591,\n        83  ,\n        80  ,\n        7592,\n        77  ,\n        7593,\n        7594,\n        7595,\n        7596,\n        7597,\n        7598,\n        7572,\n        7599,\n        7600,\n        7601\n    )\nORDER BY \n    Intranet ASC, \n    Assesment_Date ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Welltower Homes', ' - Dependency Tool Responses -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"HomeName": {
+						"type": "String"
+					},
+					"IntranetID": {
+						"type": "Integer"
+					}
+				},
+				"folder": {
+					"name": "Yardi/Dependency Tool"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Yardi_CSV')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data_SingleHome')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Extracts data Yardi require to csv files for a single home",
 				"activities": [
 					{
 						"name": "Export Rooms",
@@ -44972,7 +45163,7 @@
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"type": "SelfHosted",
-				"description": "Runtime for on prem servers at Avery",
+				"description": "Runtime for on prem servers at Avery. Installed on 10.0.4.5",
 				"typeProperties": {}
 			},
 			"dependsOn": []
@@ -45471,14 +45662,15 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_DependencyTool')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data_MultiHome')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Extracts data Yardi require to single csv files for multiple homes",
 				"activities": [
 					{
-						"name": "Look up Values",
-						"type": "Lookup",
+						"name": "Export Rooms",
+						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -45490,103 +45682,11 @@
 						"userProperties": [],
 						"typeProperties": {
 							"source": {
-								"type": "AzureSqlSource",
+								"type": "SqlServerSource",
 								"sqlReaderQuery": {
-									"value": "SELECT HOME_REF, HomeName, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"value": "SELECT\n    AmendDateTime,\n    CreateDateTime,\n    HOME_REF,\n    OLOC_REF,\n    OROOM_REF,\n    ROOM_CAT,\n    ROOM_CAT_DESC,\n    ROOM_CODE,\n    ROOM_DESC,\n    ROOM_NO_BEDS,\n    ROOM_REF,\n    ROOM_TYPE,\n    ROOM_TYPE_DESC,\n    CHARGEPERIOD,\n    CURRENTRATE,\n    RATEDATE,\n    ROOM_UDF1,\n    ROOM_UDF2,\n    ROOM_UDF3,\n    ROOM_UDF4,\n    USEFLAG\nFROM \n    dbo.ROOMS\nWHERE\n    HOME_REF IN (@{variables('Home_Ref_List')})",
 									"type": "Expression"
 								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						}
-					},
-					{
-						"name": "Set HomeName",
-						"type": "SetVariable",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Look up Values",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "HomeName",
-							"value": {
-								"value": "@activity('Look up Values').output.firstRow.HomeName",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set IntranetID",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Look up Values",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "IntranetID",
-							"value": {
-								"value": "@activity('Look up Values').output.firstRow.IntranetID",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Export Dependency Records",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set HomeName",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set IntranetID",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    R.ID,\n    R.Assesment_Date,\n    R.Status,\n    R.Homename,\n    R.Intranet,\n    R.Res_No,\n    R.Res_First_Name,\n    R.Res_Surname,\n    R.Unit,\n    R.Room_No,\n    R.Type,\n    R.Total_Standard_Score AS Total_Service_Duration,\n\n    Q1.Service_Description AS Service1_Description,\n    r.Q1_Score AS Service1_Score,\n    r.Q1_Standard_Score AS Service1_MinutesRequired,\n    Q1.Support_Description AS Service1_SupportDescription,\n    \n    Q2.Service_Description AS Service2_Description,\n    r.Q2_Score AS Service2_Score,\n    r.Q2_Standard_Score AS Service2_MinutesRequired,\n    Q2.Support_Description AS Service2_SupportDescription,\n\n    Q3.Service_Description AS Service3_Description,\n    r.Q3_Score AS Service3_Score,\n    r.Q3_Standard_Score AS Service3_MinutesRequired,\n    Q3.Support_Description AS Service3_SupportDescription,\n\n    Q4.Service_Description AS Service4_Description,\n    r.Q4_Score AS Service4_Score,\n    r.Q4_Standard_Score AS Service4_MinutesRequired,\n    Q4.Support_Description AS Service4_SupportDescription,\n\n    Q5.Service_Description AS Service5_Description,\n    r.Q5_Score AS Service5_Score,\n    r.Q5_Standard_Score AS Service5_MinutesRequired,\n    Q5.Support_Description AS Service5_SupportDescription,\n\n    Q6.Service_Description AS Service6_Description,\n    r.Q6_Score AS Service6_Score,\n    r.Q6_Standard_Score AS Service6_MinutesRequired,\n    Q6.Support_Description AS Service6_SupportDescription,\n\n    Q7.Service_Description AS Service7_Description,\n    r.Q7_Score AS Service7_Score,\n    r.Q7_Standard_Score AS Service7_MinutesRequired,\n    Q7.Support_Description AS Service7_SupportDescription,\n\n    Q8.Service_Description AS Service8_Description,\n    r.Q8_Score AS Service8_Score,\n    r.Q8_Standard_Score AS Service8_MinutesRequired,\n    Q8.Support_Description AS Service8_SupportDescription,\n\n    Q9.Service_Description AS Service9_Description,\n    r.Q9_Score AS Service9_Score,\n    r.Q9_Standard_Score AS Service9_MinutesRequired,\n    Q9.Support_Description AS Service9_SupportDescription,\n\n    Q10.Service_Description AS Service10_Description,\n    r.Q10_Score AS Service10_Score,\n    r.Q10_Standard_Score AS Service10_MinutesRequired,\n    Q10.Support_Description AS Service10_SupportDescription,\n\n    Q11.Service_Description AS Service11_Description,\n    r.Q11_Score AS Service11_Score,\n    r.Q11_Standard_Score AS Service11_MinutesRequired,\n    Q11.Support_Description AS Service11_SupportDescription,\n\n    Q12.Service_Description AS Service12_Description,\n    r.Q12_Score AS Service12_Score,\n    r.Q12_Standard_Score AS Service12_MinutesRequired,\n    Q12.Support_Description AS Service12_SupportDescription,\n\n    Q13.Service_Description AS Service13_Description,\n    r.Q13_Score AS Service13_Score,\n    r.Q13_Standard_Score AS Service13_MinutesRequired,\n    Q13.Support_Description AS Service13_SupportDescription\nFROM \n    Dependency_Tool_Responses AS R\n\n    LEFT JOIN Dependency_Tool AS Q1\n        ON Q1.Support_Level = R.Q1_Score\n        AND Q1.Service_Number = 1\n\n    LEFT JOIN Dependency_Tool AS Q2\n        ON Q2.Support_Level = R.Q2_Score\n        AND Q2.Service_Number = 2\n\n    LEFT JOIN Dependency_Tool AS Q3\n        ON Q3.Support_Level = R.Q3_Score\n        AND Q3.Service_Number = 3\n\n    LEFT JOIN Dependency_Tool AS Q4\n        ON Q4.Support_Level = R.Q4_Score\n        AND Q4.Service_Number = 4\n\n    LEFT JOIN Dependency_Tool AS Q5\n        ON Q5.Support_Level = R.Q5_Score\n        AND Q5.Service_Number = 5\n\n    LEFT JOIN Dependency_Tool AS Q6\n        ON Q6.Support_Level = R.Q6_Score\n        AND Q6.Service_Number = 6\n\n    LEFT JOIN Dependency_Tool AS Q7\n        ON Q7.Support_Level = R.Q7_Score\n        AND Q7.Service_Number = 7\n\n    LEFT JOIN Dependency_Tool AS Q8\n        ON Q8.Support_Level = R.Q8_Score\n        AND Q8.Service_Number = 8\n\n    LEFT JOIN Dependency_Tool AS Q9\n        ON Q9.Support_Level = R.Q9_Score\n        AND Q9.Service_Number = 9\n\n    LEFT JOIN Dependency_Tool AS Q10\n        ON Q10.Support_Level = R.Q10_Score\n        AND Q10.Service_Number = 10\n\n    LEFT JOIN Dependency_Tool AS Q11\n        ON Q11.Support_Level = R.Q11_Score\n        AND Q11.Service_Number = 11\n\n    LEFT JOIN Dependency_Tool AS Q12\n        ON Q12.Support_Level = R.Q12_Score\n        AND Q12.Service_Number = 12\n\n    LEFT JOIN Dependency_Tool AS Q13\n        ON Q13.Support_Level = R.Q13_Score\n        AND Q13.Service_Number = 13\nWHERE \n    R.Status = 'Active' \n    AND R.Intranet IN (\n        84,\n        7573,\n        7574,\n        7575,\n        7576,\n        7577,\n        78  ,\n        79  ,\n        7578,\n        7561,\n        7562,\n        7579,\n        7580,\n        7581,\n        7582,\n        7583,\n        7584,\n        96  ,\n        7585,\n        7586,\n        7587,\n        7588,\n        7589,\n        7603,\n        7568,\n        7590,\n        7566,\n        81  ,\n        7563,\n        7591,\n        83  ,\n        80  ,\n        7592,\n        77  ,\n        7593,\n        7594,\n        7595,\n        7596,\n        7597,\n        7598,\n        7572,\n        7599,\n        7600,\n        7601\n    )\nORDER BY \n    Intranet ASC, \n    Assesment_Date ASC",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -45613,7 +45713,7 @@
 						},
 						"inputs": [
 							{
-								"referenceName": "DS_AH2_Avery",
+								"referenceName": "DS_OnPrem_CH_GRG",
 								"type": "DatasetReference",
 								"parameters": {
 									"Schema": "n/a",
@@ -45627,7 +45727,372 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"Filename": {
-										"value": "@concat('Welltower Homes', ' - Dependency Tool Responses -', utcNow('yyyy-MM-dd'), '.csv')",
+										"value": "@concat('Rooms -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Residents",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Rooms",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    ADANAL_DEC\n    ,ADDRESS1\n    ,ADDRESS2\n    ,ADDRESS3\n    ,ADDRESS4\n    ,ADMSN_ANAL\n    ,ADMSN_TYPE\n    ,ADM_REASON\n    ,ADTYP_DEC\n    ,ANAL_GROUP\n    ,AUTHORITY\n    ,AmendDateTime\n    ,BIRTHDATE\n    ,CARECAT\n    ,CONTSIGNED\n    ,CreateDateTime\n    ,DISABILITY\n    ,ENQ_REF\n    ,HOME\n    ,HOME_REF\n    ,LASTADDATE\n    ,LASTDIDATE\n    ,LOC_DESC\n    ,LOC_REF\n    ,MARKETING\n    ,NINUMBER\n    ,OCC_IGNORE\n    ,ORES_REF\n    ,ORIGADDATE\n    ,POSTCODE\n    ,RELIGION\n    ,RESPAYINT\n    ,RES_CODE\n    ,RES_FNAME\n    ,RES_REF\n    ,RES_SNAME\n    ,ROOM\n    ,ROOMCAT\n    ,ROOM_DESC\n    ,ROOM_TYPE\n    ,SEX\n    ,STATUS\n    ,TEL_NO1\n    ,TEL_NO2\n    ,TITLE\n    ,USERDEF\n    ,AUTHCODE\n    ,DOUBLEINS\n    ,FIRSTAWARE\n    ,FIRSTVISIT\n    ,REAL_FNAME\n    ,REAL_SNAME\n    ,REAL_TITLE\n    ,SIGIND\n    ,THIRDPARTY\n    ,USERFIELD1\n    ,USERFIELD2\n    ,USERFIELD3\n    ,NHSNUMBER\n    ,ALTCOMMS\n    ,ALTCOMMS_REF\n    ,ASS_ACTBY\n    ,ASS_ACTBY_REF\n    ,ASS_ACTDT\n    ,CONNECTION\n    ,CONNECTIONDET\n    ,CONNECTION_REF\n    ,FUNDERREF\n    ,LANGUAGE\n    ,LANGUAGE_REF\n    ,MOVEDINFROM\n    ,MOVEDINFROM_REF\n    ,PATIENTREF\n    ,PICID\n    ,PREVCODE\nFROM \n    dbo.RESIDENT\nWHERE\n    HOME_REF IN (@{variables('Home_Ref_List')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Residents -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Resident Contacts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Residents",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    Address1\n    ,Address2\n    ,Address3\n    ,Address4\n    ,AmendDateTime\n    ,Cont_SubType\n    ,Cont_SubTypeDec\n    ,CreateDateTime\n    ,Forenames\n    ,GRGApp_GrGsRef\n    ,GRGrep_Cnta_Det_Ref\n    ,Gen_Comments\n    ,PostCode\n    ,RelType\n    ,RelTypeDec\n    ,Res_Ref\n    ,Surname\n    ,Tel_No1\n    ,Tel_No2\n    ,TitleDec\n    ,oCnta_Det_Ref\n    ,Email\n    ,LASTUPDATE\nFROM \n    dbo.RESCONTACTS\nWHERE\n    Res_Ref IN (SELECT ORES_REF FROM RESIDENT WHERE HOME_REF IN (@{variables('Home_Ref_List')}))",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Resident Contacts -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Resident Movement",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Resident Contacts",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    ACTDEATHDT\n    ,ADANAL_DEC\n    ,ADTYP_DEC\n    ,AD_REF\n    ,AmendDateTime\n    ,CAUSE\n    ,CAUSEDEATH\n    ,CreateDateTime\n    ,DATE\n    ,DISCHDECEAS\n    ,DISDEST\n    ,DISREASON\n    ,DISTYPE\n    ,DOCTOR\n    ,FINALDISCH\n    ,HOME_REF\n    ,INITIALADM\n    ,INOUT\n    ,LOC_REF\n    ,MOVE_REF\n    ,PLACE\n    ,REASON\n    ,RES_REF\n    ,ROOM\n    ,ROOM_TYPE\n    ,TIME\n    ,MOVE_TIME\n    ,ANALCHANGE\n    ,COMPOSITE\n    ,MOVESUB_REF\n    ,PREVDISDEST\n    ,PREVDISTYPE\nFROM \n    dbo.ADMIN_DISCHARGE\nWHERE\n    HOME_REF IN (@{variables('Home_Ref_List')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Resident Contacts -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Accounts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Resident Movement",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    ACCNO\n    ,ACCSUFFIX\n    ,ACCTYPE\n    ,ACCTYPE2\n    ,ACCTYPE_DECODE\n    ,ACC_REF\n    ,AmendDateTime\n    ,CALENDAR\n    ,CAL_REF\n    ,CHGPER\n    ,Cnta_Det_Ref\n    ,Cont_Ref\n    ,CreateDateTime\n    ,DAILYRATE\n    ,ENDDATE\n    ,FINALINV\n    ,FS_REF\n    ,FUNDSOURCE\n    ,HOME_REF\n    ,LASTRATEDT\n    ,ORIGREF\n    ,PENSBOOK\n    ,PROFILE\n    ,RATE\n    ,RECGRP\n    ,RECGRPDESC\n    ,RELACCREF\n    ,RES_REF\n    ,RecType\n    ,STARTDATE\n    ,SUFFIXSUPERCEDED\n    ,ANAL3\n    ,ATTENTION\n    ,AUTHORISED\n    ,CONSULTANT\n    ,CRCONTROL\n    ,DEBTORCODE\n    ,FUNDREQEDI\n    ,FURC_DEC\n    ,INPFUNDAPR\n    ,LOCALITY\n    ,NURFUNDAPR\n    ,RECONCILED\n    ,BANKACC\n    ,BANKACCNAME\n    ,BANKADDRESS1\n    ,BANKADDRESS2\n    ,BANKADDRESS3\n    ,BANKADDRESS4\n    ,BANKNAME\n    ,BANKPOSTCODE\n    ,BANKSORTCODE\n    ,BANKSTREF\n    ,BANKTRTYPE\n    ,DDMANDREF\n    ,SOCOLDAY\n    ,SOCOLLECT\n    ,SOVALUE\n    ,USAGE\n    ,CALCODE\n    ,PCTDESC\n    ,REVDATE\nFROM \n    ACCOUNT \nWHERE\n    HOME_REF IN (@{variables('Home_Ref_List')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Accounts -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Fund Source Contacts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Accounts",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    Address1\n    ,Address2\n    ,Address3\n    ,Address4\n    ,AmendDateTime\n    ,CreateDateTime\n    ,EMAIL\n    ,FundSourceName\n    ,GRGApp_GrGsRef\n    ,GRGrep_Cnta_Det_Ref\n    ,Inv_Narrative\n    ,PostCode\n    ,Tel_No1\n    ,Tel_No2\n    ,oCnta_Det_Ref\n    ,CQUIN\n    ,CQUIN_REF\n    ,CQUIN_TYPE\n    ,EDICONTACT\n    ,PAYDAYS\n    ,PAYDAYSDOM\n    ,PAYDAYSDOMDESC\n    ,PAYMONTH\n    ,PAYMONTHDESC\nFROM \n    dbo.FSCONTACTS\nWHERE\n    GRGApp_GrGsRef IN (@{variables('Home_Ref_List')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Fund Source Contacts -', utcNow('yyyy-MM-dd'), '.csv')",
 										"type": "Expression"
 									}
 								}
@@ -45639,25 +46104,18 @@
 					"elapsedTimeMetric": {}
 				},
 				"variables": {
-					"Home_Ref": {
+					"Home_Ref_List": {
 						"type": "String",
-						"defaultValue": "611"
-					},
-					"HomeName": {
-						"type": "String"
-					},
-					"IntranetID": {
-						"type": "Integer"
+						"defaultValue": "644,627,637,649,638,603,611,607,655,624,623,633,628,632,641,650,654,618,642,643,629,647,653,660,621,630,620,606,622,631,610,605,634,604,635,645,646,651,636,639,659,652,640,648"
 					}
 				},
 				"folder": {
-					"name": "Yardi/Dependency Tool"
+					"name": "Yardi/GRG"
 				},
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]",
 				"[concat(variables('factoryId'), '/datasets/DS_Yardi_CSV')]"
 			]
 		}
