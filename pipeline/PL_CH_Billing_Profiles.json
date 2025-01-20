@@ -5,7 +5,14 @@
 			{
 				"name": "Extract Local Auth Profiles",
 				"type": "Copy",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Clear LocalAuthProfiles Table",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -58,6 +65,102 @@
 						}
 					}
 				]
+			},
+			{
+				"name": "Export to CSV file",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Extract Local Auth Profiles",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT \n    C.Home_Ref\n    --,P.SiteId\n    ,SiteName\n    ,profile_code\n    ,profile_description\n    ,account_type\n    ,Pro_ref\n    ,bill_days_or_nights\n    ,bill_day_of_death\n    ,bill_day_of_discharge\n    ,bill_day_of_admission\n    --,Invprint\n    --,Invdoc\n    ,standing_order\n    ,notice_period\n    ,notice_period_analysis_code\n    ,notice_period_vat_code\n    ,default_charge_rate\n    ,charge_period\n    ,analysis_code\n    ,fees_description\n    ,vat_code\n    ,bill_while_temp_absent\n    ,automatic_credit\n    ,attach_pension_books\n    --,UserMemo\n    --,NoInvDec\n    ,sg_BankAcc\n    --,UseFlag\n    --,OOSExtraContrib\nFROM \n    dbo.LocalAuthProfiles AS P\n\n    LEFT JOIN ColdHarbourHomeID AS C\n        ON C.SITEID = P.SiteId",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_YardiStage",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Yardi_CSV",
+						"type": "DatasetReference",
+						"parameters": {
+							"Filename": {
+								"value": "@concat('Billing Profiles - ', utcNow('yyyy-MM-dd'), '.csv')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Clear LocalAuthProfiles Table",
+				"type": "Script",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AH2_YardiStage",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "TRUNCATE TABLE dbo.LocalAuthProfiles"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
 			}
 		],
 		"folder": {
