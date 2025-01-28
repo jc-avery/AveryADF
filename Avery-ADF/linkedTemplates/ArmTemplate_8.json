@@ -2636,6 +2636,88 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Bill_Profile_With_FundSource')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Profile and Fundsource",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": "SELECT DISTINCT\r\n\tP.PRO_CODE AS profile_code\r\n\t,P.PRODESC AS profile_description\r\n\t,CONTACT.CONTACT_REF AS oCnta_Det_Ref\r\n\t,CONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName\t\r\nFROM \r\n\tFUNDSRC_HD AS ACC\r\n\r\n\tLEFT JOIN PROFILES AS P\r\n\t\tON P.PRO_REF = ACC.PRO_REF\r\n\r\n\tLEFT JOIN CONTACT_HD AS CONTACT\r\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\r\n\r\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\r\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\r\nWHERE\r\n\tP.FSTYPE = 401",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('LA Billing Profiles and FundSource - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Yardi/CHIP"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Broadshield_Download_Data')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3218,113 +3300,6 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
 			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CQC_Proces_API_Results')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Runs pipelines to copy files from file share, then process them into SQL tables.",
-				"activities": [
-					{
-						"name": "Copy Files to Azure storage",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_CopyAPI_Responses",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Process Location Details",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy Files to Azure storage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_Upsert_Location",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Process Provider details",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Process Location Details",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_Upsert_Provider",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update Home ratings",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Process Provider details",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_Upsert_HomeAssessment",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "CQC"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
 		}
 	]
 }
