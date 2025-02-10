@@ -13,6 +13,358 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_Billing_Profiles')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Extract Local Auth Profiles",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Clear LocalAuthProfiles Table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": "SELECT \r\n    Site.SiteId\r\n\t,Site.SiteName\r\n\t,Profiles.Pro_code AS profile_code\r\n    ,Profiles.Prodesc AS profile_description\r\n    ,Chsysdec.Description AS account_type\r\n    ,Profiles.Pro_ref\r\n    ,Profiles.Billdays AS bill_days_or_nights\r\n    ,Profiles.Billdeath AS bill_day_of_death\r\n    ,Profiles.Billdod AS bill_day_of_discharge\r\n    ,Profiles.Billdoa AS bill_day_of_admission\r\n    ,Profiles.Invprint\r\n    ,Profiles.Invdoc\r\n    ,Profiles.Soflag AS standing_order\r\n    ,Profiles.Noticeper AS notice_period\r\n    ,Profiles.Nperanal AS notice_period_analysis_code\r\n    ,Profiles.Npervatr AS notice_period_vat_code\r\n    ,Profiles.Defrate AS default_charge_rate\r\n    ,Profiles.Chgper AS charge_period\r\n    ,Profiles.Feesanal AS analysis_code\r\n    ,Profiles.Feesdesc AS fees_description\r\n    ,Profiles.FeesVatC AS vat_code\r\n    ,Profiles.BillAbs AS bill_while_temp_absent\r\n    ,Profiles.Autocredit AS automatic_credit\r\n    ,Profiles.PenBooks AS attach_pension_books\r\n    ,Profiles.UserMemo\r\n    ,Profiles.NoInvDec\r\n    ,Profiles.sg_BankAcc\r\n    ,Profiles.UseFlag\r\n    ,Profiles.OOSExtraContrib\r\n\r\nFROM \r\n\tProfiles (NOLOCK)\r\n\r\n    JOIN Chsysdec (NOLOCK) -- Lookup table for values?\r\n        ON Chsysdec.Decode_Ref = Profiles.FsType\r\n\r\n    JOIN Site (NOLOCK)\r\n        ON Site.Site_Ref IN (\r\n                                SELECT Site_Ref\r\n                                FROM Site_Join (NOLOCK)\r\n                                WHERE Site_Join.LinkKey = Profiles.Pro_Ref\r\n                                      AND upper(Site_Join.LinkTable) = 'PROFILES'\r\n                            )\r\n           OR Profiles.SiteFilter = 0\r\nWHERE \r\n\tProfiles.FSTYPE = 401 --Local Auth\r\n\tAND Site.SITEID IN (\r\n\t071,\r\n072,\r\n073,\r\n074,\r\n075,\r\n078,\r\n079,\r\n086,\r\n089,\r\n088,\r\n091,\r\n092,\r\n090,\r\n095,\r\n096,\r\n097,\r\n098,\r\n099,\r\n100,\r\n101,\r\n102,\r\n103,\r\n104,\r\n105,\r\n106,\r\n107,\r\n108,\r\n109,\r\n110,\r\n111,\r\n112,\r\n113,\r\n114,\r\n115,\r\n116,\r\n117,\r\n118,\r\n119,\r\n120,\r\n121,\r\n122,\r\n123,\r\n127,\r\n128\r\n)",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "LocalAuthProfiles"
+								}
+							}
+						]
+					},
+					{
+						"name": "Export to CSV file",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Extract Local Auth Profiles",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    H.Home_Ref\n    --,P.SiteId\n    ,SiteName\n    ,profile_code\n    ,profile_description\n    ,account_type\n    ,Pro_ref\n    ,bill_days_or_nights\n    ,bill_day_of_death\n    ,bill_day_of_discharge\n    ,bill_day_of_admission\n    --,Invprint\n    --,Invdoc\n    ,standing_order\n    ,notice_period\n    ,notice_period_analysis_code\n    ,notice_period_vat_code\n    ,default_charge_rate\n    ,charge_period\n    ,analysis_code\n    ,fees_description\n    ,vat_code\n    ,bill_while_temp_absent\n    ,automatic_credit\n    ,attach_pension_books\n    --,UserMemo\n    --,NoInvDec\n    ,sg_BankAcc\n    --,UseFlag\n    --,OOSExtraContrib\nFROM \n    dbo.LocalAuthProfiles AS P\n\n    LEFT JOIN ColdHarbourHomeID AS H\n        ON H.SITEID = P.SiteId",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('LA Billing Profiles - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Clear LocalAuthProfiles Table",
+						"type": "Script",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_YardiStage",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "TRUNCATE TABLE dbo.LocalAuthProfiles"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Yardi/CHIP"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_Calendars')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Extract Calendars",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Clear Calendars table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": "SELECT DISTINCT\n    Site.SiteName\n    ,Site.SiteId\n    ,Calendar_Hd.Cal_Ref\n    ,Calendar_Hd.Cal_code AS calendar_code\n    ,Calendar_Hd.Cal_desc as calendar_description\n    ,DECGrouping.Description AS calendar_grouping\n    ,Calendar_Hd.Invdtoff\n    ,Calendar_Hd.Invdttype\n    ,Calendar_Hd.BldStartDt AS calendar_start_date\n    ,Calendar_Hd.BldEndDt AS calendar_end_date\n    ,Calendar_Hd.BldFreq AS frequency\n    ,Calendar_Hd.BldDays AS no_of_days\n    ,Calendar_Hd.ProcFlag\n    ,Calendar_Hd.SiteFilter\n    ,Calendar_Hd.Sched_Only\n    ,Calendar_Hd.AutoProc\n    ,Calendar_Hd.ProcOffset\n    ,Calendar_Hd.AutoProcWarn\n    ,Calendar_Hd.InvOffset\n    ,Calendar_Hd.AutoInvWarn\n    ,Calendar_Dt.StartDate AS period_start_date\n    ,Calendar_Dt.EndDate AS period_end_date\n    ,Calendar_Dt.BillDate AS period_bill_date\n    ,Calendar_Dt.SSProcessDate\n    ,Calendar_Dt.SSInvoiceDate\nFROM \n\tCalendar_Hd (NOLOCK)\n    \n\tJOIN ChSysDec AS DECGrouping (NOLOCK)\n        ON DECGrouping.Decode_Ref = Calendar_Hd.Grouping\n    \n\tJOIN Calendar_Dt (NOLOCK)\n        ON Calendar_Dt.Cal_Ref = Calendar_Hd.Cal_Ref\n    \n\tJOIN Site (NOLOCK)\n        ON Site.Site_Ref IN (\n                                SELECT Site_Ref\n                                FROM Site_Join (NOLOCK)\n                                WHERE Site_Join.LinkKey = Calendar_Hd.Cal_Ref\n                                      AND upper(Site_Join.LinkTable) = 'CALENDAR_HD'\n                            )\n           OR Calendar_Hd.SiteFilter = 0\nWHERE \n\tCalendar_Hd.Cal_Code\n    BETWEEN '      ' AND 'ZZZZZZ'\n    AND Calendar_Dt.StartDate\n    BETWEEN '17530101' AND '20991212'\n    AND Calendar_Dt.EndDate\n    BETWEEN '17530101' AND '20991212'\n    AND (\n            Calendar_Dt.BillDate\n    BETWEEN '17530101' AND '20991212'\n            OR Calendar_Dt.BillDate IS NULL\n        )\n    AND Site.SITEID IN (\n\t071,\n\t072,\n\t073,\n\t074,\n\t075,\n\t078,\n\t079,\n\t086,\n\t089,\n\t088,\n\t091,\n\t092,\n\t090,\n\t095,\n\t096,\n\t097,\n\t098,\n\t099,\n\t100,\n\t101,\n\t102,\n\t103,\n\t104,\n\t105,\n\t106,\n\t107,\n\t108,\n\t109,\n\t110,\n\t111,\n\t112,\n\t113,\n\t114,\n\t115,\n\t116,\n\t117,\n\t118,\n\t119,\n\t120,\n\t121,\n\t122,\n\t123,\n\t127,\n\t128\n\t)\nORDER BY \n\tCalendar_Hd.Cal_code",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Calendars"
+								}
+							}
+						]
+					},
+					{
+						"name": "Export to CSV file",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Extract Calendars",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    H.HOME_REF\n    ,SiteName\n    --,Cal.SiteId\n    ,Cal_Ref\n    ,calendar_code\n    ,calendar_description\n    ,calendar_grouping\n    --,Invdtoff\n    --,Invdttype\n    ,calendar_start_date\n    ,calendar_end_date\n    ,frequency\n    ,no_of_days\n    ,ProcFlag\n    ,SiteFilter\n    ,Sched_Only\n    --,AutoProc\n    --,ProcOffset\n    --,AutoProcWarn\n    --,InvOffset\n    --,AutoInvWarn\n    ,period_start_date\n    ,period_end_date\n    ,period_bill_date\n    ,SSProcessDate\n    ,SSInvoiceDate\nFROM \n    dbo.Calendars AS Cal\n\n    LEFT JOIN dbo.ColdHarbourHomeID AS H\n        ON H.SITEID = Cal.SiteID\n",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Calendars - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Clear Calendars table",
+						"type": "Script",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_YardiStage",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "TRUNCATE TABLE dbo.Calendars"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Yardi/CHIP"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_Residents')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -5119,81 +5471,6 @@
 				}
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_11-45pm')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Broadshield_Download_Data",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2024-10-02T16:09:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								45
-							],
-							"hours": [
-								23
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_2am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Every day at 2am",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_CareBlox_Download",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2024-03-12T16:04:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								2
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_CareBlox_Download')]"
-			]
 		}
 	]
 }
