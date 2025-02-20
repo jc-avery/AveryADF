@@ -26003,7 +26003,7 @@
 					"elapsedTimeMetric": {}
 				},
 				"folder": {
-					"name": "Agency"
+					"name": "Agency/Children Pipeline"
 				},
 				"annotations": []
 			},
@@ -47468,7 +47468,7 @@
 					},
 					{
 						"pipelineReference": {
-							"referenceName": "PL_ClearAndPopulate_AgencyShiftClean",
+							"referenceName": "PL_Agency_WAC",
 							"type": "PipelineReference"
 						},
 						"parameters": {}
@@ -47505,7 +47505,7 @@
 				"[concat(variables('factoryId'), '/pipelines/PL_Agency_HomeName')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Pricing_CreateOrAlter_Views')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Avery_RLS_TRANSFORM')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_ClearAndPopulate_AgencyShiftClean')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Agency_WAC')]"
 			]
 		},
 		{
@@ -48190,6 +48190,114 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Employee')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_ClearAndPopulate_AgencyRanking')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Exec Stored Proc",
+						"description": "Execute the ClearAndPopulate$AgencyRanking procedure to clear and populate the AgencyRanking table.",
+						"type": "Script",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_Agency",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC ClearAndPopulate$AgencyRanking"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Agency/Children Pipeline"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AH2_Agency')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Agency_WAC')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline used to build data used for average costs and ranking or agencies and rate using WAC.",
+				"activities": [
+					{
+						"name": "AgencyShiftClean table",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ClearAndPopulate_AgencyShiftClean",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "AgencyRanking",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "AgencyShiftClean table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ClearAndPopulate_AgencyRanking",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Agency"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_ClearAndPopulate_AgencyShiftClean')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_ClearAndPopulate_AgencyRanking')]"
 			]
 		}
 	]
