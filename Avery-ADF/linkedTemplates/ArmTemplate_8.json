@@ -13,6 +13,313 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_SoftWorks_API_Employee')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Employee data",
+						"description": "Start date in the body looks to be irrelevant, it uses the end date to return emp with a start date less than that. ",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Employee File Name",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:03:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "POST",
+								"requestBody": {
+									"value": "@concat('{\n    \"DataExtractType\": 4000,\n    \"StartDate\": \"',variables('TodaysDate'),'\",\n    \"EndDate\": \"',variables('ThreeMonthsAhead'),'\",\n    \"Customer\": \"internal\"\n}')",
+									"type": "Expression"
+								},
+								"additionalHeaders": {
+									"Content-Type": "application/json"
+								},
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Softworks_API_Employees",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('EmpFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Todays Date",
+						"description": "Used in sink to Store the files in folder with todays date",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "TodaysDate",
+							"value": {
+								"value": "@formatDateTime(utcNow(), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set One Months Ahead",
+						"description": "Set to the end of the month, 1 month ahead. Used in the API call so details of future starters is returned.",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Todays Date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ThreeMonthsAhead",
+							"value": {
+								"value": "@formatDateTime(addToTime(utcNow(), 1, 'Month'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set WeekEndingDate",
+						"description": "Set the previous week ending date in the dd-MM-yyyy format for the API",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "WeekEndingDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set WeekBegining Date",
+						"description": "Set the previous week Start date in the dd-MM-yyyy format for the API",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set WeekEndingDate",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "WeekBeginingDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 6, 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Download Clockings data",
+						"description": "Start date in the body looks to be irrelevant, it uses the end date to return emp with a start date less than that. ",
+						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set Clockings File Name",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:03:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "POST",
+								"requestBody": {
+									"value": "@concat('{\n    \"DataExtractType\": 2000,\n    \"StartDate\": \"',variables('WeekBeginingDate'),'\",\n    \"EndDate\": \"',variables('WeekEndingDate'),'\",\n    \"Customer\": \"internal\"\n}')",
+									"type": "Expression"
+								},
+								"additionalHeaders": {
+									"Content-Type": "application/json"
+								},
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Softworks_API_Employees",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('ClockingsFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Clockings File Name",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set WeekBegining Date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ClockingsFileName",
+							"value": {
+								"value": "@concat('Clockings', '$', variables('WeekBeginingDate'), '$', variables('WeekEndingDate') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Employee File Name",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set One Months Ahead",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EmpFileName",
+							"value": {
+								"value": "@concat('EmployeeList', '$', variables('TodaysDate'))",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"TodaysDate": {
+						"type": "String"
+					},
+					"ThreeMonthsAhead": {
+						"type": "String"
+					},
+					"EmpFileName": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Softworks/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-10T11:21:25Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Softworks_EmployeeHoliday')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2568,81 +2875,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Agency_WAC')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Pipeline used to build data used for average costs and ranking or agencies and rate using WAC.",
-				"activities": [
-					{
-						"name": "AgencyShiftClean table",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_ClearAndPopulate_AgencyShiftClean",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "AgencyRanking",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 10",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_ClearAndPopulate_AgencyRanking",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 10",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "AgencyShiftClean table",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 10
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Agency"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2929,7 +3161,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\r\n\tP.PRO_CODE AS profile_code\r\n\t,P.PRODESC AS profile_description\r\n\t,CONTACT.CONTACT_REF AS oCnta_Det_Ref\r\n\t,CONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName\t\r\nFROM \r\n\tFUNDSRC_HD AS ACC\r\n\r\n\tLEFT JOIN PROFILES AS P\r\n\t\tON P.PRO_REF = ACC.PRO_REF\r\n\r\n\tLEFT JOIN CONTACT_HD AS CONTACT\r\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\r\n\r\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\r\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\r\nWHERE\r\n\tP.FSTYPE = 401",
+								"sqlReaderQuery": "SELECT DISTINCT\r\n\tP.PRO_CODE AS profile_code\r\n\t,P.PRODESC AS profile_description\r\n\t,CONTACT.CONTACT_REF AS oCnta_Det_Ref\r\n\t,CONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName\t\r\nFROM \r\n\tFUNDSRC_HD AS ACC\r\n\r\n\tLEFT JOIN PROFILES AS P\r\n\t\tON P.PRO_REF = ACC.PRO_REF\r\n\r\n\tLEFT JOIN CONTACT_HD AS CONTACT\r\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\r\n\r\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\r\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\r\n\t\t\r\n\tLEFT JOIN RESIDENT AS R\r\n\t\tON R.RES_REF = ACC.RES_REF\r\nWHERE\r\n\tP.FSTYPE = 401\r\n\tAND R.STATUS IN (25028, 25029)",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
