@@ -38360,6 +38360,150 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_AllResults')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ResultID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "ResultID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['passed']"
+										},
+										"sink": {
+											"name": "Passed",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['score']"
+										},
+										"sink": {
+											"name": "Score",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "$['completed_at']"
+										},
+										"sink": {
+											"name": "CompletedAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['expires_at']"
+										},
+										"sink": {
+											"name": "ExpiresAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['course']['id']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['user']['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_AllResults",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "Results"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_YourHippo_AllResults')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Move_WebHook_files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -47479,6 +47623,34 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_YourHippo_AllResults')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "AllResults_Page_1001-1500.json",
+						"folderPath": "AllResults",
+						"container": "yourhippo"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_YourHippo_Courses')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -48337,6 +48509,60 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Hydra_Output_File')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Every30Min')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_YourHippo_WebHook",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2025-03-07T06:00:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30,
+								0
+							],
+							"hours": [
+								6,
+								7,
+								8,
+								9,
+								10,
+								11,
+								12,
+								13,
+								14,
+								15,
+								16,
+								17,
+								18,
+								19,
+								20,
+								21
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_YourHippo_WebHook')]"
 			]
 		},
 		{
@@ -49384,60 +49610,6 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Employee')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Every30Min')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_YourHippo_WebHook",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2025-03-07T06:00:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								30,
-								0
-							],
-							"hours": [
-								6,
-								7,
-								8,
-								9,
-								10,
-								11,
-								12,
-								13,
-								14,
-								15,
-								16,
-								17,
-								18,
-								19,
-								20,
-								21
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_YourHippo_WebHook')]"
 			]
 		}
 	]
