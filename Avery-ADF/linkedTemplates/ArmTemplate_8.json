@@ -13,6 +13,163 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Fileshare')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Moves the exported csv file from the Azure File Share to Azure Storage Container. The file contains list of Exchequer companies and the users with access to it",
+				"activities": [
+					{
+						"name": "Copy CSV",
+						"description": "Copy CSV file to Exchequer Azure Container",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare_Exchequer",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Exchequer",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Delete File from File Share",
+						"type": "Delete",
+						"dependsOn": [
+							{
+								"activity": "Copy CSV",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_PolestarStorageAcc_Fileshare_Exchequer",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureFileStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Exchequer/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-26T11:47:51Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "removes files from provided container in the date range provided",
+				"activities": [
+					{
+						"name": "Delete Careblox bak files",
+						"type": "Delete",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_Polestar_Storage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "other"
+								}
+							},
+							"logStorageSettings": {
+								"linkedServiceName": {
+									"referenceName": "PolestarStorageAcc",
+									"type": "LinkedServiceReference"
+								},
+								"path": "other"
+							},
+							"enableLogging": true,
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"modifiedDatetimeStart": "2024-05-01T00:00:00.000Z",
+								"modifiedDatetimeEnd": "2025-01-31T00:00:00.000Z",
+								"enablePartitionDiscovery": false
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Date": {
+						"type": "String"
+					}
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-09-17T11:21:25Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Hydra_Output_File')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -4460,258 +4617,6 @@
 								}
 							}
 						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "YourHippo"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_AllResults')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy data1",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"ResultID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "ResultID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "$['passed']"
-										},
-										"sink": {
-											"name": "Passed",
-											"type": "Boolean"
-										}
-									},
-									{
-										"source": {
-											"path": "$['score']"
-										},
-										"sink": {
-											"name": "Score",
-											"type": "Decimal"
-										}
-									},
-									{
-										"source": {
-											"path": "$['completed_at']"
-										},
-										"sink": {
-											"name": "CompletedAt",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['expires_at']"
-										},
-										"sink": {
-											"name": "ExpiresAt",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['course']['id']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "$['user']['id']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "String"
-										}
-									}
-								]
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_AllResults",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "YourHippo",
-									"Table": "Results"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "YourHippo"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Delete_Archive_Files')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Deletes files older than 4 days from the archive to prevent build up",
-				"activities": [
-					{
-						"name": "Delete Result Archive Files",
-						"type": "Delete",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_YourHippo_WebHook_Files",
-								"type": "DatasetReference",
-								"parameters": {
-									"Folder": "WebhookFiles/Archive/Result"
-								}
-							},
-							"logStorageSettings": {
-								"linkedServiceName": {
-									"referenceName": "PolestarStorageAcc",
-									"type": "LinkedServiceReference"
-								},
-								"path": "yourhippo/Deletion Log"
-							},
-							"enableLogging": true,
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": false,
-								"modifiedDatetimeStart": {
-									"value": "@addDays(utcNow(), -20 )",
-									"type": "Expression"
-								},
-								"modifiedDatetimeEnd": {
-									"value": "@addDays(utcNow(), -4 )",
-									"type": "Expression"
-								},
-								"enablePartitionDiscovery": false
-							}
-						}
-					},
-					{
-						"name": "Delete User Archive",
-						"type": "Delete",
-						"dependsOn": [
-							{
-								"activity": "Delete Result Archive Files",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_YourHippo_WebHook_Files",
-								"type": "DatasetReference",
-								"parameters": {
-									"Folder": "WebhookFiles/Archive/User"
-								}
-							},
-							"logStorageSettings": {
-								"linkedServiceName": {
-									"referenceName": "PolestarStorageAcc",
-									"type": "LinkedServiceReference"
-								},
-								"path": "yourhippo/Deletion Log"
-							},
-							"enableLogging": true,
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": false,
-								"modifiedDatetimeStart": {
-									"value": "@addDays(utcNow(), -20 )",
-									"type": "Expression"
-								},
-								"modifiedDatetimeEnd": {
-									"value": "@addDays(utcNow(), -4 )",
-									"type": "Expression"
-								},
-								"enablePartitionDiscovery": false
-							}
-						}
 					}
 				],
 				"policy": {
