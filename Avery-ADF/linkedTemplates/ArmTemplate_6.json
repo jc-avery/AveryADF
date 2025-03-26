@@ -13,6 +13,144 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Enquiries_Export')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Enquiries to CSV",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Enquiries Rec FileName",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[AEMS].[EnquiriesReceived$Export]",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".csv"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_AEMS",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@variables('Today')",
+										"type": "Expression"
+									},
+									"FileName": {
+										"value": "@variables('EnquiriesRecFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Todays date",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Today",
+							"value": {
+								"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Enquiries Rec FileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Todays date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EnquiriesRecFileName",
+							"value": {
+								"value": "@concat('EnquiriesReceived$', formatDateTime(utcNow(), 'dd-MM-yyyy'), '.csv')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EnquiriesRecFileName": {
+						"type": "String"
+					},
+					"Today": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "AEMS/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-29T14:01:21Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export_PBData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -9487,142 +9625,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-03T15:08:45Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_UAT_Courses')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Download Coursesdata",
-						"description": "Connects to Myrus API Courses end point and downloads data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set Courses File Name",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "RestSource",
-								"httpRequestTimeout": "00:01:40",
-								"requestInterval": "00.00:00:00.010",
-								"requestMethod": "GET",
-								"paginationRules": {
-									"supportRFC5988": "true"
-								}
-							},
-							"sink": {
-								"type": "JsonSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "JsonWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_BroadShield_UAT_API",
-								"type": "DatasetReference",
-								"parameters": {
-									"Date": {
-										"value": "@variables('API_Date')",
-										"type": "Expression"
-									},
-									"EndPoint": "courses"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_BroadShield_JSON",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@variables('UsersFileName')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Courses File Name",
-						"description": "Sets the name of the file to be used in the sink data set",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set Date for API Call",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "UsersFileName",
-							"value": {
-								"value": "@concat('Courses', '$', formatDateTime(utcNow(), 'dd-MM-yyyy'))",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set Date for API Call",
-						"description": "Sets the date to be 30 days prior to today",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "API_Date",
-							"value": {
-								"value": "@formatDateTime(subtractFromTime(utcNow(), 30, 'Day'), 'yyyyMMddHHmmss')",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"UsersFileName": {
-						"type": "String"
-					},
-					"API_Date": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Broadshield/UAT"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-09-26T09:59:30Z"
 			},
 			"dependsOn": []
 		}
