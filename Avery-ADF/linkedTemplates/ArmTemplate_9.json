@@ -13,6 +13,993 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_AEMS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Look up Values",
+						"type": "Lookup",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "AEMS Enquiry",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set HomeName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set IntranetID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    ID\n    ,AEMS_ID\n    ,aems_version\n    ,homeID\n    ,uploadedBy\n    ,managerEmailed\n    ,enquiryStatus\n    ,enquiryID\n    ,initialEnquiry\n    ,enquirerSalutation\n    ,enquirerLastName AS enquirerFirstName\n    ,enquirerFirstName AS enquirerLastName \n    ,enquirerSalutationTwo\n    ,enquirerLastNameTwo \n    ,enquirerFirstNameTwo \n    ,enquiryDate\n    ,enquirerRelationshipToResident\n    ,en_areacode\n    ,enquirerTelephone \n    ,enquiry_mobile \n    ,enquirerEmail \n    ,enquirerAddress \n    ,enquirerAddressOne \n    ,enquirerAddressTwo \n    ,enquirerAddressThree \n    ,enquiry_postcode \n    ,enquiry_postcode_two \n    ,residentSalutation\n    ,residentFirstName \n    ,residentLastName \n    ,residentDOB \n    ,residentSalutationTwo\n    ,residentFirstNameTwo\n    ,residentLastNameTwo\n    ,residentDOBTwo\n    ,residentNOK\n    ,residentAddress \n    ,residentAddressOne \n    ,residentAddressTwo \n    ,residentAddressThree \n    ,residentPostcode \n    ,residentTelephone \n    ,residentCareCategory\n    ,residentFundingCategory\n    ,residentCareCategoryTwo\n    ,funding_total\n    ,residentFunding\n    ,residentFundingTwo\n    --,enquiryDetails \n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiryDetails), '\"', '') AS enquiryDetails\n    ,enquiryType\n    ,responseTime\n    ,responseCurrentStatus\n    ,responseNeeded\n    ,responseAmountTried\n    ,followUpDate\n    ,followUpReason\n    ,uploadToCH\n    ,admissionDate\n    ,enquiryClosed\n    ,managerContacted\n    ,homeVisit\n    ,assessmentBooked\n    ,assesmentComplete\n    ,admission\n    ,homeVisitBooked\n    ,admissionBooked\n    ,video_booked\n    ,video_complete\n    ,homeVisitRequested\n    ,assesmentRequested\n    ,newEnquiry\n    ,cameFrom\n    ,enquirer_address \n    ,enquirer_postcode \n    ,lng\n    ,lat\n    ,enquirer_area\n    ,enquirer_county\n    ,nok_name\n    ,nok_surname\n    ,nok_county\n    ,nok_relation\n    ,nok_telephone\n    ,nok_mobile\n    ,nok_address\n    ,resident_county\n    ,nok_Salutation\n    ,newsletter_receive\n    ,newsletter_email\n    ,enquiry_urgent\n    ,optOut\n    ,type_news\n    ,type_mag\n    ,type_other\n    ,gp_name\n    ,gp_address\n    ,gp_telephone\n    ,gp_requested\n    ,gp_received\n    ,website\n    ,brochure\n    ,brochure_requestID\n    ,entryMethod\n    ,current_action_id\n    ,column_hash\n    ,receiveMarketing\n    ,willTopUp\n    ,enquiry_entered_from\n    ,enquiry_closed_reason\n    ,enquiry_deleted\n    ,enquiry_weight\nFROM \n    AEMS.AEMS_Enquiries AS E\nWHERE \n    E.homeID IN (@{variables('IntranetID')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('AEMS Enquiry - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set HomeName",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "HomeName",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set IntranetID",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IntranetID",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.IntranetID",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "AEMS Enquiry Actions",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "AEMS Enquiry",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    A.ID\n    ,A.AEMS_ID\n    ,enquiry_setBy\n    ,enquiry_id\n    ,enquiry_dateRequired\n    ,enquiry_reason\n    ,enquiry_contact\n    ,enquiry_actionComplete\n    ,enquiry_actionInserted\n    ,enquiry_actionCompleteDate\n    ,enquiry_actionCompleteBy\n    ,enquiry_homeID\n    ,enquiry_missed\n    ,enquiry_missedEmail\n    ,enquiry_missedEmailDate\n    ,enquiry_initialContact\n    ,enquiry_flag\n    ,enquiry_critical\n    --,REPLACE(enquiry_details, '\"', '')\n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiry_details), '\"', '') AS enquiry_details\n    ,enquiry_picked_up\n    ,enquiry_assigned_to\n    ,enquiry_assigned_when\n    ,enquiry_action_call_handler\n    ,enquiry_new\nFROM \n    AEMS.AEMS_Enquiries_Actions AS A\n\n    INNER JOIN AEMS.AEMS_Enquiries AS E\n        ON E.AEMS_ID = A.enquiry_id\n        AND E.homeID = A.enquiry_homeID\n    WHERE\n        A.enquiry_homeID IN (@{variables('IntranetID')})\n        ",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('AEMS Enquiry Actions - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"HomeName": {
+						"type": "String"
+					},
+					"IntranetID": {
+						"type": "String",
+						"defaultValue": "7573,7574,7575,7576,7577,7581,7588,7589,7591,83,7594,7596,7598,7600,7601"
+					}
+				},
+				"folder": {
+					"name": "Yardi/AEMS"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_DependencyTool')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Look up Values",
+						"type": "Lookup",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set HomeName",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "HomeName",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set IntranetID",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IntranetID",
+							"value": "[[object Object]"
+						}
+					},
+					{
+						"name": "Export Dependency Records",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set IntranetID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    R.ID,\n    R.Assesment_Date,\n    R.Status,\n    R.Homename,\n    R.Intranet,\n    R.Res_No,\n    R.Res_First_Name,\n    R.Res_Surname,\n    R.Unit,\n    R.Room_No,\n    R.Type,\n    R.Total_Standard_Score AS Total_Service_Duration,\n\n    Q1.Service_Description AS Service1_Description,\n    r.Q1_Score AS Service1_Score,\n    r.Q1_Standard_Score AS Service1_MinutesRequired,\n    Q1.Support_Description AS Service1_SupportDescription,\n    \n    Q2.Service_Description AS Service2_Description,\n    r.Q2_Score AS Service2_Score,\n    r.Q2_Standard_Score AS Service2_MinutesRequired,\n    Q2.Support_Description AS Service2_SupportDescription,\n\n    Q3.Service_Description AS Service3_Description,\n    r.Q3_Score AS Service3_Score,\n    r.Q3_Standard_Score AS Service3_MinutesRequired,\n    Q3.Support_Description AS Service3_SupportDescription,\n\n    Q4.Service_Description AS Service4_Description,\n    r.Q4_Score AS Service4_Score,\n    r.Q4_Standard_Score AS Service4_MinutesRequired,\n    Q4.Support_Description AS Service4_SupportDescription,\n\n    Q5.Service_Description AS Service5_Description,\n    r.Q5_Score AS Service5_Score,\n    r.Q5_Standard_Score AS Service5_MinutesRequired,\n    Q5.Support_Description AS Service5_SupportDescription,\n\n    Q6.Service_Description AS Service6_Description,\n    r.Q6_Score AS Service6_Score,\n    r.Q6_Standard_Score AS Service6_MinutesRequired,\n    Q6.Support_Description AS Service6_SupportDescription,\n\n    Q7.Service_Description AS Service7_Description,\n    r.Q7_Score AS Service7_Score,\n    r.Q7_Standard_Score AS Service7_MinutesRequired,\n    Q7.Support_Description AS Service7_SupportDescription,\n\n    Q8.Service_Description AS Service8_Description,\n    r.Q8_Score AS Service8_Score,\n    r.Q8_Standard_Score AS Service8_MinutesRequired,\n    Q8.Support_Description AS Service8_SupportDescription,\n\n    Q9.Service_Description AS Service9_Description,\n    r.Q9_Score AS Service9_Score,\n    r.Q9_Standard_Score AS Service9_MinutesRequired,\n    Q9.Support_Description AS Service9_SupportDescription,\n\n    Q10.Service_Description AS Service10_Description,\n    r.Q10_Score AS Service10_Score,\n    r.Q10_Standard_Score AS Service10_MinutesRequired,\n    Q10.Support_Description AS Service10_SupportDescription,\n\n    Q11.Service_Description AS Service11_Description,\n    r.Q11_Score AS Service11_Score,\n    r.Q11_Standard_Score AS Service11_MinutesRequired,\n    Q11.Support_Description AS Service11_SupportDescription,\n\n    Q12.Service_Description AS Service12_Description,\n    r.Q12_Score AS Service12_Score,\n    r.Q12_Standard_Score AS Service12_MinutesRequired,\n    Q12.Support_Description AS Service12_SupportDescription,\n\n    Q13.Service_Description AS Service13_Description,\n    r.Q13_Score AS Service13_Score,\n    r.Q13_Standard_Score AS Service13_MinutesRequired,\n    Q13.Support_Description AS Service13_SupportDescription\nFROM \n    Dependency_Tool_Responses AS R\n\n    LEFT JOIN Dependency_Tool AS Q1\n        ON Q1.Support_Level = R.Q1_Score\n        AND Q1.Service_Number = 1\n\n    LEFT JOIN Dependency_Tool AS Q2\n        ON Q2.Support_Level = R.Q2_Score\n        AND Q2.Service_Number = 2\n\n    LEFT JOIN Dependency_Tool AS Q3\n        ON Q3.Support_Level = R.Q3_Score\n        AND Q3.Service_Number = 3\n\n    LEFT JOIN Dependency_Tool AS Q4\n        ON Q4.Support_Level = R.Q4_Score\n        AND Q4.Service_Number = 4\n\n    LEFT JOIN Dependency_Tool AS Q5\n        ON Q5.Support_Level = R.Q5_Score\n        AND Q5.Service_Number = 5\n\n    LEFT JOIN Dependency_Tool AS Q6\n        ON Q6.Support_Level = R.Q6_Score\n        AND Q6.Service_Number = 6\n\n    LEFT JOIN Dependency_Tool AS Q7\n        ON Q7.Support_Level = R.Q7_Score\n        AND Q7.Service_Number = 7\n\n    LEFT JOIN Dependency_Tool AS Q8\n        ON Q8.Support_Level = R.Q8_Score\n        AND Q8.Service_Number = 8\n\n    LEFT JOIN Dependency_Tool AS Q9\n        ON Q9.Support_Level = R.Q9_Score\n        AND Q9.Service_Number = 9\n\n    LEFT JOIN Dependency_Tool AS Q10\n        ON Q10.Support_Level = R.Q10_Score\n        AND Q10.Service_Number = 10\n\n    LEFT JOIN Dependency_Tool AS Q11\n        ON Q11.Support_Level = R.Q11_Score\n        AND Q11.Service_Number = 11\n\n    LEFT JOIN Dependency_Tool AS Q12\n        ON Q12.Support_Level = R.Q12_Score\n        AND Q12.Service_Number = 12\n\n    LEFT JOIN Dependency_Tool AS Q13\n        ON Q13.Support_Level = R.Q13_Score\n        AND Q13.Service_Number = 13\nWHERE \n    --R.Status = 'Active' \n    R.Intranet IN (@{variables('IntranetID')})\nORDER BY \n    Intranet ASC, \n    Assesment_Date ASC",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('Welltower Homes', ' - Dependency Tool Responses - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String"
+					},
+					"HomeName": {
+						"type": "String"
+					},
+					"IntranetID": {
+						"type": "String",
+						"defaultValue": "7573,7574,7575,7576,7577,7581,7588,7589,7591,83,7594,7596,7598,7600,7601"
+					}
+				},
+				"folder": {
+					"name": "Yardi/Dependency Tool"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_ResidentForms')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Lookup Home",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, SITE_REF, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": true
+						}
+					},
+					{
+						"name": "Set HomeName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Lookup Home",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "HomeName",
+							"value": {
+								"value": "@activity('Lookup Home').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set HomeName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set IntranetID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    [ID]\n    ,[res_no]\n    ,[forename]\n    ,[surname]\n    ,[intranet]\n    ,[change_date]\n    ,[admitted_from]\n    ,[tested_prior_last]\n    ,[tested_date]\n    ,[tested_where]\n    ,[tested_result]\n    ,[symptomatic]\n    ,[symptomatic_date]\n    ,[isolation_Date]\n    ,[isolation_end_date]\n    ,[days_isolated]\n    ,[protocol_followed]\n    ,[hospital_prior]\n    ,[Hospital_lastdate]\n    ,[hospital_duration]\n    ,[hospital_tested]\n    ,[hospital_tested_date]\n    ,[hospital_rest_result]\n    ,[form_type]\n    ,[status]\n    ,[room_no]\n    ,[funding_change]\n    ,[dilaps_charge]\n    ,[SL_Chk_by]\n    ,[SL_chk_date]\n    ,[discharge_reason]\n    ,[comments]\n    ,[dob]\n    ,[SL_comments]\n    ,[NHS_No]\n    ,[Nurs_res]\n    ,[Resp_Perm]\n    ,[disch_date]\n    ,[paymentonadm]\n    ,[NSHIDno]\n    ,[fee]\n    ,[Date_Complete]\nFROM \n    [ResidentForms].[Submitted_Forms]\nWHERE\n    intranet = '@{variables('IntranetID')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('HomeName'), '  - Resident Forms - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set IntranetID",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Lookup Home",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IntranetID",
+							"value": {
+								"value": "@activity('Lookup Home').output.firstRow.IntranetID",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"HomeName": {
+						"type": "String"
+					},
+					"IntranetID": {
+						"type": "Integer"
+					}
+				},
+				"folder": {
+					"name": "Yardi/Resident Forms"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Upsert Entity Details",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"EntityID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "EntityID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['name']"
+										},
+										"sink": {
+											"name": "EntityName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['email']"
+										},
+										"sink": {
+											"name": "Email",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_EntityList",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "Entity"
+								}
+							}
+						]
+					},
+					{
+						"name": "Upsert Courses",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Upsert Entity Details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"CourseID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['title']"
+										},
+										"sink": {
+											"name": "CourseTitle",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['published']"
+										},
+										"sink": {
+											"name": "Published",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['archived']"
+										},
+										"sink": {
+											"name": "Archived",
+											"type": "Boolean"
+										}
+									}
+								],
+								"collectionReference": ""
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Courses",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "Course"
+								}
+							}
+						]
+					},
+					{
+						"name": "Upsert Users",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Upsert Courses",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"UserID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['employee_number']"
+										},
+										"sink": {
+											"name": "EmployeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['created_at']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['name']"
+										},
+										"sink": {
+											"name": "UserName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['email']"
+										},
+										"sink": {
+											"name": "Email",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['gender']['description']"
+										},
+										"sink": {
+											"name": "Gender",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['job_title']"
+										},
+										"sink": {
+											"name": "JobTitle",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['role']['name']"
+										},
+										"sink": {
+											"name": "UserRole",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['primaryEntity']['id']"
+										},
+										"sink": {
+											"name": "PrimaryEntityID",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Users",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "Users"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_AllResults')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2423,520 +3410,6 @@
 				"lastPublishTime": "2024-10-08T10:01:01Z"
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_Bill_Profile_With_Calendar')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export billing profiles and Calendars used",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\n\tP.PRO_CODE AS profile_code,\n\tP.PRODESC AS profile_description,\n\tCALENDAR.CAL_REF AS Cal_Ref,\n\tCALENDAR.CAL_CODE AS calendar_code,\n\tCALENDAR.CAL_DESC AS calendar_description\t\nFROM \n\tFUNDSRC_HD AS ACC\n\n\tLEFT JOIN PROFILES AS P\n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN CONTACT_HD AS CONTACT\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\nWHERE\n\tP.FSTYPE = 401",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('LA Billing Profile Calendar Usage - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_Billing_Profiles')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Extract Local Auth Profiles",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Clear LocalAuthProfiles Table",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT \r\n    Site.SiteId\r\n\t,Site.SiteName\r\n\t,Profiles.Pro_code AS profile_code\r\n    ,Profiles.Prodesc AS profile_description\r\n    ,Chsysdec.Description AS account_type\r\n    ,Profiles.Pro_ref\r\n    ,Profiles.Billdays AS bill_days_or_nights\r\n    ,Profiles.Billdeath AS bill_day_of_death\r\n    ,Profiles.Billdod AS bill_day_of_discharge\r\n    ,Profiles.Billdoa AS bill_day_of_admission\r\n    ,Profiles.Invprint\r\n    ,Profiles.Invdoc\r\n    ,Profiles.Soflag AS standing_order\r\n    ,Profiles.Noticeper AS notice_period\r\n    ,Profiles.Nperanal AS notice_period_analysis_code\r\n    ,Profiles.Npervatr AS notice_period_vat_code\r\n    ,Profiles.Defrate AS default_charge_rate\r\n    ,Profiles.Chgper AS charge_period\r\n    ,Profiles.Feesanal AS analysis_code\r\n    ,Profiles.Feesdesc AS fees_description\r\n    ,Profiles.FeesVatC AS vat_code\r\n    ,Profiles.BillAbs AS bill_while_temp_absent\r\n    ,Profiles.Autocredit AS automatic_credit\r\n    ,Profiles.PenBooks AS attach_pension_books\r\n    ,Profiles.UserMemo\r\n    ,Profiles.NoInvDec\r\n    ,Profiles.sg_BankAcc\r\n    ,Profiles.UseFlag\r\n    ,Profiles.OOSExtraContrib\r\n\r\nFROM \r\n\tProfiles (NOLOCK)\r\n\r\n    JOIN Chsysdec (NOLOCK) -- Lookup table for values?\r\n        ON Chsysdec.Decode_Ref = Profiles.FsType\r\n\r\n    JOIN Site (NOLOCK)\r\n        ON Site.Site_Ref IN (\r\n                                SELECT Site_Ref\r\n                                FROM Site_Join (NOLOCK)\r\n                                WHERE Site_Join.LinkKey = Profiles.Pro_Ref\r\n                                      AND upper(Site_Join.LinkTable) = 'PROFILES'\r\n                            )\r\n           OR Profiles.SiteFilter = 0\r\nWHERE \r\n\tProfiles.FSTYPE = 401 --Local Auth\r\n\tAND Site.SITEID IN (\r\n\t071,\r\n072,\r\n073,\r\n074,\r\n075,\r\n078,\r\n079,\r\n086,\r\n089,\r\n088,\r\n091,\r\n092,\r\n090,\r\n095,\r\n096,\r\n097,\r\n098,\r\n099,\r\n100,\r\n101,\r\n102,\r\n103,\r\n104,\r\n105,\r\n106,\r\n107,\r\n108,\r\n109,\r\n110,\r\n111,\r\n112,\r\n113,\r\n114,\r\n115,\r\n116,\r\n117,\r\n118,\r\n119,\r\n120,\r\n121,\r\n122,\r\n123,\r\n127,\r\n128\r\n)",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "LocalAuthProfiles"
-								}
-							}
-						]
-					},
-					{
-						"name": "Export to CSV file",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Extract Local Auth Profiles",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    H.Home_Ref\n    --,P.SiteId\n    ,SiteName\n    ,profile_code\n    ,profile_description\n    ,account_type\n    ,Pro_ref\n    ,bill_days_or_nights\n    ,bill_day_of_death\n    ,bill_day_of_discharge\n    ,bill_day_of_admission\n    --,Invprint\n    --,Invdoc\n    ,standing_order\n    ,notice_period\n    ,notice_period_analysis_code\n    ,notice_period_vat_code\n    ,default_charge_rate\n    ,charge_period\n    ,analysis_code\n    ,fees_description\n    ,vat_code\n    ,bill_while_temp_absent\n    ,automatic_credit\n    ,attach_pension_books\n    --,UserMemo\n    --,NoInvDec\n    ,sg_BankAcc\n    --,UseFlag\n    --,OOSExtraContrib\nFROM \n    dbo.LocalAuthProfiles AS P\n\n    LEFT JOIN ColdHarbourHomeID AS H\n        ON H.SITEID = P.SiteId",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('LA Billing Profiles - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Clear LocalAuthProfiles Table",
-						"type": "Script",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_YardiStage",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "TRUNCATE TABLE dbo.LocalAuthProfiles"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_Calendars')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Extract Calendars",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Clear Calendars table",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\n    Site.SiteName\n    ,Site.SiteId\n    ,Calendar_Hd.Cal_Ref\n    ,Calendar_Hd.Cal_code AS calendar_code\n    ,Calendar_Hd.Cal_desc as calendar_description\n    ,DECGrouping.Description AS calendar_grouping\n    ,Calendar_Hd.Invdtoff\n    ,Calendar_Hd.Invdttype\n    ,Calendar_Hd.BldStartDt AS calendar_start_date\n    ,Calendar_Hd.BldEndDt AS calendar_end_date\n    ,Calendar_Hd.BldFreq AS frequency\n    ,Calendar_Hd.BldDays AS no_of_days\n    ,Calendar_Hd.ProcFlag\n    ,Calendar_Hd.SiteFilter\n    ,Calendar_Hd.Sched_Only\n    ,Calendar_Hd.AutoProc\n    ,Calendar_Hd.ProcOffset\n    ,Calendar_Hd.AutoProcWarn\n    ,Calendar_Hd.InvOffset\n    ,Calendar_Hd.AutoInvWarn\n    ,Calendar_Dt.StartDate AS period_start_date\n    ,Calendar_Dt.EndDate AS period_end_date\n    ,Calendar_Dt.BillDate AS period_bill_date\n    ,Calendar_Dt.SSProcessDate\n    ,Calendar_Dt.SSInvoiceDate\nFROM \n\tCalendar_Hd (NOLOCK)\n    \n\tJOIN ChSysDec AS DECGrouping (NOLOCK)\n        ON DECGrouping.Decode_Ref = Calendar_Hd.Grouping\n    \n\tJOIN Calendar_Dt (NOLOCK)\n        ON Calendar_Dt.Cal_Ref = Calendar_Hd.Cal_Ref\n    \n\tJOIN Site (NOLOCK)\n        ON Site.Site_Ref IN (\n                                SELECT Site_Ref\n                                FROM Site_Join (NOLOCK)\n                                WHERE Site_Join.LinkKey = Calendar_Hd.Cal_Ref\n                                      AND upper(Site_Join.LinkTable) = 'CALENDAR_HD'\n                            )\n           OR Calendar_Hd.SiteFilter = 0\nWHERE \n\tCalendar_Hd.Cal_Code\n    BETWEEN '      ' AND 'ZZZZZZ'\n    AND Calendar_Dt.StartDate\n    BETWEEN '17530101' AND '20991212'\n    AND Calendar_Dt.EndDate\n    BETWEEN '17530101' AND '20991212'\n    AND (\n            Calendar_Dt.BillDate\n    BETWEEN '17530101' AND '20991212'\n            OR Calendar_Dt.BillDate IS NULL\n        )\n    AND Site.SITEID IN (\n\t071,\n\t072,\n\t073,\n\t074,\n\t075,\n\t078,\n\t079,\n\t086,\n\t089,\n\t088,\n\t091,\n\t092,\n\t090,\n\t095,\n\t096,\n\t097,\n\t098,\n\t099,\n\t100,\n\t101,\n\t102,\n\t103,\n\t104,\n\t105,\n\t106,\n\t107,\n\t108,\n\t109,\n\t110,\n\t111,\n\t112,\n\t113,\n\t114,\n\t115,\n\t116,\n\t117,\n\t118,\n\t119,\n\t120,\n\t121,\n\t122,\n\t123,\n\t127,\n\t128\n\t)\nORDER BY \n\tCalendar_Hd.Cal_code",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Calendars"
-								}
-							}
-						]
-					},
-					{
-						"name": "Export to CSV file",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Extract Calendars",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    H.HOME_REF\n    ,SiteName\n    --,Cal.SiteId\n    ,Cal_Ref\n    ,calendar_code\n    ,calendar_description\n    ,calendar_grouping\n    --,Invdtoff\n    --,Invdttype\n    ,calendar_start_date\n    ,calendar_end_date\n    ,frequency\n    ,no_of_days\n    ,ProcFlag\n    ,SiteFilter\n    ,Sched_Only\n    --,AutoProc\n    --,ProcOffset\n    --,AutoProcWarn\n    --,InvOffset\n    --,AutoInvWarn\n    ,period_start_date\n    ,period_end_date\n    ,period_bill_date\n    ,SSProcessDate\n    ,SSInvoiceDate\nFROM \n    dbo.Calendars AS Cal\n\n    LEFT JOIN dbo.ColdHarbourHomeID AS H\n        ON H.SITEID = Cal.SiteID\n",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('Calendars - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Clear Calendars table",
-						"type": "Script",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_YardiStage",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "TRUNCATE TABLE dbo.Calendars"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_Residents')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Resident data from GRG",
-				"activities": [
-					{
-						"name": "Copy Residents data",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE ColdHarbour.Residents",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_GRG",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Resident"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "Residents"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]"
-			]
 		}
 	]
 }
