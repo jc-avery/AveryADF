@@ -13,6 +13,604 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Softworks_RateSheets')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "For Each File",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Copy from file to SQL",
+									"description": "the @item().Name variable is key on the source. the .Name provides the childItem Name from the output of the Metadata task",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "DelimitedTextSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"wildcardFolderPath": "RateSheets",
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "DelimitedTextReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "Employee Number",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "EmployeeID",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "Employee Name",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "EmployeeName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "Contract Type",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ContractType",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "Contract Start Date",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ContractStartDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "Contract End Date",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ContractEndDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "External Reference",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "ExternalReference",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "Is Default",
+														"type": "String",
+														"physicalType": "String"
+													},
+													"sink": {
+														"name": "IsDefault",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_PolestarStorageAcc_Softworks_RateSheets",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Softworks",
+												"Table": "EmployeeRates"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Get File List",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_PolestarStorageAcc_Softworks_RateSheets",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "DelimitedTextReadSettings"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Softworks"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-07-23T14:21:03Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Transform_HomeDetails')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy Home Details",
+						"description": "Copys the various Home Details from Avery DB vHomeDetails to TRANSFORM_DB HomeDetails",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"HomeID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Homename",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeTypeName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeTypeName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeStatus",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeStatus",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "BedCount",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "BedCount",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Group",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Group",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "SubGroup",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "SubGroup",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Division",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Division",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DivisionAltName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DivisionAltName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Postcode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Postcode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ColdHarbourHOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ColdHarbourHOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CHCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CHCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CareBloxHomeid",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CareBloxHomeID",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CBCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CBCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeManager",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeManager",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ManagerEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ManagerEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "DeputyEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DeputyEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AdminEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AdminEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CSMEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CSMEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionalDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionalDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RegionalDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RegionalDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "OpsDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "OpsDirector",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "OpsDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "OpsDirectorEmail",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Avery",
+									"Table": "VHomeDetails"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB_Avery_HomeDetails",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T08:27:28Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Yardi_AEMS')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2919,6 +3517,295 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/pipeline2')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy Results to Stage table",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['results'][0]['id']"
+										},
+										"sink": {
+											"name": "ResultID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['passed']"
+										},
+										"sink": {
+											"name": "Passed",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['grade']"
+										},
+										"sink": {
+											"name": "Grade",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['score']"
+										},
+										"sink": {
+											"name": "Score",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['completed_at']"
+										},
+										"sink": {
+											"name": "CompletedAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['expires_at']"
+										},
+										"sink": {
+											"name": "ExpiresAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['has_expired']"
+										},
+										"sink": {
+											"name": "HasExpired",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['course']['id']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['user']['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": ""
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_results",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "StageResults"
+								}
+							}
+						]
+					},
+					{
+						"name": "Copy Results to Stage table_copy1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['results'][0]['id']"
+										},
+										"sink": {
+											"name": "ResultID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['passed']"
+										},
+										"sink": {
+											"name": "Passed",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['grade']"
+										},
+										"sink": {
+											"name": "Grade",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['score']"
+										},
+										"sink": {
+											"name": "Score",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['completed_at']"
+										},
+										"sink": {
+											"name": "CompletedAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['expires_at']"
+										},
+										"sink": {
+											"name": "ExpiresAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['has_expired']"
+										},
+										"sink": {
+											"name": "HasExpired",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['course']['id']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['results'][0]['user']['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": ""
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_results",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "StageResults"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3181,234 +4068,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-07-02T10:33:39Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Bill_Profile_With_FundSource')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export Profile and Fundsource",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\r\n\tP.PRO_CODE AS profile_code\r\n\t,P.PRODESC AS profile_description\r\n\t,CONTACT.CONTACT_REF AS oCnta_Det_Ref\r\n\t,CONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName\t\r\nFROM \r\n\tFUNDSRC_HD AS ACC\r\n\r\n\tLEFT JOIN PROFILES AS P\r\n\t\tON P.PRO_REF = ACC.PRO_REF\r\n\r\n\tLEFT JOIN CONTACT_HD AS CONTACT\r\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\r\n\r\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\r\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\r\n\t\t\r\n\tLEFT JOIN RESIDENT AS R\r\n\t\tON R.RES_REF = ACC.RES_REF\r\n\r\n\tLEFT JOIN Room_Dt AS Rooms\r\n\t\tON Rooms.Room_Ref = R.Room_Ref\r\nWHERE\r\n\tP.FSTYPE = 401\r\n\t--AND R.STATUS IN (25028, 25029)\r\n\tAND Rooms.LOC_REF IN (\r\n\t\t112,\r\n\t\t113,\r\n\t\t114,\r\n\t\t115,\r\n\t\t117,\r\n\t\t122,\r\n\t\t123,\r\n\t\t124,\r\n\t\t125,\r\n\t\t134,\r\n\t\t138,\r\n\t\t139,\r\n\t\t140,\r\n\t\t141,\r\n\t\t142,\r\n\t\t145,\r\n\t\t146,\r\n\t\t147,\r\n\t\t148,\r\n\t\t149,\r\n\t\t150,\r\n\t\t151,\r\n\t\t152,\r\n\t\t153,\r\n\t\t154,\r\n\t\t155,\r\n\t\t156,\r\n\t\t157,\r\n\t\t158,\r\n\t\t159,\r\n\t\t160,\r\n\t\t161,\r\n\t\t162,\r\n\t\t163,\r\n\t\t164,\r\n\t\t165,\r\n\t\t166,\r\n\t\t167,\r\n\t\t168,\r\n\t\t169,\r\n\t\t170,\r\n\t\t171,\r\n\t\t172,\r\n\t\t173,\r\n\t\t180,\r\n\t\t181\r\n\t\t)",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('LA Billing Profiles and FundSource - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Broadshield_Download_Data')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Downloads data from Broadshields API each evening @ 11:45",
-				"activities": [
-					{
-						"name": "Download Users",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_Users",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Download Courses",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Download Users",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_Courses",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Download UserCourses",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Download Courses",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_UserCourses",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Broadshield"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-03T15:41:31Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Broadshield_Process_Data')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Uses the daily Json files from Broadshield API to update the Current table with an Upsert operation. And add new/updated records to the History tables.",
-				"activities": [
-					{
-						"name": "Update Current data",
-						"description": "Upserts data from the JSON files to the current tables",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_JSON_SQL_Current",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Create History records",
-						"description": "Inserts any new or updated records into the history tables.",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Update Current data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_JSON_SQL_History",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Broadshield"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-08T10:01:01Z"
 			},
 			"dependsOn": []
 		}
