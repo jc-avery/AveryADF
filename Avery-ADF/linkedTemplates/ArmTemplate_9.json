@@ -2043,7 +2043,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Move_WebHook_files')]",
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Move_WebHook_files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -2233,7 +2233,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Process_WebHook_Result_files')]",
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_Result_files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -2571,7 +2571,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Process_WebHook_User_Files')]",
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_User_Files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -3091,13 +3091,14 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/pipeline2')]",
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Process_Merged_Files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Inserts results into the stage table and upserts user table",
 				"activities": [
 					{
-						"name": "Copy Results to Stage table",
+						"name": "Copy merged results data to Stage table",
 						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
@@ -3131,7 +3132,7 @@
 								"mappings": [
 									{
 										"source": {
-											"path": "$['results'][0]['id']"
+											"path": "[['id']"
 										},
 										"sink": {
 											"name": "ResultID",
@@ -3140,7 +3141,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['passed']"
+											"path": "[['passed']"
 										},
 										"sink": {
 											"name": "Passed",
@@ -3149,7 +3150,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['grade']"
+											"path": "[['grade']"
 										},
 										"sink": {
 											"name": "Grade",
@@ -3158,7 +3159,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['score']"
+											"path": "[['score']"
 										},
 										"sink": {
 											"name": "Score",
@@ -3167,7 +3168,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['completed_at']"
+											"path": "[['completed_at']"
 										},
 										"sink": {
 											"name": "CompletedAt",
@@ -3176,7 +3177,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['expires_at']"
+											"path": "[['expires_at']"
 										},
 										"sink": {
 											"name": "ExpiresAt",
@@ -3185,7 +3186,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['has_expired']"
+											"path": "[['has_expired']"
 										},
 										"sink": {
 											"name": "HasExpired",
@@ -3194,7 +3195,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['course']['id']"
+											"path": "[['course']['id']"
 										},
 										"sink": {
 											"name": "CourseID",
@@ -3203,7 +3204,7 @@
 									},
 									{
 										"source": {
-											"path": "$['results'][0]['user']['id']"
+											"path": "[['user']['id']"
 										},
 										"sink": {
 											"name": "UserID",
@@ -3211,7 +3212,7 @@
 										}
 									}
 								],
-								"collectionReference": ""
+								"collectionReference": "$['results']"
 							}
 						},
 						"inputs": [
@@ -3233,9 +3234,16 @@
 						]
 					},
 					{
-						"name": "Copy Results to Stage table_copy1",
+						"name": "Upsert users data to Users table",
 						"type": "Copy",
-						"dependsOn": [],
+						"dependsOn": [
+							{
+								"activity": "Copy merged results data to Stage table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
 						"policy": {
 							"timeout": "0.12:00:00",
 							"retry": 0,
@@ -3258,8 +3266,15 @@
 							},
 							"sink": {
 								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"UserID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
 							},
 							"enableStaging": false,
 							"translator": {
@@ -3267,92 +3282,110 @@
 								"mappings": [
 									{
 										"source": {
-											"path": "$['results'][0]['id']"
-										},
-										"sink": {
-											"name": "ResultID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['passed']"
-										},
-										"sink": {
-											"name": "Passed",
-											"type": "Boolean"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['grade']"
-										},
-										"sink": {
-											"name": "Grade",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['score']"
-										},
-										"sink": {
-											"name": "Score",
-											"type": "Decimal"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['completed_at']"
-										},
-										"sink": {
-											"name": "CompletedAt",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['expires_at']"
-										},
-										"sink": {
-											"name": "ExpiresAt",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['has_expired']"
-										},
-										"sink": {
-											"name": "HasExpired",
-											"type": "Boolean"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['course']['id']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "$['results'][0]['user']['id']"
+											"path": "[['id']"
 										},
 										"sink": {
 											"name": "UserID",
 											"type": "String"
 										}
+									},
+									{
+										"source": {
+											"path": "[['employee_number']"
+										},
+										"sink": {
+											"name": "EmployeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['created_at']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['start_date']"
+										},
+										"sink": {
+											"name": "StartDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['name']"
+										},
+										"sink": {
+											"name": "UserName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['email']"
+										},
+										"sink": {
+											"name": "Email",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['gender']['description']"
+										},
+										"sink": {
+											"name": "Gender",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['job_title']"
+										},
+										"sink": {
+											"name": "JobTitle",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['role']['name']"
+										},
+										"sink": {
+											"name": "UserRole",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['primaryEntity']['id']"
+										},
+										"sink": {
+											"name": "PrimaryEntityID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['status']"
+										},
+										"sink": {
+											"name": "UserStatus",
+											"type": "String"
+										}
 									}
 								],
-								"collectionReference": ""
+								"collectionReference": "$['users']"
 							}
 						},
 						"inputs": [
 							{
-								"referenceName": "DS_YourHippo_Merged_results",
+								"referenceName": "DS_YourHippo_Merged_users",
 								"type": "DatasetReference",
 								"parameters": {}
 							}
@@ -3363,7 +3396,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"Schema": "YourHippo",
-									"Table": "StageResults"
+									"Table": "Users"
 								}
 							}
 						]
@@ -4013,62 +4046,15 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Move_WebHook_Files_Step1')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Moves the user and result files to Fileshare to be combined by a python script in the VM. Moves Verification files to another folder.",
 				"activities": [
 					{
-						"name": "Execute Pipeline1",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Remove CR and LF",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AEMS_Enquiries_Export",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Execute Pipeline2",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Execute Pipeline1",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AEMS_Export_PBData",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Remove CR and LF",
-						"type": "SqlServerStoredProcedure",
+						"name": "Move User Files",
+						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -4079,22 +4065,164 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"storedProcedureName": "[[AEMS].[Enquiries$RemoveHiddenCharacters]"
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "webhook$user*.json",
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
 						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						}
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Route_Files",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Move Result Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Move User Files",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "webhook$result*.json",
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Route_Files",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Move Verification Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Move Result Files",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "webhook$verification*.json",
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Route_Files",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles','/','Verification')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
 				"folder": {
-					"name": "AEMS"
+					"name": "YourHippo/Child Pipelines"
 				},
-				"annotations": [],
-				"lastPublishTime": "2024-04-29T16:06:59Z"
+				"annotations": []
 			},
 			"dependsOn": []
 		}
