@@ -1,0 +1,98 @@
+{
+	"name": "PL_YourHippo_Move_WebHook_Files_Step2",
+	"properties": {
+		"description": "Moves the merged user and result file back to YourHippo container.",
+		"activities": [
+			{
+				"name": "Copy Merged files",
+				"description": "Move merged files to AZ storage container",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Remove webhookfiles",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "BinarySource",
+						"storeSettings": {
+							"type": "AzureFileStorageReadSettings",
+							"recursive": false,
+							"wildcardFileName": "yh_merged*.json",
+							"deleteFilesAfterCompletion": false
+						},
+						"formatSettings": {
+							"type": "BinaryReadSettings"
+						}
+					},
+					"sink": {
+						"type": "BinarySink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_PolestarStorageAcc_Fileshare",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Polestar_Storage",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": {
+								"value": "@concat('yourhippo','/','mergedfiles', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Remove webhookfiles",
+				"type": "Delete",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_PolestarStorageAcc_Fileshare",
+						"type": "DatasetReference"
+					},
+					"enableLogging": true,
+					"storeSettings": {
+						"type": "AzureFileStorageReadSettings",
+						"recursive": true,
+						"wildcardFileName": "webhook$*.json",
+						"enablePartitionDiscovery": false
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "YourHippo/Child Pipelines"
+		},
+		"annotations": []
+	}
+}
