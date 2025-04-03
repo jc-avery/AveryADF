@@ -44889,6 +44889,86 @@
 								}
 							}
 						]
+					},
+					{
+						"name": "Exceptions",
+						"description": "Add any exceptions to a Exception table, to be retried at a later date",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Upsert users data to Users table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['file_type']"
+										},
+										"sink": {
+											"name": "QueryType",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "ID",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_Result_Exceptions",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "WebHookExceptions"
+								}
+							}
+						]
 					}
 				],
 				"policy": {
@@ -44902,7 +44982,8 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_YourHippo_Merged_results')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
-				"[concat(variables('factoryId'), '/datasets/DS_YourHippo_Merged_users')]"
+				"[concat(variables('factoryId'), '/datasets/DS_YourHippo_Merged_users')]",
+				"[concat(variables('factoryId'), '/datasets/DS_YourHippo_Merged_Result_Exceptions')]"
 			]
 		},
 		{
@@ -54096,8 +54177,14 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureBlobStorageLocation",
-						"fileName": "merged_results_2025-04-02.json",
-						"folderPath": "AllResults",
+						"fileName": {
+							"value": "@concat('yh_merged_results_', formatDateTime(utcNow(), 'yyyy'),'-',formatDateTime(utcNow(), 'MM'),'-',formatDateTime(utcNow(), 'dd'), '.json' )",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat('mergedfiles', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+							"type": "Expression"
+						},
 						"container": "yourhippo"
 					}
 				},
@@ -56423,6 +56510,50 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_PolestarStorageAcc_Fileshare')]",
 				"[concat(variables('factoryId'), '/datasets/DS_Polestar_Storage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_YourHippo_Merged_Result_Exceptions')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@concat('yh_merged_exceptions_results_', formatDateTime(utcNow(), 'yyyy'),'-',formatDateTime(utcNow(), 'MM'),'-',formatDateTime(utcNow(), 'dd'), '.json' )",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat('mergedfiles', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+							"type": "Expression"
+						},
+						"container": "yourhippo"
+					}
+				},
+				"schema": {
+					"type": "object",
+					"properties": {
+						"file_type": {
+							"type": "string"
+						},
+						"id": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
 			]
 		}
 	]

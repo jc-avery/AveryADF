@@ -13,6 +13,313 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_SoftWorks_API_Employee')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Employee data",
+						"description": "Start date in the body looks to be irrelevant, it uses the end date to return emp with a start date less than that. ",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Employee File Name",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:03:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "POST",
+								"requestBody": {
+									"value": "@concat('{\n    \"DataExtractType\": 4000,\n    \"StartDate\": \"',variables('TodaysDate'),'\",\n    \"EndDate\": \"',variables('ThreeMonthsAhead'),'\",\n    \"Customer\": \"internal\"\n}')",
+									"type": "Expression"
+								},
+								"additionalHeaders": {
+									"Content-Type": "application/json"
+								},
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Softworks_API_Employees",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('EmpFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Todays Date",
+						"description": "Used in sink to Store the files in folder with todays date",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "TodaysDate",
+							"value": {
+								"value": "@formatDateTime(utcNow(), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set One Months Ahead",
+						"description": "Set to the end of the month, 1 month ahead. Used in the API call so details of future starters is returned.",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Todays Date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ThreeMonthsAhead",
+							"value": {
+								"value": "@formatDateTime(addToTime(utcNow(), 1, 'Month'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set WeekEndingDate",
+						"description": "Set the previous week ending date in the dd-MM-yyyy format for the API",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "WeekEndingDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set WeekBegining Date",
+						"description": "Set the previous week Start date in the dd-MM-yyyy format for the API",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set WeekEndingDate",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "WeekBeginingDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 6, 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Download Clockings data",
+						"description": "Start date in the body looks to be irrelevant, it uses the end date to return emp with a start date less than that. ",
+						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set Clockings File Name",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:03:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "POST",
+								"requestBody": {
+									"value": "@concat('{\n    \"DataExtractType\": 2000,\n    \"StartDate\": \"',variables('WeekBeginingDate'),'\",\n    \"EndDate\": \"',variables('WeekEndingDate'),'\",\n    \"Customer\": \"internal\"\n}')",
+									"type": "Expression"
+								},
+								"additionalHeaders": {
+									"Content-Type": "application/json"
+								},
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Softworks_API_Employees",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('ClockingsFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Clockings File Name",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set WeekBegining Date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ClockingsFileName",
+							"value": {
+								"value": "@concat('Clockings', '$', variables('WeekBeginingDate'), '$', variables('WeekEndingDate') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set Employee File Name",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set One Months Ahead",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EmpFileName",
+							"value": {
+								"value": "@concat('EmployeeList', '$', variables('TodaysDate'))",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"TodaysDate": {
+						"type": "String"
+					},
+					"ThreeMonthsAhead": {
+						"type": "String"
+					},
+					"EmpFileName": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Softworks/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-10T11:21:25Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Softworks_EmployeeHoliday')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3400,6 +3707,86 @@
 								}
 							}
 						]
+					},
+					{
+						"name": "Exceptions",
+						"description": "Add any exceptions to a Exception table, to be retried at a later date",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Upsert users data to Users table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['file_type']"
+										},
+										"sink": {
+											"name": "QueryType",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "ID",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_Result_Exceptions",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "WebHookExceptions"
+								}
+							}
+						]
 					}
 				],
 				"policy": {
@@ -4042,187 +4429,6 @@
 						"     )) ~> ClockingsTable"
 					]
 				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Move_WebHook_Files_Step1')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Moves the user and result files to Fileshare to be combined by a python script in the VM. Moves Verification files to another folder.",
-				"activities": [
-					{
-						"name": "Move User Files",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "webhook$user*.json",
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureFileStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_WebHook_Route_Files",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Fileshare",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Move Result Files",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Move User Files",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "webhook$result*.json",
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureFileStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_WebHook_Route_Files",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Fileshare",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Move Verification Files",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Move Result Files",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "webhook$verification*.json",
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_WebHook_Route_Files",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_YourHippo_WebHook_Files",
-								"type": "DatasetReference",
-								"parameters": {
-									"Folder": {
-										"value": "@concat('WebhookFiles','/','Verification')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "YourHippo/Child Pipelines"
-				},
-				"annotations": []
 			},
 			"dependsOn": []
 		}
