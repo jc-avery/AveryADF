@@ -13,6 +13,173 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_SoftWorks_API_Clockings')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Set WeekEndingDate",
+						"description": "Set the previous week ending date in the dd-MM-yyyy format for the API",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "WeekEndingDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set WeekBegining Date",
+						"description": "Set the previous week Start date in the dd-MM-yyyy format for the API",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set WeekEndingDate",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "WeekBeginingDate",
+							"value": {
+								"value": "@formatDateTime(subtractFromTime(subtractFromTime(utcNow(), dayOfWeek(utcNow()), 'Day'), 6, 'Day'), 'dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Download Clockings data",
+						"description": "Start date in the body looks to be irrelevant, it uses the end date to return emp with a start date less than that. ",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Clockings File Name",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.00:10:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:03:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "POST",
+								"requestBody": {
+									"value": "@concat('{\n    \"DataExtractType\": 2000,\n    \"StartDate\": \"',variables('WeekBeginingDate'),'\",\n    \"EndDate\": \"',variables('WeekEndingDate'),'\",\n    \"Customer\": \"internal\"\n}')",
+									"type": "Expression"
+								},
+								"additionalHeaders": {
+									"Content-Type": "application/json"
+								},
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Softworks_API_Employees",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Softworks",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('ClockingsFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Clockings File Name",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set WeekBegining Date",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "ClockingsFileName",
+							"value": {
+								"value": "@concat('Clockings', '$', variables('WeekBeginingDate'), '$', variables('WeekEndingDate') )",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"TodaysDate": {
+						"type": "String"
+					},
+					"ClockingsFileName": {
+						"type": "String"
+					},
+					"WeekEndingDate": {
+						"type": "String"
+					},
+					"WeekBeginingDate": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Softworks/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-10T11:21:25Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_SoftWorks_API_Employee')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -4172,42 +4339,6 @@
 			"properties": {
 				"linkedServiceName": {
 					"referenceName": "OnPrem_ColdHarbour_IP",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Schema": {
-						"type": "string"
-					},
-					"Table": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "OnPrem"
-				},
-				"annotations": [],
-				"type": "SqlServerTable",
-				"schema": [],
-				"typeProperties": {
-					"schema": {
-						"value": "@dataset().Schema",
-						"type": "Expression"
-					},
-					"table": {
-						"value": "@dataset().Table",
-						"type": "Expression"
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_Exchequer')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "OnPrem_Exchequer",
 					"type": "LinkedServiceReference"
 				},
 				"parameters": {
