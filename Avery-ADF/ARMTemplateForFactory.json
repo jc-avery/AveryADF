@@ -3765,6 +3765,254 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Post_Transfer_DuplicateClear')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Exec 2 stored procedures that will delete duplicate records (if any) from the AEMS.AEMS Actions table",
+				"activities": [
+					{
+						"name": "Post Transfer Clear Action Duplicates",
+						"description": "AEMS.PostTransfer$ClearActionDuplicates",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[AEMS].[PostTransfer$ClearActionDuplicates]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Post Transfer Clear Enquiry Duplicates",
+						"description": "AEMS.PostTransfer$ClearEnquiryDuplicates",
+						"type": "SqlServerStoredProcedure",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Post Transfer Clear Action Duplicates",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[AEMS].[PostTransfer$ClearEnquiryDuplicates]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "AEMS"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-05-30T11:12:28Z"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_AH1_Actuals')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \r\n\tA.intranetnew,\r\n\tH.Exch_Code,\r\n\tA.GLCODE,\r\n\tA.Period,\r\n\tNULL AS Actual_Desc,\r\n\tA.Amount,\r\n\t'TRUE' AS PeriodClosed,\r\n\t'1900-01-01 00:00:00' AS LoadedDateTime\r\nFROM \r\n\tactuals2 AS A\r\n\r\n\tLEFT JOIN Homes AS H\r\n\t\tON H.IntranetNew = A.IntranetNew\r\nWHERE\r\n--\tA.intranetnew IS NULL\r\n\tA.Period >= '2023-01-01'\r\nORDER BY\r\n\tA.Period DESC,\r\n\tA.intranetnew",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "intranetnew",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Exch_Code",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "ExchCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "GLCODE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 5
+										},
+										"sink": {
+											"name": "GLCODE",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Period",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "Period",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "Actual_Desc",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "actual_desc",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Amount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										},
+										"sink": {
+											"name": "amount",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 5,
+											"precision": 18
+										}
+									},
+									{
+										"source": {
+											"name": "PeriodClosed",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "PeriodClosed",
+											"type": "Boolean",
+											"physicalType": "bit"
+										}
+									},
+									{
+										"source": {
+											"name": "LoadedDateTime",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "LoadedDateTIme",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Exchequer",
+									"Table": "Actuals"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_AH1_Financials')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -39459,7 +39707,7 @@
 							"source": {
 								"type": "AzureSqlSource",
 								"sqlReaderQuery": {
-									"value": "SELECT\n    ID\n    ,AEMS_ID\n    ,aems_version\n    ,homeID\n    ,uploadedBy\n    ,managerEmailed\n    ,enquiryStatus\n    ,enquiryID\n    ,initialEnquiry\n    ,enquirerSalutation\n    ,enquirerLastName AS enquirerFirstName\n    ,enquirerFirstName AS enquirerLastName \n    ,enquirerSalutationTwo\n    ,enquirerLastNameTwo \n    ,enquirerFirstNameTwo \n    ,enquiryDate\n    ,enquirerRelationshipToResident\n    ,en_areacode\n    ,enquirerTelephone \n    ,enquiry_mobile \n    ,enquirerEmail \n    ,enquirerAddress \n    ,enquirerAddressOne \n    ,enquirerAddressTwo \n    ,enquirerAddressThree \n    ,enquiry_postcode \n    ,enquiry_postcode_two \n    ,residentSalutation\n    ,residentFirstName \n    ,residentLastName \n    ,residentDOB \n    ,residentSalutationTwo\n    ,residentFirstNameTwo\n    ,residentLastNameTwo\n    ,residentDOBTwo\n    ,residentNOK\n    ,residentAddress \n    ,residentAddressOne \n    ,residentAddressTwo \n    ,residentAddressThree \n    ,residentPostcode \n    ,residentTelephone \n    ,residentCareCategory\n    ,residentFundingCategory\n    ,residentCareCategoryTwo\n    ,funding_total\n    ,residentFunding\n    ,residentFundingTwo\n    --,enquiryDetails \n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiryDetails), '\"', '') AS enquiryDetails\n    ,enquiryType\n    ,responseTime\n    ,responseCurrentStatus\n    ,responseNeeded\n    ,responseAmountTried\n    ,followUpDate\n    ,followUpReason\n    ,uploadToCH\n    ,admissionDate\n    ,enquiryClosed\n    ,managerContacted\n    ,homeVisit\n    ,assessmentBooked\n    ,assesmentComplete\n    ,admission\n    ,homeVisitBooked\n    ,admissionBooked\n    ,video_booked\n    ,video_complete\n    ,homeVisitRequested\n    ,assesmentRequested\n    ,newEnquiry\n    ,cameFrom\n    ,enquirer_address \n    ,enquirer_postcode \n    ,lng\n    ,lat\n    ,enquirer_area\n    ,enquirer_county\n    ,nok_name\n    ,nok_surname\n    ,nok_county\n    ,nok_relation\n    ,nok_telephone\n    ,nok_mobile\n    ,nok_address\n    ,resident_county\n    ,nok_Salutation\n    ,newsletter_receive\n    ,newsletter_email\n    ,enquiry_urgent\n    ,optOut\n    ,type_news\n    ,type_mag\n    ,type_other\n    ,gp_name\n    ,gp_address\n    ,gp_telephone\n    ,gp_requested\n    ,gp_received\n    ,website\n    ,brochure\n    ,brochure_requestID\n    ,entryMethod\n    ,current_action_id\n    ,column_hash\n    ,receiveMarketing\n    ,willTopUp\n    ,enquiry_entered_from\n    ,enquiry_closed_reason\n    ,enquiry_deleted\n    ,enquiry_weight\nFROM \n    AEMS.AEMS_Enquiries AS E\nWHERE \n    E.homeID IN (@{variables('IntranetID')})",
+									"value": "SELECT\n    ID\n    ,AEMS_ID\n    ,aems_version\n    ,homeID\n    ,uploadedBy\n    ,managerEmailed\n    ,enquiryStatus\n    ,enquiryID\n    ,initialEnquiry\n    ,enquirerSalutation\n    ,enquirerLastName AS enquirerFirstName\n    ,enquirerFirstName AS enquirerLastName \n    ,enquirerSalutationTwo\n    ,enquirerLastNameTwo \n    ,enquirerFirstNameTwo \n    ,enquiryDate\n    ,enquirerRelationshipToResident\n    ,en_areacode\n    ,enquirerTelephone \n    ,enquiry_mobile \n    ,enquirerEmail \n    ,enquirerAddress AS nok_address\n    ,enquirerAddressOne AS nok_addressOne\n    ,enquirerAddressTwo AS nok_addressTwo\n    ,enquirerAddressThree AS nok_addressThree\n    ,enquiry_postcode \n    ,enquiry_postcode_two \n    ,residentSalutation\n    ,residentFirstName \n    ,residentLastName \n    ,residentDOB \n    ,residentSalutationTwo\n    ,residentFirstNameTwo\n    ,residentLastNameTwo\n    ,residentDOBTwo\n    ,residentNOK\n    ,residentAddress \n    ,residentAddressOne \n    ,residentAddressTwo \n    ,residentAddressThree \n    ,residentPostcode \n    ,residentTelephone \n    ,residentCareCategory\n    ,residentFundingCategory\n    ,residentCareCategoryTwo\n    ,funding_total\n    ,residentFunding\n    ,residentFundingTwo\n    --,enquiryDetails \n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiryDetails), '\"', '') AS enquiryDetails\n    ,enquiryType\n    ,responseTime\n    ,responseCurrentStatus\n    ,responseNeeded\n    ,responseAmountTried\n    ,followUpDate\n    ,followUpReason\n    ,uploadToCH\n    ,admissionDate\n    ,enquiryClosed\n    ,managerContacted\n    ,homeVisit\n    ,assessmentBooked\n    ,assesmentComplete\n    ,admission\n    ,homeVisitBooked\n    ,admissionBooked\n    ,video_booked\n    ,video_complete\n    ,homeVisitRequested\n    ,assesmentRequested\n    ,newEnquiry\n    ,cameFrom\n    ,enquirer_address \n    ,enquirer_postcode \n    ,lng\n    ,lat\n    ,enquirer_area\n    ,enquirer_county\n    ,nok_name\n    ,nok_surname\n    ,nok_county\n    ,nok_relation\n    ,nok_telephone\n    ,nok_mobile\n    ,nok_address\n    ,resident_county\n    ,nok_Salutation\n    ,newsletter_receive\n    ,newsletter_email\n    ,enquiry_urgent\n    ,optOut\n    ,type_news\n    ,type_mag\n    ,type_other\n    ,gp_name\n    ,gp_address\n    ,gp_telephone\n    ,gp_requested\n    ,gp_received\n    ,website\n    ,brochure\n    ,brochure_requestID\n    ,entryMethod\n    ,current_action_id\n    ,column_hash\n    ,receiveMarketing\n    ,willTopUp\n    ,enquiry_entered_from\n    ,enquiry_closed_reason\n    ,enquiry_deleted\n    ,enquiry_weight\nFROM \n    AEMS.AEMS_Enquiries AS E\nWHERE \n    E.homeID IN (@{variables('IntranetID')})",
 									"type": "Expression"
 								},
 								"queryTimeout": "02:00:00",
@@ -44385,78 +44633,6 @@
 				"lastPublishTime": "2024-09-18T15:39:36Z"
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Post_Transfer_DuplicateClear')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Exec 2 stored procedures that will delete duplicate records (if any) from the AEMS.AEMS Actions table",
-				"activities": [
-					{
-						"name": "Post Transfer Clear Action Duplicates",
-						"description": "AEMS.PostTransfer$ClearActionDuplicates",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[AEMS].[PostTransfer$ClearActionDuplicates]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						}
-					},
-					{
-						"name": "Post Transfer Clear Enquiry Duplicates",
-						"description": "AEMS.PostTransfer$ClearEnquiryDuplicates",
-						"type": "SqlServerStoredProcedure",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Post Transfer Clear Action Duplicates",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"storedProcedureName": "[[AEMS].[PostTransfer$ClearEnquiryDuplicates]"
-						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "AEMS"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-05-30T11:12:28Z"
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
-			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/X_PL_AEMS_Pre_Transfer_Clear')]",
