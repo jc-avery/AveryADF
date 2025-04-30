@@ -13,6 +13,397 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_User_Files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get User File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Does WebhookFiles User files exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Json_User_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "Process File List",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get User File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get User File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Process User Files",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": false,
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"UserID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['data']['user']['id']"
+													},
+													"sink": {
+														"name": "UserID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['employee_number']"
+													},
+													"sink": {
+														"name": "EmployeeNumber",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['created_at']"
+													},
+													"sink": {
+														"name": "CreatedDateTime",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['start_date']"
+													},
+													"sink": {
+														"name": "StartDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['name']"
+													},
+													"sink": {
+														"name": "UserName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['email']"
+													},
+													"sink": {
+														"name": "Email",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['gender']['description']"
+													},
+													"sink": {
+														"name": "Gender",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['job_title']"
+													},
+													"sink": {
+														"name": "JobTitle",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['role']['name']"
+													},
+													"sink": {
+														"name": "UserRole",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['primaryEntity']['id']"
+													},
+													"sink": {
+														"name": "PrimaryEntityID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['status']['name']"
+													},
+													"sink": {
+														"name": "UserStatus",
+														"type": "String"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_YourHippo_WebHook_Json_User_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "YourHippo",
+												"Table": "Users"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Archive Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Process File List",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles', '/', 'User')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles', '/', 'Archive', '/', 'User')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Does WebhookFiles User files exists",
+						"description": "Checks there are files to process. If there are it will succeeds and carry on, if not it fails with custom failure message",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "webhook$user*.json",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Json_User_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "No Files failure",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "Does WebhookFiles User files exists",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "No User files to process",
+							"errorCode": "404"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_GRG')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "OnPrem_Coldharbour",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Schema": {
+						"type": "string"
+					},
+					"Table": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "OnPrem"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_IP')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -1576,7 +1967,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CQC_Proces_API_Results')]",
@@ -2493,7 +2886,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_GRG_RESIDENT')]",
@@ -3469,700 +3864,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_GRG_ROOMS')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy Room Data",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT  \r\n\tR.[AmendDateTime]\r\n    ,R.[CreateDateTime]\r\n    ,R.[HOME_REF]\r\n    ,R.[OLOC_REF]\r\n    ,[OROOM_REF]\r\n    ,[ROOM_CAT]\r\n    ,[ROOM_CAT_DESC]\r\n    ,[ROOM_CODE]\r\n    ,[ROOM_DESC]\r\n    ,[ROOM_NO_BEDS]\r\n    ,[ROOM_REF]\r\n    ,[ROOM_TYPE]\r\n    ,[ROOM_TYPE_DESC]\r\n    ,[CHARGEPERIOD]\r\n    ,[CURRENTRATE]\r\n    ,[RATEDATE]\r\n    ,[ROOM_UDF1]\r\n    ,[ROOM_UDF2]\r\n    ,[ROOM_UDF3]\r\n    ,[ROOM_UDF4]\r\n    ,R.[USEFLAG]\r\nFROM \r\n\t[AHC_GRG_FBWIN].[dbo].[ROOMS] AS R\r\nWHERE\r\n\t--R.AmendDateTime >= '2020-01-01'\r\n\tR.HOME_REF IN (\r\n\t587,\r\n    547,\r\n    559,\r\n    560,\r\n    554,\r\n    568,\r\n    601,\r\n    544,\r\n    566,\r\n    588,\r\n    589,\r\n    573,\r\n    590,\r\n    592,\r\n    569,\r\n    594,\r\n    570,\r\n    556,\r\n    602,\r\n    595,\r\n    599,\r\n    586,\r\n    571,\r\n    578,\r\n    562,\r\n    600,\r\n    583,\r\n    584,\r\n    585,\r\n    548,\r\n    540,\r\n    564,\r\n    572,\r\n    579,\r\n    596,\r\n    561,\r\n    591,\r\n    558,\r\n    581,\r\n    575,\r\n    603,\r\n    604,\r\n    606,\r\n    607,\r\n    609,\r\n    608,\r\n    605,\r\n    555,\r\n    563,\r\n    565,\r\n    597,\r\n    613,\r\n    614,\r\n    612,\r\n    611,\r\n    610,\r\n    580,\r\n    549,\r\n    615,\r\n    616,\r\n    619,\r\n    618,\r\n    617,\r\n    620,\r\n    624,\r\n    622,\r\n    626,\r\n    625,\r\n    623,\r\n    658,\r\n    621,\r\n    656,\r\n    657,\r\n    660,\r\n    659,\r\n    644,\r\n    627,\r\n    637,\r\n    649,\r\n    638,\r\n    655,\r\n    633,\r\n    628,\r\n    632,\r\n    641,\r\n    650,\r\n    654,\r\n    642,\r\n    643,\r\n    629,\r\n    647,\r\n    653,\r\n    630,\r\n    631,\r\n    634,\r\n    635,\r\n    645,\r\n    646,\r\n    651,\r\n    636,\r\n    639,\r\n    652,\r\n    640,\r\n    648,\r\n    661,\r\n    662)\r\nORDER BY \r\n\tROOM_REF ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE GRG.ROOMS",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "HOME_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "OLOC_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "OLOC_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "OROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "OROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CAT",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_CAT",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CAT_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_CAT_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_CODE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ROOM_DESC",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_NO_BEDS",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_NO_BEDS",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ROOM_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_TYPE_DESC",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "ROOM_TYPE_DESC",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "CHARGEPERIOD",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CHARGEPERIOD",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CURRENTRATE",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 12
-										},
-										"sink": {
-											"name": "CURRENTRATE",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 12
-										}
-									},
-									{
-										"source": {
-											"name": "RATEDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "RATEDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_UDF1",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "ROOM_UDF1",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_UDF2",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "ROOM_UDF2",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_UDF3",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "ROOM_UDF3",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "ROOM_UDF4",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "ROOM_UDF4",
-											"type": "String",
-											"physicalType": "text"
-										}
-									},
-									{
-										"source": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "USEFLAG",
-											"type": "String",
-											"physicalType": "char"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_GRG",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "GRG",
-									"Table": "ROOMS"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "GRG/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_GRG_ResidentContacts')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export Resident Contacts",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": {
-									"value": "SELECT\n    Address1\n    ,Address2\n    ,Address3\n    ,Address4\n    ,AmendDateTime\n    ,Cont_SubType\n    ,Cont_SubTypeDec\n    ,CreateDateTime\n    ,Forenames\n    ,GRGApp_GrGsRef\n    ,GRGrep_Cnta_Det_Ref\n    ,Gen_Comments\n    ,PostCode\n    ,RelType\n    ,RelTypeDec\n    ,Res_Ref\n    ,Surname\n    ,Tel_No1\n    ,Tel_No2\n    ,TitleDec\n    ,oCnta_Det_Ref\n    ,Email\n    ,LASTUPDATE\nFROM \n    dbo.RESCONTACTS\nWHERE\n    Res_Ref IN (SELECT ORES_REF FROM RESIDENT WHERE HOME_REF IN (@{variables('Home_Ref_List')}))",
-									"type": "Expression"
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "Address1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Address1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Address2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Address2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Address3",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Address3",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Address4",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Address4",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "AmendDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime2"
-										}
-									},
-									{
-										"source": {
-											"name": "Cont_SubType",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Cont_SubType",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Cont_SubTypeDec",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Cont_SubTypeDec",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreateDateTime",
-											"type": "DateTime",
-											"physicalType": "datetime2"
-										}
-									},
-									{
-										"source": {
-											"name": "Forenames",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Forenames",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "GRGApp_GrGsRef",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "GRGApp_GrGsRef",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "GRGrep_Cnta_Det_Ref",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "GRGrep_Cnta_Det_Ref",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Gen_Comments",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "Gen_Comments",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PostCode",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "PostCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RelType",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RelType",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RelTypeDec",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RelTypeDec",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Res_Ref",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Res_Ref",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Tel_No1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Tel_No1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Tel_No2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Tel_No2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TitleDec",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TitleDec",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "oCnta_Det_Ref",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "oCnta_Det_Ref",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Email",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Email",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LASTUPDATE",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LASTUPDATE",
-											"type": "DateTime",
-											"physicalType": "datetime2"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_GRG",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "GRG",
-									"Table": "RESIDENTCONTACTS"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"Home_Ref_List": {
-						"type": "String",
-						"defaultValue": "644,627,637,649,638,603,611,607,655,624,623,633,628,632,641,650,654,618,642,643,629,647,653,660,621,630,620,606,622,631,610,605,634,604,635,645,646,651,636,639,659,652,640,648"
-					}
-				},
-				"folder": {
-					"name": "Yardi/YardiStage"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]"
+			]
 		}
 	]
 }
