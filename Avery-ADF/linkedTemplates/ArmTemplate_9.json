@@ -13,6 +13,164 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_MCM_Get_Generic')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Get data from the supplied endpoint (query/report) for the supplied community ID",
+				"activities": [
+					{
+						"name": "Download Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Get_Generic",
+								"type": "DatasetReference",
+								"parameters": {
+									"APIKey": "93ec8bc7-159f4e-1045a6-209d40-2491100be4f6e2",
+									"Query": {
+										"value": "@variables('Query')",
+										"type": "Expression"
+									},
+									"CommunityID": {
+										"value": "@variables('CommunityID')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@variables('Filename')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Query",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set CommunityID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Query",
+							"value": "/ReportsAndChartsApi/Get/CareNotesReport"
+						}
+					},
+					{
+						"name": "Set CommunityID",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "CommunityID",
+							"value": "b1961c38-5b2f-4c4f-b60c-fabc3cdf7498"
+						}
+					},
+					{
+						"name": "Set Filename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Query",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Filename",
+							"value": {
+								"value": "@last(split(variables('Query'), '/'))",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Query": {
+						"type": "String"
+					},
+					"CommunityID": {
+						"type": "String"
+					},
+					"Filename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Polestar_Occupancy')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -5671,451 +5829,6 @@
 								"wildcardFileName": "yh_merged_*.json",
 								"enablePartitionDiscovery": false
 							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "YourHippo/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Process_Merged_Files')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Inserts results into the stage table and upserts user table",
-				"activities": [
-					{
-						"name": "Copy merged results data to Stage table",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "ResultID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['passed']"
-										},
-										"sink": {
-											"name": "Passed",
-											"type": "Boolean"
-										}
-									},
-									{
-										"source": {
-											"path": "[['grade']"
-										},
-										"sink": {
-											"name": "Grade",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['score']"
-										},
-										"sink": {
-											"name": "Score",
-											"type": "Decimal"
-										}
-									},
-									{
-										"source": {
-											"path": "[['completed_at']"
-										},
-										"sink": {
-											"name": "CompletedAt",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['expires_at']"
-										},
-										"sink": {
-											"name": "ExpiresAt",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['has_expired']"
-										},
-										"sink": {
-											"name": "HasExpired",
-											"type": "Boolean"
-										}
-									},
-									{
-										"source": {
-											"path": "[['course']['id']"
-										},
-										"sink": {
-											"name": "CourseID",
-											"type": "Int32"
-										}
-									},
-									{
-										"source": {
-											"path": "[['user']['id']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['results']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_Merged_results",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "YourHippo",
-									"Table": "StageResults"
-								}
-							}
-						]
-					},
-					{
-						"name": "Upsert users data to Users table",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Copy merged results data to Stage table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"UserID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "UserID",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employee_number']"
-										},
-										"sink": {
-											"name": "EmployeeNumber",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['created_at']"
-										},
-										"sink": {
-											"name": "CreatedDateTime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['start_date']"
-										},
-										"sink": {
-											"name": "StartDate",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['name']"
-										},
-										"sink": {
-											"name": "UserName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['email']"
-										},
-										"sink": {
-											"name": "Email",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['gender']['description']"
-										},
-										"sink": {
-											"name": "Gender",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['job_title']"
-										},
-										"sink": {
-											"name": "JobTitle",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['role']['name']"
-										},
-										"sink": {
-											"name": "UserRole",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['primaryEntity']['id']"
-										},
-										"sink": {
-											"name": "PrimaryEntityID",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['users']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_Merged_users",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "YourHippo",
-									"Table": "Users"
-								}
-							}
-						]
-					},
-					{
-						"name": "Exceptions",
-						"description": "Add any exceptions to a Exception table, to be retried at a later date",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Upsert users data to Users table",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['file_type']"
-										},
-										"sink": {
-											"name": "QueryType",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "ID",
-											"type": "String"
-										}
-									}
-								]
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_Merged_Result_Exceptions",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "YourHippo",
-									"Table": "WebHookExceptions"
-								}
-							}
-						]
-					},
-					{
-						"name": "Failure on Exceptions",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Exceptions",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "Failure on Exceptions",
-							"errorCode": "404"
-						}
-					},
-					{
-						"name": "Failure on Users",
-						"description": "",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Upsert users data to Users table",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "Failure on Users",
-							"errorCode": "404"
-						}
-					},
-					{
-						"name": "Failure on Results",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Copy merged results data to Stage table",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "Failure on Results",
-							"errorCode": "404"
 						}
 					}
 				],

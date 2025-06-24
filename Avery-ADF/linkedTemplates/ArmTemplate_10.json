@@ -13,6 +13,451 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Process_Merged_Files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Inserts results into the stage table and upserts user table",
+				"activities": [
+					{
+						"name": "Copy merged results data to Stage table",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "ResultID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['passed']"
+										},
+										"sink": {
+											"name": "Passed",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "[['grade']"
+										},
+										"sink": {
+											"name": "Grade",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['score']"
+										},
+										"sink": {
+											"name": "Score",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "[['completed_at']"
+										},
+										"sink": {
+											"name": "CompletedAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['expires_at']"
+										},
+										"sink": {
+											"name": "ExpiresAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['has_expired']"
+										},
+										"sink": {
+											"name": "HasExpired",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "[['course']['id']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user']['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['results']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_results",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "StageResults"
+								}
+							}
+						]
+					},
+					{
+						"name": "Upsert users data to Users table",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy merged results data to Stage table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"UserID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employee_number']"
+										},
+										"sink": {
+											"name": "EmployeeNumber",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['created_at']"
+										},
+										"sink": {
+											"name": "CreatedDateTime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['start_date']"
+										},
+										"sink": {
+											"name": "StartDate",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['name']"
+										},
+										"sink": {
+											"name": "UserName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['email']"
+										},
+										"sink": {
+											"name": "Email",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['gender']['description']"
+										},
+										"sink": {
+											"name": "Gender",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['job_title']"
+										},
+										"sink": {
+											"name": "JobTitle",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['role']['name']"
+										},
+										"sink": {
+											"name": "UserRole",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['primaryEntity']['id']"
+										},
+										"sink": {
+											"name": "PrimaryEntityID",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['users']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_users",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "Users"
+								}
+							}
+						]
+					},
+					{
+						"name": "Exceptions",
+						"description": "Add any exceptions to a Exception table, to be retried at a later date",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Upsert users data to Users table",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['file_type']"
+										},
+										"sink": {
+											"name": "QueryType",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "ID",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_Merged_Result_Exceptions",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "WebHookExceptions"
+								}
+							}
+						]
+					},
+					{
+						"name": "Failure on Exceptions",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "Exceptions",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "Failure on Exceptions",
+							"errorCode": "404"
+						}
+					},
+					{
+						"name": "Failure on Users",
+						"description": "",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "Upsert users data to Users table",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "Failure on Users",
+							"errorCode": "404"
+						}
+					},
+					{
+						"name": "Failure on Results",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "Copy merged results data to Stage table",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "Failure on Results",
+							"errorCode": "404"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Move_WebHook_files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1492,6 +1937,42 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_530am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_AEMS_CleanHTML",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2025-06-24T08:45:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								5
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2735,228 +3216,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-09-26T11:05:27Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Download bak files from FTP",
-						"description": "Download the zipped bak files from FTP",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CareBlox-bak-Files",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Copy Bak files to Fileshare",
-						"description": "Copy today's downloaded bak files",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Failed",
-						"dependsOn": [
-							{
-								"activity": "Wait 15",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CareBlox-Fileshare",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 15",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Download bak files from FTP",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 15
-						}
-					},
-					{
-						"name": "Copy Bak files to Fileshare Failure",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Copy Bak files to Fileshare",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": {
-									"value": "Red",
-									"type": "Expression"
-								},
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Copy Bak files to Fileshare"
-							}
-						}
-					},
-					{
-						"name": "Download bak files from FTP Failure",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Download bak files from FTP",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": {
-									"value": "Red",
-									"type": "Expression"
-								},
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Download bak files from FTP"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Careblox"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-01T10:23:31Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyAccessAudit')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Transfer File to Blob Storage",
-						"description": "Copies the file generated on the VM from the file share to container in Blob Storage",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Fileshare",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Load CSV file to DB table",
-						"description": "Inserts the records in the csv file to the Avery DB on AH2",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Transfer File to Blob Storage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Insert_ExchequerCompanyAccess",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-06-27T14:27:51Z"
 			},
 			"dependsOn": []
 		}

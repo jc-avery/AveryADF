@@ -13,6 +13,228 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download bak files from FTP",
+						"description": "Download the zipped bak files from FTP",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-bak-Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Copy Bak files to Fileshare",
+						"description": "Copy today's downloaded bak files",
+						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Failed",
+						"dependsOn": [
+							{
+								"activity": "Wait 15",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CareBlox-Fileshare",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 15",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Download bak files from FTP",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 15
+						}
+					},
+					{
+						"name": "Copy Bak files to Fileshare Failure",
+						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Copy Bak files to Fileshare",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "Pipeline failed",
+								"Colour": {
+									"value": "Red",
+									"type": "Expression"
+								},
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Copy Bak files to Fileshare"
+							}
+						}
+					},
+					{
+						"name": "Download bak files from FTP Failure",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Download bak files from FTP",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "Pipeline failed",
+								"Colour": {
+									"value": "Red",
+									"type": "Expression"
+								},
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Download bak files from FTP"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Careblox"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-01T10:23:31Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyAccessAudit')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Transfer File to Blob Storage",
+						"description": "Copies the file generated on the VM from the file share to container in Blob Storage",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Fileshare",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Load CSV file to DB table",
+						"description": "Inserts the records in the csv file to the Avery DB on AH2",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Transfer File to Blob Storage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Insert_ExchequerCompanyAccess",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-06-27T14:27:51Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_GRG_ADMIN_DISCHARGE')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -8876,89 +9098,6 @@
 							],
 							"hours": [
 								23
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_AfterMidnight')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Runs everyday just after midnight (00:05)",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Hydra_Output_File",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2024-12-17T15:55:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								10
-							],
-							"hours": [
-								0
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_10-15pm')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Scheduled to trigger once at 10:15pm, Everyday",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_AEMS_BackupToAveryTables",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2024-05-30T11:15:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								15
-							],
-							"hours": [
-								22
-							],
-							"weekDays": [
-								"Sunday",
-								"Monday",
-								"Tuesday",
-								"Wednesday",
-								"Thursday",
-								"Friday",
-								"Saturday"
 							]
 						}
 					}
