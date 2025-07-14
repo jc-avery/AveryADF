@@ -39,6 +39,10 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'AveryArtisan_Artisan'"
 		},
+		"AveryblobStorageAccount_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AveryblobStorageAccount'"
+		},
 		"CareBlox_FTP_password": {
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'CareBlox_FTP'"
@@ -234,6 +238,14 @@
 		"Softworks_API_properties_typeProperties_userName": {
 			"type": "string",
 			"defaultValue": "AHC23"
+		},
+		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_privateLinkResourceId": {
+			"type": "string",
+			"defaultValue": "/subscriptions/1463136a-d925-4b90-abc6-6236a477d62f/resourceGroups/Avery/providers/Microsoft.Storage/storageAccounts/averyblob"
+		},
+		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
+			"type": "string",
+			"defaultValue": "blob"
 		}
 	},
 	"variables": {
@@ -14848,6 +14860,526 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_Allocation')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Transfers the allocation data from CH to Transform_DB",
+				"activities": [
+					{
+						"name": "Copy Data to STG",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": "SELECT\r\n\tAllocations.[AL_DET_REF]\r\n\t,Allocations.[AL_ACCOUNT] AS AccNo\r\n\t,Allocations.[AL_CREDATT] AS CreatedAt\r\n\t,Allocations.[AL_DATE] AS TransactionDate\r\n\t,Allocations.[AL_PAYDAY] AS DateAllocated\r\n\t,Allocations.[AL_PAYIND]\r\n\t,Allocations.[AL_POSTREF] AS POST_REF\r\n\t,Allocations.[AL_REF1] AS Reference1\r\n\t,Allocations.[AL_REF2] AS Reference2\r\n\t,Allocations.[AL_TYPE] \r\n\t,CASE \r\n\t\tWHEN Allocations.[AL_TYPE] = 'A' THEN 'Adjustment - System'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'C' THEN 'Credit'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'I' THEN 'Invoice'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'J' THEN 'Adjustment - User'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'R' THEN 'Receipt'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'N' THEN 'Adjustment - System'\r\n\t\tELSE ''\r\n\tEND AS TransactionType\r\n\t,Allocations.[AL_VAL] AS AllocationValue\r\n\t,Allocations.[MEMO] AS AllocationMemo\r\nFROM \r\n\tInvAlloc AS Allocations WITH (NOLOCK)",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE ColdHarbour.STGAllocations",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "AL_DET_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "AL_DET_REF",
+											"type": "Int64",
+											"physicalType": "bigint"
+										}
+									},
+									{
+										"source": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedAt",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "CreatedAt",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "TransactionDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "DateAllocated",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "DateAllocated",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "AL_PAYIND",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "AL_PAYIND",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "AL_TYPE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "AL_TYPE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AllocationValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										},
+										"sink": {
+											"name": "AllocationValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										}
+									},
+									{
+										"source": {
+											"name": "AllocationMemo",
+											"type": "String",
+											"physicalType": "text"
+										},
+										"sink": {
+											"name": "AllocationMemo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "STGAllocations"
+								}
+							}
+						]
+					},
+					{
+						"name": "Wait1",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Copy Data to STG",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 5
+						}
+					},
+					{
+						"name": "Upsert",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Wait1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"AL_DET_REF"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "AL_DET_REF",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "AL_DET_REF",
+											"type": "Int64",
+											"physicalType": "bigint"
+										}
+									},
+									{
+										"source": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedAt",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "CreatedAt",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "TransactionDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "DateAllocated",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "DateAllocated",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "AL_PAYIND",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AL_PAYIND",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AL_TYPE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AL_TYPE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AllocationValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										},
+										"sink": {
+											"name": "AllocationValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										}
+									},
+									{
+										"source": {
+											"name": "AllocationMemo",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AllocationMemo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "STGAllocations"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "Allocations"
+								}
+							}
+						]
+					},
+					{
+						"name": "Clear STG table",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Upsert",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "TRUNCATE TABLE ColdHarbour.STGAllocations"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Cold Harbour/Children Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_Billing_Profiles')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -15050,7 +15582,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT \n\tInvPosting.POST_REF,\n\tSite.SiteId AS siteid,\n\tSite.SiteName as sitename, \n\tP.PRODESC AS AccProfile,\n\tCONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName,\n\tInvPosting.account_No AS AccNo, \n\tR.RES_CODE AS RES_CODE,\n\tInvPosting.CRE_DATET AS CreatedAt,\n\tInvPosting.DUE_DATE AS DueDate,\n\tInvPosting.INV_DATE AS InvoiceDate,\n\tCASE \n\t\tWHEN InvPosting.Tran_Type = 'U' THEN 'Receipt'\n\t\tWHEN InvPosting.Tran_Type = 'I' THEN 'Invoice'\n\t\tWHEN InvPosting.Tran_Type = 'C' THEN 'Credit'\n\t\tWHEN InvPosting.Tran_Type = 'J' THEN 'Adjustment'\n\t\tWHEN InvPosting.Tran_Type = 'R' THEN 'Receipt'\n\t\tELSE ''\n\tEND AS TransactionType,\n\tInvPosting.Ref1 AS Reference1, \n\tInvPosting.Ref2 AS Reference2, \n\tInvPosting.Value AS TransactionValue, \n\tInvPosting.Balance AS TransactionBalance\n\t,INVPOSTING.TRAN_TYPE\nFROM \n\tInvPosting (NOLOCK) \n\n\tLEFT JOIN FUNDSRC_HD AS ACC (NOLOCK) \n\t\tON ACC.ACCNO = InvPosting.ACCOUNT_NO\n\t\tAND ACC.ENDDATE IS NULL\n\n\tLEFT JOIN CONTACT_HD AS CONTACT (NOLOCK) \n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN PROFILES AS P (NOLOCK) \n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN RESIDENT AS R (NOLOCK) \n\t\tON R.RES_REF = INVPOSTING.RES_REF\n\n\tLEFT JOIN Site (NOLOCK) \n\t\tON Site.Site_Ref = InvPosting.Site_Ref",
+								"sqlReaderQuery": "SELECT \n\tInvPosting.POST_REF,\n\tSite.SiteId AS siteid,\n\tSite.SiteName as sitename, \n\tP.PRODESC AS AccProfile,\n\tCONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName,\n\tInvPosting.account_No AS AccNo, \n\tR.RES_CODE AS RES_CODE,\n\tInvPosting.CRE_DATET AS CreatedAt,\n\tInvPosting.DUE_DATE AS DueDate,\n\tInvPosting.INV_DATE AS TransactionDate,\n\tCASE \n\t\tWHEN InvPosting.Tran_Type = 'U' THEN 'Receipt - To account'\n\t\tWHEN InvPosting.Tran_Type = 'I' THEN 'Invoice'\n\t\tWHEN InvPosting.Tran_Type = 'C' THEN 'Credit'\n\t\tWHEN InvPosting.Tran_Type = 'J' THEN 'Adjustment'\n\t\tWHEN InvPosting.Tran_Type = 'R' THEN 'Receipt - To transaction'\n\t\tELSE ''\n\tEND AS TransactionType,\n\tInvPosting.Ref1 AS Reference1, \n\tInvPosting.Ref2 AS Reference2, \n\tInvPosting.Value AS TransactionValue, \n\tInvPosting.Balance AS TransactionBalance\n\t,INVPOSTING.TRAN_TYPE\nFROM \n\tInvPosting WITH (NOLOCK)\n\t\n\tLEFT JOIN FUNDSRC_HD AS ACC WITH (NOLOCK)\n\t\tON ACC.ACCNO = InvPosting.ACCOUNT_NO\n\t\tAND ACC.ENDDATE IS NULL\n\n\tLEFT JOIN CONTACT_HD AS CONTACT WITH (NOLOCK) \n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN PROFILES AS P WITH (NOLOCK)\n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN RESIDENT AS R WITH (NOLOCK)\n\t\tON R.RES_REF = INVPOSTING.RES_REF\n\n\tLEFT JOIN Site WITH (NOLOCK)\n\t\tON Site.Site_Ref = InvPosting.Site_Ref",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -15175,12 +15707,12 @@
 									},
 									{
 										"source": {
-											"name": "InvoiceDate",
+											"name": "TransactionDate",
 											"type": "DateTime",
 											"physicalType": "datetime"
 										},
 										"sink": {
-											"name": "InvoiceDate",
+											"name": "TransactionDate",
 											"type": "DateTime",
 											"physicalType": "date"
 										}
@@ -15304,7 +15836,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    STGPostedTransactions.POST_REF\n    ,STGPostedTransactions.SiteID\n    ,HOME.HOME_REF\n    ,STGPostedTransactions.SiteName\n    ,STGPostedTransactions.AccProfile\n    ,STGPostedTransactions.FundSourceName\n    ,STGPostedTransactions.AccNo\n    ,STGPostedTransactions.RES_CODE\n    ,STGPostedTransactions.CreatedAt\n    ,STGPostedTransactions.DueDate\n    ,STGPostedTransactions.InvoiceDate\n    ,STGPostedTransactions.TransactionType\n    ,STGPostedTransactions.Reference1\n    ,STGPostedTransactions.Reference2\n    ,STGPostedTransactions.TransactionValue\n    ,STGPostedTransactions.TransactionBalance\nFROM \n    ColdHarbour.STGPostedTransactions\n\n    LEFT JOIN GRG.HOME\n        ON HOME.SiteID = STGPostedTransactions.SiteID",
+								"sqlReaderQuery": "SELECT\n    STGPostedTransactions.POST_REF\n    ,STGPostedTransactions.SiteID\n    ,HOME.HOME_REF\n    ,STGPostedTransactions.SiteName\n    ,STGPostedTransactions.AccProfile\n    ,STGPostedTransactions.FundSourceName\n    ,STGPostedTransactions.AccNo\n    ,STGPostedTransactions.RES_CODE\n    ,STGPostedTransactions.CreatedAt\n    ,STGPostedTransactions.DueDate\n    ,STGPostedTransactions.TransactionDate\n    ,STGPostedTransactions.TransactionType\n    ,STGPostedTransactions.Reference1\n    ,STGPostedTransactions.Reference2\n    ,STGPostedTransactions.TransactionValue\n    ,STGPostedTransactions.TransactionBalance\nFROM \n    ColdHarbour.STGPostedTransactions\n\n    LEFT JOIN GRG.HOME\n        ON HOME.SiteID = STGPostedTransactions.SiteID",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -15446,12 +15978,12 @@
 									},
 									{
 										"source": {
-											"name": "InvoiceDate",
+											"name": "TransactionDate",
 											"type": "DateTime",
 											"physicalType": "date"
 										},
 										"sink": {
-											"name": "InvoiceDate",
+											"name": "TransactionDate",
 											"type": "DateTime",
 											"physicalType": "date"
 										}
@@ -15607,7 +16139,7 @@
 					"elapsedTimeMetric": {}
 				},
 				"folder": {
-					"name": "Cold Harbour"
+					"name": "Cold Harbour/Children Pipelines"
 				},
 				"annotations": []
 			},
@@ -15692,6 +16224,68 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_GRG')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_Avery')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_TransactionData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Runs the pipelines to copy across posted transactions and Allocations",
+				"activities": [
+					{
+						"name": "Posted Transactions",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CH_PostedTransactions",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Allocations",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Posted Transactions",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CH_Allocation",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Cold Harbour"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_CH_PostedTransactions')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_CH_Allocation')]"
 			]
 		},
 		{
@@ -51193,6 +51787,32 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AveryblobStorageAccount')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_AH1_Avery')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -60885,6 +61505,25 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobStorageAccount')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AveryblobStorageAccount_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AveryVirtualNetworkIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/AveryVirtualNetworkIntegrationRuntime')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/Broadshield Live API')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
@@ -61829,7 +62468,7 @@
 					},
 					{
 						"pipelineReference": {
-							"referenceName": "PL_CH_PostedTransactions",
+							"referenceName": "PL_CH_TransactionData",
 							"type": "PipelineReference"
 						},
 						"parameters": {}
@@ -61863,7 +62502,7 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Artisan')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_CH_Residents')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_CH_PostedTransactions')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_CH_TransactionData')]"
 			]
 		},
 		{
@@ -61990,6 +62629,39 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Exchequer_CompanyAccessAudit')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryVirtualNetworkIntegrationRuntime')]",
+			"type": "Microsoft.DataFactory/factories/integrationRuntimes",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "Managed",
+				"description": "Integration runtime to Avery's virtual network",
+				"typeProperties": {
+					"computeProperties": {
+						"location": "UK South",
+						"dataFlowProperties": {
+							"computeType": "General",
+							"coreCount": 8,
+							"timeToLive": 10,
+							"cleanup": false,
+							"customProperties": []
+						},
+						"pipelineExternalComputeScaleProperties": {
+							"timeToLive": 60,
+							"numberOfPipelineNodes": 1,
+							"numberOfExternalNodes": 1
+						}
+					}
+				},
+				"managedVirtualNetwork": {
+					"type": "ManagedVirtualNetworkReference",
+					"referenceName": "default"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
 			]
 		},
 		{
@@ -62494,6 +63166,25 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Employee')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB_SoftWorks_Clockings')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/default')]",
+			"type": "Microsoft.DataFactory/factories/managedVirtualNetworks",
+			"apiVersion": "2018-06-01",
+			"properties": {},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/default/AveryAzureBlobStorageAccountPrivateEndPoint')]",
+			"type": "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"privateLinkResourceId": "[parameters('AveryAzureBlobStorageAccountPrivateEndPoint_properties_privateLinkResourceId')]",
+				"groupId": "[parameters('AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId')]"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
 			]
 		}
 	]
