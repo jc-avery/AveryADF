@@ -83,6 +83,10 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'Softworks_API'"
 		},
+		"AveryblobFileShare_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AveryblobFileShare'"
+		},
 		"AH2_Agency_properties_typeProperties_server": {
 			"type": "string",
 			"defaultValue": "averyhealthcare2.database.windows.net"
@@ -246,6 +250,14 @@
 		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
 			"type": "string",
 			"defaultValue": "blob"
+		},
+		"AveryAzureBlobFileSharePrivateEndPoint_properties_privateLinkResourceId": {
+			"type": "string",
+			"defaultValue": "/subscriptions/1463136a-d925-4b90-abc6-6236a477d62f/resourceGroups/Avery/providers/Microsoft.Storage/storageAccounts/averyblob"
+		},
+		"AveryAzureBlobFileSharePrivateEndPoint_properties_groupId": {
+			"type": "string",
+			"defaultValue": "file"
 		}
 	},
 	"variables": {
@@ -63185,6 +63197,130 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/default/AveryAzureBlobFileSharePrivateEndPoint')]",
+			"type": "Microsoft.DataFactory/factories/managedVirtualNetworks/managedPrivateEndpoints",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"privateLinkResourceId": "[parameters('AveryAzureBlobFileSharePrivateEndPoint_properties_privateLinkResourceId')]",
+				"groupId": "[parameters('AveryAzureBlobFileSharePrivateEndPoint_properties_groupId')]"
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobFileShare')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureFileStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AveryblobFileShare_connectionString')]",
+					"fileShare": "averyblobfileshare"
+				},
+				"connectVia": {
+					"referenceName": "AveryVirtualNetworkIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/integrationRuntimes/AveryVirtualNetworkIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobFileShare')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AveryblobFileShare",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureFileStorageLocation"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AveryblobFileShare')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Fusion_Move_Files_To_VM')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Moves files loaded to the Fusion Container in the averyblob storage account, to the averyblobfileshare. So they can be copied off the file share to a location on the VM",
+				"activities": [
+					{
+						"name": "Copy container files to Fileshare",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"deleteFilesAfterCompletion": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "Averyblob_Fusion",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "AveryblobFileShare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Fusion"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Averyblob_Fusion')]",
+				"[concat(variables('factoryId'), '/datasets/AveryblobFileShare')]"
 			]
 		}
 	]
