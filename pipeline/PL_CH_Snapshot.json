@@ -1,0 +1,225 @@
+{
+	"name": "PL_CH_Snapshot",
+	"properties": {
+		"activities": [
+			{
+				"name": "Posted Transactions Snapshot",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set SnapshotDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"additionalColumns": [
+							{
+								"name": "SnapShotDate",
+								"value": {
+									"value": "@variables('SnapshotDate')",
+									"type": "Expression"
+								}
+							},
+							{
+								"name": "SnapShotTaken",
+								"value": {
+									"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd')",
+									"type": "Expression"
+								}
+							}
+						],
+						"sqlReaderQuery": "SELECT \r\n    [HOME_REF]\r\n    ,[SiteName]\r\n    ,[AccProfile]\r\n    ,[FundSourceName]\r\n    ,[AccNo]\r\n    ,[RES_CODE]\r\n    ,SUM([TransactionBalance]) AS [TransactionBalance]\r\nFROM \r\n    [ColdHarbour].[PostedTransactions]\r\nGROUP BY        \r\n    [HOME_REF]\r\n    ,[SiteName]\r\n    ,[AccProfile]\r\n    ,[FundSourceName]\r\n    ,[AccNo]\r\n    ,[RES_CODE]\r\nHAVING \r\n    SUM([TransactionBalance]) <> 0",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"tableOption": "autoCreate",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "SnapShotDate",
+									"type": "String"
+								},
+								"sink": {
+									"name": "SnapshotDate",
+									"type": "DateTime",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "HOME_REF",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "HOME_REF",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "SiteName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "SiteName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AccProfile",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "AccProfile",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "FundSourceName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "FundSourceName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AccNo",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "AccNo",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "RES_CODE",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "RES_CODE",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "TransactionBalance",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 9,
+									"precision": 38
+								},
+								"sink": {
+									"name": "TransactionBalance",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 9,
+									"precision": 19
+								}
+							},
+							{
+								"source": {
+									"name": "SnapShotTaken",
+									"type": "String"
+								},
+								"sink": {
+									"name": "SnapShotTaken",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "ColdHarbour",
+							"Table": "PostedTransactionsSnapshot"
+						}
+					}
+				]
+			},
+			{
+				"name": "Set SnapshotDate",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "SnapshotDate",
+					"value": {
+						"value": "@formatDateTime(addDays(utcNow(), -1), 'yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"variables": {
+			"SnapshotDate": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Cold Harbour/Children Pipelines"
+		},
+		"annotations": []
+	}
+}
