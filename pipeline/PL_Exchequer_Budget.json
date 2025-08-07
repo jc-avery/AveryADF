@@ -476,18 +476,11 @@
 				]
 			},
 			{
-				"name": "Copy data1",
+				"name": "Upsert Budget1",
 				"type": "Copy",
 				"state": "Inactive",
 				"onInactiveMarkAs": "Succeeded",
-				"dependsOn": [
-					{
-						"activity": "Insert Budget1 into Stage Table",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
+				"dependsOn": [],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -497,8 +490,149 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"enableStaging": false
-				}
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT \n    CAST(\n        CAST(H.IntranetID AS VARCHAR(4)) + \n        CAST(S.GLCode AS VARCHAR(6)) + \n        CONVERT(VARCHAR(8), S.Period1Date, 112) \n    AS BIGINT) AS BudgetCompositeKey,\n\n    H.IntranetID,\n    S.BudgetType,\n    S.ExchCode,\n    S.GLCode,\n    S.GLDesc,\n    P.BudgetDate,\n    TRY_CAST(NULLIF(P.Amount, '#(511): Invalid GL Code') AS NUMERIC(18,5)) AS Amount\nFROM \n    Exchequer.STGBudgets S\n\n    LEFT JOIN Avery.HomeDetails H\n        ON H.ExchCode = S.ExchCode\n\n    CROSS APPLY (VALUES\n        (S.Period1Date, S.Period1Value),\n        (S.Period2Date, S.Period2Value),\n        (S.Period3Date, S.Period3Value),\n        (S.Period4Date, S.Period4Value),\n        (S.Period5Date, S.Period5Value),\n        (S.Period6Date, S.Period6Value),\n        (S.Period7Date, S.Period7Value),\n        (S.Period8Date, S.Period8Value),\n        (S.Period9Date, S.Period9Value),\n        (S.Period10Date, S.Period10Value),\n        (S.Period11Date, S.Period11Value),\n        (S.Period12Date, S.Period12Value),\n        (S.Period13Date, S.Period13Value),\n        (S.Period14Date, S.Period14Value),\n        (S.Period15Date, S.Period15Value)\n    ) AS P(BudgetDate, Amount)\n\nWHERE \n    S.ExchCode IS NOT NULL\n    AND P.BudgetDate IS NOT NULL\nORDER BY\n    IntranetID ASC,\n    GLCode ASC,\n    BudgetDate ASC",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "BudgetCompositeKey",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "BudgetCompositeKey",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "IntranetID",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "IntranetID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "BudgetType",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "BudgetType",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ExchCode",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "ExchCode",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "GLCode",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "GLCode",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "GLDesc",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "GLDesc",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "BudgetDate",
+									"type": "DateTime",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "BudgetDate",
+									"type": "DateTime",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "Amount",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 5,
+									"precision": 18
+								},
+								"sink": {
+									"name": "Amount",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 5,
+									"precision": 18
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Exchequer",
+							"Table": "Budgets"
+						}
+					}
+				]
 			}
 		],
 		"variables": {
