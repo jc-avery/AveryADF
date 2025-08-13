@@ -424,9 +424,14 @@
 			{
 				"name": "Upsert Budget1",
 				"type": "Copy",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Budget 2 Staging",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -438,16 +443,19 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "SELECT \n    CAST(\n        CAST(H.IntranetID AS VARCHAR(4)) + \n        CAST(S.GLCode AS VARCHAR(6)) + \n        CONVERT(VARCHAR(8), S.Period1Date, 112) \n    AS BIGINT) AS BudgetCompositeKey,\n\n    H.IntranetID,\n    S.BudgetType,\n    S.ExchCode,\n    S.GLCode,\n    S.GLDesc,\n    P.BudgetDate,\n    TRY_CAST(NULLIF(P.Amount, '#(511): Invalid GL Code') AS NUMERIC(18,5)) AS Amount\nFROM \n    Exchequer.STGBudgets S\n\n    LEFT JOIN Avery.HomeDetails H\n        ON H.ExchCode = S.ExchCode\n\n    CROSS APPLY (VALUES\n        (S.Period1Date, S.Period1Value),\n        (S.Period2Date, S.Period2Value),\n        (S.Period3Date, S.Period3Value),\n        (S.Period4Date, S.Period4Value),\n        (S.Period5Date, S.Period5Value),\n        (S.Period6Date, S.Period6Value),\n        (S.Period7Date, S.Period7Value),\n        (S.Period8Date, S.Period8Value),\n        (S.Period9Date, S.Period9Value),\n        (S.Period10Date, S.Period10Value),\n        (S.Period11Date, S.Period11Value),\n        (S.Period12Date, S.Period12Value),\n        (S.Period13Date, S.Period13Value),\n        (S.Period14Date, S.Period14Value),\n        (S.Period15Date, S.Period15Value)\n    ) AS P(BudgetDate, Amount)\n\nWHERE \n    S.ExchCode IS NOT NULL\n    AND P.BudgetDate IS NOT NULL\nORDER BY\n    IntranetID ASC,\n    GLCode ASC,\n    BudgetDate ASC",
+						"sqlReaderQuery": "WITH BudgetData AS(\nSELECT \n    H.IntranetID,\n    S.BudgetType,\n    S.ExchCode,\n    S.GLCode,\n    S.GLDesc,\n    P.BudgetDate,\n    S.YearEnd,\n    TRY_CAST(P.Amount AS NUMERIC(18,5)) AS BudgetAmount\nFROM \n    Exchequer.STGBudgets AS S\n\n    LEFT JOIN Avery.HomeDetails H\n        ON H.ExchCode = S.ExchCode\n\n    CROSS APPLY (VALUES\n        (S.Period1Date, S.Period1Value),\n        (S.Period2Date, S.Period2Value),\n        (S.Period3Date, S.Period3Value),\n        (S.Period4Date, S.Period4Value),\n        (S.Period5Date, S.Period5Value),\n        (S.Period6Date, S.Period6Value),\n        (S.Period7Date, S.Period7Value),\n        (S.Period8Date, S.Period8Value),\n        (S.Period9Date, S.Period9Value),\n        (S.Period10Date, S.Period10Value),\n        (S.Period11Date, S.Period11Value),\n        (S.Period12Date, S.Period12Value)\n    ) AS P(BudgetDate, Amount)\n\nWHERE \n    S.ExchCode IS NOT NULL\n    AND P.BudgetDate IS NOT NULL\n)\n\nSELECT \n    CAST(\n        CAST(BudgetData.IntranetID AS VARCHAR(4)) + \n        CAST(BudgetData.BudgetType AS VARCHAR(1)) +\n        CAST(BudgetData.GLCode AS VARCHAR(6)) + \n        CONVERT(VARCHAR(8), CAST(BudgetData.BudgetDate AS DATE), 112) \n    AS BIGINT) AS BudgetCompositeKey,\n    *\nFROM\n    BudgetData\nORDER BY\n    IntranetID ASC,\n    GLCode ASC,\n    BudgetDate ASC,\n    BudgetType ASC",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
 					"sink": {
 						"type": "AzureSqlSink",
 						"writeBehavior": "insert",
-						"sqlWriterUseTableLock": false
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
 					},
 					"enableStaging": false,
+					"parallelCopies": 8,
+					"dataIntegrationUnits": 16,
 					"translator": {
 						"type": "TabularTranslator",
 						"mappings": [
@@ -478,8 +486,8 @@
 							{
 								"source": {
 									"name": "BudgetType",
-									"type": "String",
-									"physicalType": "varchar"
+									"type": "Byte",
+									"physicalType": "tinyint"
 								},
 								"sink": {
 									"name": "BudgetType",
@@ -526,8 +534,8 @@
 							{
 								"source": {
 									"name": "BudgetDate",
-									"type": "DateTime",
-									"physicalType": "date"
+									"type": "String",
+									"physicalType": "varchar"
 								},
 								"sink": {
 									"name": "BudgetDate",
@@ -537,14 +545,26 @@
 							},
 							{
 								"source": {
-									"name": "Amount",
+									"name": "YearEnd",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "YearEnd",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "BudgetAmount",
 									"type": "Decimal",
 									"physicalType": "decimal",
 									"scale": 5,
 									"precision": 18
 								},
 								"sink": {
-									"name": "Amount",
+									"name": "BudgetAmount",
 									"type": "Decimal",
 									"physicalType": "decimal",
 									"scale": 5,
