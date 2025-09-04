@@ -13,6 +13,228 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_Download_AllData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Coursesdata",
+						"description": "Connects to Myrus API Courses end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": "courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllCoursesData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Download Users data",
+						"description": "Connects to Myrus API user end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Download Coursesdata",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": "users"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON_AllData",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUsersData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Download User Course data",
+						"description": "Connects to Myrus API user-course end point and downloads data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Date for Usercourse endpoint",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:08:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_BroadShield_Live_API",
+								"type": "DatasetReference",
+								"parameters": {
+									"Date": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									},
+									"Endpoint": "user-courses"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_BroadShield_JSON",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "AllUser_CoursesData$20241002"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Date for Usercourse endpoint",
+						"description": "Sets the date to be the 1st of the current year and assigns it to the API dataset",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Download Users data",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": "20210401090000"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Broadshield/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-02T09:31:21Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_BroadShield_JSON_SQL_AllData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -10803,118 +11025,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-04-10T11:21:25Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CareBlox-parquet-copy')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies Parquet files from file share to azure blob storage. Then deletes the files on the file share.",
-				"activities": [
-					{
-						"name": "Copy Careblox Parquet files",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "ParquetSource",
-								"storeSettings": {
-									"type": "AzureFileStorageReadSettings",
-									"recursive": true,
-									"wildcardFileName": "*.parquet",
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "ParquetReadSettings"
-								}
-							},
-							"sink": {
-								"type": "ParquetSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "ParquetWriteSettings"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Fileshare_Parquet",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AZStorage_careblox_parquet",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Delete1",
-						"type": "Delete",
-						"dependsOn": [
-							{
-								"activity": "Copy Careblox Parquet files",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_PolestarStorageAcc_Fileshare_Parquet",
-								"type": "DatasetReference",
-								"parameters": {}
-							},
-							"enableLogging": false,
-							"storeSettings": {
-								"type": "AzureFileStorageReadSettings",
-								"recursive": true,
-								"wildcardFileName": "*.parquet",
-								"enablePartitionDiscovery": false
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Careblox/Children Pipelines"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-09-26T11:05:26Z"
 			},
 			"dependsOn": []
 		}

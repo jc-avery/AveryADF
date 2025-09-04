@@ -87,6 +87,10 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'Softworks_API'"
 		},
+		"Radar_SQL_password": {
+			"type": "secureString",
+			"metadata": "Secure string for 'password' of 'Radar_SQL'"
+		},
 		"AH2_Agency_properties_typeProperties_server": {
 			"type": "string",
 			"defaultValue": "averyhealthcare2.database.windows.net"
@@ -258,6 +262,18 @@
 		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
 			"type": "string",
 			"defaultValue": "blob"
+		},
+		"Radar_SQL_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "radar-integration.radarhealthcare.net"
+		},
+		"Radar_SQL_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "radar-avery"
+		},
+		"Radar_SQL_properties_typeProperties_userName": {
+			"type": "string",
+			"defaultValue": "avery-admin"
 		}
 	},
 	"variables": {
@@ -39431,6 +39447,8 @@
 					{
 						"name": "Copy AH1 data to AH2",
 						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [],
 						"policy": {
 							"secureInput": false
@@ -54721,6 +54739,36 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion_Archive')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('archive/', formatDateTime(utcNow(), 'yyyy'), '/', formatDateTime(utcNow(), 'MM'), '/', formatDateTime(utcNow(), 'dd'), '/')\n",
+							"type": "Expression"
+						},
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AveryblobStorageAccount')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_AH1_Avery')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -66271,34 +66319,27 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion_Archive')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
+			"name": "[concat(parameters('factoryName'), '/Radar_SQL')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
-				"linkedServiceName": {
-					"referenceName": "AveryblobStorageAccount",
-					"type": "LinkedServiceReference"
-				},
-				"folder": {
-					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
-				},
+				"description": "Connection to Radar's integration server hosting Radar SQL DB",
 				"annotations": [],
-				"type": "Binary",
+				"type": "AzureSqlDatabase",
 				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"folderPath": {
-							"value": "@concat('archive/', formatDateTime(utcNow(), 'yyyy'), '/', formatDateTime(utcNow(), 'MM'), '/', formatDateTime(utcNow(), 'dd'), '/')\n",
-							"type": "Expression"
-						},
-						"container": "fusion"
+					"server": "[parameters('Radar_SQL_properties_typeProperties_server')]",
+					"database": "[parameters('Radar_SQL_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SQL",
+					"userName": "[parameters('Radar_SQL_properties_typeProperties_userName')]",
+					"password": {
+						"type": "SecureString",
+						"value": "[parameters('Radar_SQL_password')]"
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/AveryblobStorageAccount')]"
-			]
+			"dependsOn": []
 		}
 	]
 }
