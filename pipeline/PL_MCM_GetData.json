@@ -1,11 +1,24 @@
 {
-	"name": "PL_MCM_GetData_v2",
+	"name": "PL_MCM_GetData",
 	"properties": {
 		"activities": [
 			{
-				"name": "Copy data1",
+				"name": "Call AZ Function",
 				"type": "Copy",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Set Az Func Code",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set MCM API Key",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -37,24 +50,158 @@
 				},
 				"inputs": [
 					{
-						"referenceName": "DS_MCM_Data_Extract",
+						"referenceName": "DS_MCM_Data_Extract_CommunityId",
 						"type": "DatasetReference",
 						"parameters": {
-							"name": "jon",
-							"code": "n/a"
+							"MCM_endPoint": {
+								"value": "@variables('MCMEndPoint')",
+								"type": "Expression"
+							},
+							"MCM_api_key": {
+								"value": "@variables('MCMAPIKey')",
+								"type": "Expression"
+							},
+							"FunctionCode": {
+								"value": "@variables('AzFuncCode')",
+								"type": "Expression"
+							},
+							"CommunityId": "04b8b5cb-f680-4aa1-b3ec-12ddb04b8d7d"
 						}
 					}
 				],
 				"outputs": [
 					{
 						"referenceName": "DS_MCM_Json",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"FileType": {
+								"value": "@variables('MCMEndPoint')",
+								"type": "Expression"
+							}
+						}
 					}
 				]
+			},
+			{
+				"name": "Get AZ Func Code",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set End Point",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMDataExtractAzFunc/9ad6bb869bce44809b76c700e88d789f?api-version=7.3",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Set Az Func Code",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get AZ Func Code",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "AzFuncCode",
+					"value": {
+						"value": "@activity('Get AZ Func Code').output.value",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get MCM API key",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMJonCrockettAPIKey/bde96b82a47a40628426ca459ee044ec?api-version=7.3",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Set MCM API Key",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Get MCM API key",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "MCMAPIKey",
+					"value": {
+						"value": "@activity('Get MCM API key').output.value",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set End Point",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "MCMEndPoint",
+					"value": "serviceusers"
+				}
 			}
 		],
 		"variables": {
-			"MCM_Json_Data": {
+			"AzFuncCode": {
+				"type": "String"
+			},
+			"MCMAPIKey": {
+				"type": "String"
+			},
+			"MCMEndPoint": {
 				"type": "String"
 			}
 		},
