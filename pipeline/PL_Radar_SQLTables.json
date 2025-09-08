@@ -33,7 +33,10 @@
 								},
 								"sink": {
 									"type": "AzureSqlSink",
-									"preCopyScript": "DROP TABLE IF EXISTS \n[@{item().destination.schema}].[@{item().destination.table}]",
+									"preCopyScript": {
+										"value": "DROP TABLE IF EXISTS \n[@{item().destination.schema}].[@{item().destination.table}]",
+										"type": "Expression"
+									},
 									"writeBehavior": {
 										"value": "@item().copySink.writeBehavior",
 										"type": "Expression"
@@ -86,6 +89,37 @@
 							]
 						}
 					]
+				}
+			},
+			{
+				"name": "Send Error Message",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "For Each DB Item",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": "Pipeline failed",
+						"Colour": "Red",
+						"PipelineName": "@pipeline().Pipeline",
+						"PipelineRunID": "@pipeline().RunId",
+						"pStepFailed": "For Each DB Item"
+					}
 				}
 			}
 		],
