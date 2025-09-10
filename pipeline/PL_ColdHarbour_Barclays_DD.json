@@ -1,0 +1,135 @@
+{
+	"name": "PL_ColdHarbour_Barclays_DD",
+	"properties": {
+		"description": "Exports the DD report for the 3 homes that bank with Barclays. Saves to container which is monitored by a logic app, which will save to share point.",
+		"activities": [
+			{
+				"name": "Lookup Home details",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "DS_Polestar_storage_csv",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "user",
+							"FileName": "DDReportDetails.csv"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "For Each Home",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup Home details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup Home details').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Copy data1",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "@SELECT \n\tFundSrc_Hd.AccNo,\n    Resident.Res_Code,\n    Contact_Hd_Res.Forenames,\n    Contact_Hd_Res.Surname,\n    Locations.Loc_Desc,\n    Locations.CostCentre,\n    CASE\n        WHEN DirectD_Dt.BankAcc != '' THEN\n            DirectD_Dt.BankAcc\n        ELSE\n            FundSrc_Hd.BankAcc\n    END AS BankAcc,\n    CASE\n        WHEN DirectD_Dt.BnkAccName != '' THEN\n            DirectD_Dt.BnkAccName\n        ELSE\n            FundSrc_Hd.BnkAccName\n    END AS BnkAccName,\n    CASE\n        WHEN DirectD_Dt.BkSortCode != '' THEN\n            DirectD_Dt.BkSortCode\n        ELSE\n            isnull(Contact_Hd_FS.BkSortCode, space(8))\n    END AS BkSortCode,\n    DirectD_Dt.DDTranType,\n    isnull(DirectD_Dt.Due_Date, DirectD_Dt.Inv_Date) AS Due_Date,\n    DirectD_Dt.Submitted,\n    DirectD_Dt.Allocated,\n    DirectD_Hd.BatchNo,\n    Site.SiteId,\n    Site.SiteName,\n    DirectD_Dt.Amount\nFROM \n\tDirectD_Dt (NOLOCK)\n    JOIN DirectD_Hd (NOLOCK)\n        ON DirectD_Hd.DDHd_Ref = DirectD_Dt.DDHd_Ref\n           AND DirectD_Hd.BatchNo\n           BETWEEN 0 AND 9999999999\n    JOIN FundSrc_Hd (NOLOCK)\n        LEFT JOIN Contact_Dt AS Contact_Dt_FS (NOLOCK)\n            JOIN Contact_Hd AS Contact_Hd_FS (NOLOCK)\n                ON Contact_Hd_FS.Contact_Ref = Contact_Dt_FS.Contact_Ref\n            ON Contact_Dt_FS.Cnta_Det_Ref = FundSrc_Hd.Bank_Det_Ref\n        JOIN Resident (NOLOCK)\n            JOIN Contact_Dt AS Contact_Dt_Res (NOLOCK)\n                JOIN Contact_Hd AS Contact_Hd_Res (NOLOCK)\n                    ON Contact_Hd_Res.Contact_Ref = Contact_Dt_Res.Contact_Ref\n                ON Contact_Dt_Res.Cnta_Det_Ref = Resident.Cnta_Det_Ref\n            JOIN Room_Dt (NOLOCK)\n                JOIN Locations (NOLOCK)\n                    JOIN Site (NOLOCK)\n                        ON Site.Site_Ref = Locations.Site_Ref\n                    ON Locations.Loc_Ref = Room_Dt.Loc_Ref\n                ON Room_Dt.Room_Ref = Resident.Room_Ref\n            ON Resident.Res_Ref = FundSrc_Hd.Res_Ref\n        ON FundSrc_Hd.FS_Ref = DirectD_Dt.FS_Ref\nWHERE \n\tDirectD_Dt.Due_Date\n    BETWEEN '17530101' AND '29991231'\n    --AND DirectD_Dt.Allocated != 'X'\n    and DirectD_Dt.Submitted IS NULL\n    and DirectD_Dt.DDTranType IN ( '01', '17', '18', '19' )\n    AND Locations.Site_Ref = @{item().Site_ref}",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OnPrem_CH_IP",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "n/a",
+										"Table": "n/a"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_Polestar_storage_csv",
+									"type": "DatasetReference",
+									"parameters": {
+										"Container": "user",
+										"FileName": {
+											"value": "@item().HomeName",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"folder": {
+			"name": "Cold Harbour"
+		},
+		"annotations": []
+	}
+}
