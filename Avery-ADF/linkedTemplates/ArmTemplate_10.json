@@ -4060,6 +4060,268 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_MCM_ServiceUsers_MultiHome')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "For Community",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup Community Ids",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup Community Ids').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Call AZ Function",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_MCM_Data_Extract_CommunityId",
+											"type": "DatasetReference",
+											"parameters": {
+												"MCM_endPoint": {
+													"value": "@variables('MCMEndPoint')",
+													"type": "Expression"
+												},
+												"MCM_api_key": {
+													"value": "@variables('MCMAPIKey')",
+													"type": "Expression"
+												},
+												"FunctionCode": {
+													"value": "@variables('AzFuncCode')",
+													"type": "Expression"
+												},
+												"CommunityId": {
+													"value": "@item().MCM_CommunityID",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_Yardi_Json",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileType": {
+													"value": "@concat(item().HomeName, ' ', variables('MCMEndPoint'))",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Lookup Community Ids",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Set Az Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set MCM API Key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    HOME_REF,\n    MCM_CommunityID,\n    HomeName\nFROM \n    [dbo].[ColdHarbourHomeID]\nWHERE\n    MCM_CommunityID IS NOT NULL\n    AND HOME_REF IN (@{variables('Home_Ref_List')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Get AZ Func Code",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMDataExtractAzFunc/9ad6bb869bce44809b76c700e88d789f?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set Az Func Code",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get AZ Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "AzFuncCode",
+							"value": {
+								"value": "@activity('Get AZ Func Code').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get MCM API key",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMJonCrockettAPIKey/bde96b82a47a40628426ca459ee044ec?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set MCM API Key",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get MCM API key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCMAPIKey",
+							"value": {
+								"value": "@activity('Get MCM API key').output.value",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"AzFuncCode": {
+						"type": "String"
+					},
+					"MCMAPIKey": {
+						"type": "String"
+					},
+					"MCMEndPoint": {
+						"type": "String",
+						"defaultValue": "serviceusers"
+					},
+					"Home_Ref_List": {
+						"type": "String",
+						"defaultValue": "610,632,651,639"
+					}
+				},
+				"folder": {
+					"name": "Yardi/MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Yardi_MaintApp_Tables')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -7056,344 +7318,6 @@
 								}
 							}
 						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "YourHippo/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_Result_files')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Get Result File List",
-						"type": "GetMetadata",
-						"dependsOn": [
-							{
-								"activity": "Does WebhookFiles Result files exists",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_YourHippo_WebHook_Json_Result_File",
-								"type": "DatasetReference",
-								"parameters": {}
-							},
-							"fieldList": [
-								"childItems"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "JsonReadSettings"
-							}
-						}
-					},
-					{
-						"name": "Process File List",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get Result File List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get Result File List').output.childItems",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Process Result Files",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "JsonSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"wildcardFileName": {
-													"value": "@item().Name",
-													"type": "Expression"
-												},
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "JsonReadSettings"
-											}
-										},
-										"sink": {
-											"type": "AzureSqlSink",
-											"writeBehavior": "upsert",
-											"upsertSettings": {
-												"useTempDB": true,
-												"keys": [
-													"ResultID"
-												]
-											},
-											"sqlWriterUseTableLock": false,
-											"disableMetricsCollection": false
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"mappings": [
-												{
-													"source": {
-														"path": "$['data']['result']['id']"
-													},
-													"sink": {
-														"name": "ResultID",
-														"type": "Int32"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['passed']"
-													},
-													"sink": {
-														"name": "Passed",
-														"type": "Boolean"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['grade']"
-													},
-													"sink": {
-														"name": "Grade",
-														"type": "String"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['score']"
-													},
-													"sink": {
-														"name": "Score",
-														"type": "Decimal"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['completed_at']"
-													},
-													"sink": {
-														"name": "CompletedAt",
-														"type": "DateTime"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['expires_at']"
-													},
-													"sink": {
-														"name": "ExpiresAt",
-														"type": "DateTime"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['has_expired']"
-													},
-													"sink": {
-														"name": "HasExpired",
-														"type": "Boolean"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['course']['id']"
-													},
-													"sink": {
-														"name": "CourseID",
-														"type": "Int32"
-													}
-												},
-												{
-													"source": {
-														"path": "$['data']['result']['user']['id']"
-													},
-													"sink": {
-														"name": "UserID",
-														"type": "String"
-													}
-												}
-											],
-											"collectionReference": ""
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_YourHippo_WebHook_Json_Result_File",
-											"type": "DatasetReference",
-											"parameters": {}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_AH2_TRANSFORM_DB",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "YourHippo",
-												"Table": "StageResults"
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Archive Files",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Process File List",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false,
-							"dataIntegrationUnits": 4
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_YourHippo_WebHook_Files",
-								"type": "DatasetReference",
-								"parameters": {
-									"Folder": {
-										"value": "@concat('WebhookFiles', '/', 'Result')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_YourHippo_WebHook_Files",
-								"type": "DatasetReference",
-								"parameters": {
-									"Folder": {
-										"value": "@concat('WebhookFiles', '/', 'Archive', '/', 'Result')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Does WebhookFiles Result files exists",
-						"description": "Checks there are files to process. If there are it will succeeds and carry on, if not it fails with custom failure message",
-						"type": "Lookup",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "webhook$result*.json",
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"dataset": {
-								"referenceName": "DS_YourHippo_WebHook_Json_Result_File",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						}
-					},
-					{
-						"name": "No Files failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Does WebhookFiles Result files exists",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "No Result files to process",
-							"errorCode": "404"
-						}
 					}
 				],
 				"policy": {

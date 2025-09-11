@@ -147,6 +147,10 @@
 			"type": "string",
 			"defaultValue": "ADF_User"
 		},
+		"Avery_ADF_KeyVault_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://Avery-ADF-KeyVault.vault.azure.net/"
+		},
 		"Broadshield Live API_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://myrus.careshield.com/api/organisation/avery"
@@ -2185,10 +2189,6 @@
 		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
 			"type": "string",
 			"defaultValue": "blob"
-		},
-		"Avery_ADF_KeyVault_properties_typeProperties_baseUrl": {
-			"type": "string",
-			"defaultValue": "https://Avery-ADF-KeyVault.vault.azure.net/"
 		}
 	},
 	"variables": {
@@ -30122,6 +30122,150 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Barclays_DD')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Exports the DD report for the 3 homes that bank with Barclays. Saves to container which is monitored by a logic app, which will save to share point.",
+				"activities": [
+					{
+						"name": "Lookup Home details",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "DS_Polestar_storage_csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "user",
+									"FileName": "DDReportDetails.csv"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Home",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup Home details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup Home details').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Export DD Reports",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT \n\tFundSrc_Hd.AccNo,\n    Resident.Res_Code,\n    Contact_Hd_Res.Forenames,\n    Contact_Hd_Res.Surname,\n    Locations.Loc_Desc,\n    Locations.CostCentre,\n    CASE\n        WHEN DirectD_Dt.BankAcc != '' THEN\n            DirectD_Dt.BankAcc\n        ELSE\n            FundSrc_Hd.BankAcc\n    END AS BankAcc,\n    CASE\n        WHEN DirectD_Dt.BnkAccName != '' THEN\n            DirectD_Dt.BnkAccName\n        ELSE\n            FundSrc_Hd.BnkAccName\n    END AS BnkAccName,\n    CASE\n        WHEN DirectD_Dt.BkSortCode != '' THEN\n            DirectD_Dt.BkSortCode\n        ELSE\n            isnull(Contact_Hd_FS.BkSortCode, space(8))\n    END AS BkSortCode,\n    DirectD_Dt.DDTranType,\n    isnull(DirectD_Dt.Due_Date, DirectD_Dt.Inv_Date) AS Due_Date,\n    DirectD_Dt.Submitted,\n    DirectD_Dt.Allocated,\n    DirectD_Hd.BatchNo,\n    Site.SiteId,\n    Site.SiteName,\n    DirectD_Dt.Amount\nFROM \n\tDirectD_Dt (NOLOCK)\n    JOIN DirectD_Hd (NOLOCK)\n        ON DirectD_Hd.DDHd_Ref = DirectD_Dt.DDHd_Ref\n           AND DirectD_Hd.BatchNo\n           BETWEEN 0 AND 9999999999\n    JOIN FundSrc_Hd (NOLOCK)\n        LEFT JOIN Contact_Dt AS Contact_Dt_FS (NOLOCK)\n            JOIN Contact_Hd AS Contact_Hd_FS (NOLOCK)\n                ON Contact_Hd_FS.Contact_Ref = Contact_Dt_FS.Contact_Ref\n            ON Contact_Dt_FS.Cnta_Det_Ref = FundSrc_Hd.Bank_Det_Ref\n        JOIN Resident (NOLOCK)\n            JOIN Contact_Dt AS Contact_Dt_Res (NOLOCK)\n                JOIN Contact_Hd AS Contact_Hd_Res (NOLOCK)\n                    ON Contact_Hd_Res.Contact_Ref = Contact_Dt_Res.Contact_Ref\n                ON Contact_Dt_Res.Cnta_Det_Ref = Resident.Cnta_Det_Ref\n            JOIN Room_Dt (NOLOCK)\n                JOIN Locations (NOLOCK)\n                    JOIN Site (NOLOCK)\n                        ON Site.Site_Ref = Locations.Site_Ref\n                    ON Locations.Loc_Ref = Room_Dt.Loc_Ref\n                ON Room_Dt.Room_Ref = Resident.Room_Ref\n            ON Resident.Res_Ref = FundSrc_Hd.Res_Ref\n        ON FundSrc_Hd.FS_Ref = DirectD_Dt.FS_Ref\nWHERE \n\tDirectD_Dt.Due_Date\n    BETWEEN '17530101' AND '29991231'\n    --AND DirectD_Dt.Allocated != 'X'\n    and DirectD_Dt.Submitted IS NULL\n    and DirectD_Dt.DDTranType IN ( '01', '17', '18', '19' )\n    AND Locations.Site_Ref = @{item().Site_ref}",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_CH_IP",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_Polestar_storage_csv",
+											"type": "DatasetReference",
+											"parameters": {
+												"Container": "user",
+												"FileName": {
+													"value": "@concat(item().HomeName, ' - DD - ',formatDateTime(utcNow(), 'MMM yyyy'), '.csv')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Cold Harbour"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Polestar_storage_csv')]",
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Rooms')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -40859,242 +41003,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/xPL_MCM_GetData')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Get MCM Data",
-						"description": "Get the MCM data via Azure function",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "www.test.co.uk"
-						}
-					},
-					{
-						"name": "AZ Func Results",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get MCM Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "MCM_Json_Data",
-							"value": {
-								"value": "@activity('Get MCM Data').output.response",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Write to text file",
-						"type": "Copy",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "DelimitedTextSource",
-								"additionalColumns": [
-									{
-										"name": "VariableValue",
-										"value": {
-											"value": "@variables('MCM_Json_Data')",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "DelimitedTextReadSettings"
-								}
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "VariableValue",
-											"type": "String"
-										},
-										"sink": {
-											"type": "String",
-											"physicalType": "String",
-											"ordinal": 1
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_MCM_Dummy_input",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_MCM_textFile",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Write to json file",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "AZ Func Results",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "DelimitedTextSource",
-								"additionalColumns": [
-									{
-										"name": "VariableValue",
-										"value": {
-											"value": "@json(variables('MCM_Json_Data'))",
-											"type": "Expression"
-										}
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "DelimitedTextReadSettings"
-								}
-							},
-							"sink": {
-								"type": "JsonSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "JsonWriteSettings",
-									"filePattern": "arrayOfObjects"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "VariableValue",
-											"type": "String"
-										},
-										"sink": {
-											"path": "$['Column_1']"
-										}
-									}
-								]
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_MCM_Dummy_input",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_MCM_Json",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileType": "x"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"MCM_Json_Data": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "MCM"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_MCM_Dummy_input')]",
-				"[concat(variables('factoryId'), '/datasets/DS_MCM_textFile')]",
-				"[concat(variables('factoryId'), '/datasets/DS_MCM_Json')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_MCM_GetData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -42039,8 +41947,14 @@
 								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
 								"Message": "Pipeline failed",
 								"Colour": "Red",
-								"PipelineName": "@pipeline().Pipeline",
-								"PipelineRunID": "@pipeline().RunId",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
 								"pStepFailed": "For Each DB Item"
 							}
 						}
@@ -51404,6 +51318,272 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_MCM_ServiceUsers_MultiHome')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "For Community",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup Community Ids",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup Community Ids').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Call AZ Function",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_MCM_Data_Extract_CommunityId",
+											"type": "DatasetReference",
+											"parameters": {
+												"MCM_endPoint": {
+													"value": "@variables('MCMEndPoint')",
+													"type": "Expression"
+												},
+												"MCM_api_key": {
+													"value": "@variables('MCMAPIKey')",
+													"type": "Expression"
+												},
+												"FunctionCode": {
+													"value": "@variables('AzFuncCode')",
+													"type": "Expression"
+												},
+												"CommunityId": {
+													"value": "@item().MCM_CommunityID",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_Yardi_Json",
+											"type": "DatasetReference",
+											"parameters": {
+												"FileType": {
+													"value": "@concat(item().HomeName, ' ', variables('MCMEndPoint'))",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Lookup Community Ids",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Set Az Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set MCM API Key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    HOME_REF,\n    MCM_CommunityID,\n    HomeName\nFROM \n    [dbo].[ColdHarbourHomeID]\nWHERE\n    MCM_CommunityID IS NOT NULL\n    AND HOME_REF IN (@{variables('Home_Ref_List')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Get AZ Func Code",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMDataExtractAzFunc/9ad6bb869bce44809b76c700e88d789f?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set Az Func Code",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get AZ Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "AzFuncCode",
+							"value": {
+								"value": "@activity('Get AZ Func Code').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get MCM API key",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMJonCrockettAPIKey/bde96b82a47a40628426ca459ee044ec?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set MCM API Key",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get MCM API key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCMAPIKey",
+							"value": {
+								"value": "@activity('Get MCM API key').output.value",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"AzFuncCode": {
+						"type": "String"
+					},
+					"MCMAPIKey": {
+						"type": "String"
+					},
+					"MCMEndPoint": {
+						"type": "String",
+						"defaultValue": "serviceusers"
+					},
+					"Home_Ref_List": {
+						"type": "String",
+						"defaultValue": "610,632,651,639"
+					}
+				},
+				"folder": {
+					"name": "Yardi/MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]",
+				"[concat(variables('factoryId'), '/datasets/DS_MCM_Data_Extract_CommunityId')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Yardi_Json')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Yardi_MaintApp_Tables')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -57668,6 +57848,242 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_MCM_Communities')]",
+				"[concat(variables('factoryId'), '/datasets/DS_MCM_Json')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_MCM_GetData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get MCM Data",
+						"description": "Get the MCM data via Azure function",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "www.test.co.uk"
+						}
+					},
+					{
+						"name": "AZ Func Results",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get MCM Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCM_Json_Data",
+							"value": {
+								"value": "@activity('Get MCM Data').output.response",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Write to text file",
+						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"additionalColumns": [
+									{
+										"name": "VariableValue",
+										"value": {
+											"value": "@variables('MCM_Json_Data')",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "VariableValue",
+											"type": "String"
+										},
+										"sink": {
+											"type": "String",
+											"physicalType": "String",
+											"ordinal": 1
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Dummy_input",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_textFile",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Write to json file",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "AZ Func Results",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"additionalColumns": [
+									{
+										"name": "VariableValue",
+										"value": {
+											"value": "@json(variables('MCM_Json_Data'))",
+											"type": "Expression"
+										}
+									}
+								],
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings",
+									"filePattern": "arrayOfObjects"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "VariableValue",
+											"type": "String"
+										},
+										"sink": {
+											"path": "$['Column_1']"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Dummy_input",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": "x"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"MCM_Json_Data": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_MCM_Dummy_input')]",
+				"[concat(variables('factoryId'), '/datasets/DS_MCM_textFile')]",
 				"[concat(variables('factoryId'), '/datasets/DS_MCM_Json')]"
 			]
 		},
@@ -66863,6 +67279,60 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_Polestar_storage_csv')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Generic"
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().FileName",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "Site_ref",
+						"type": "String"
+					},
+					{
+						"name": "HomeName",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_Radar_AzureStorage')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -67024,6 +67494,45 @@
 					"quoteChar": "\""
 				},
 				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_Yardi_Json')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"FileType": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Yardi"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@concat(dataset().FileType, ' - ', formatDateTime(utcNow(), 'yyyy'),'-',formatDateTime(utcNow(), 'MM'),'-',formatDateTime(utcNow(), 'dd'), '.json')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+							"type": "Expression"
+						},
+						"container": "yardi"
+					}
+				},
+				"schema": {}
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
@@ -67823,6 +68332,19 @@
 						"type": "SecureString",
 						"value": "[parameters('AveryArtisan_Artisan_password')]"
 					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Avery_ADF_KeyVault')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('Avery_ADF_KeyVault_properties_typeProperties_baseUrl')]"
 				}
 			},
 			"dependsOn": []
@@ -69607,318 +70129,45 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/Avery_ADF_KeyVault')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"name": "[concat(parameters('factoryName'), '/SCH_Fusion_MondayTransfer')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Runs the pipeline to move files from fusion to the file share so they can be loaded onto the VM",
 				"annotations": [],
-				"type": "AzureKeyVault",
-				"typeProperties": {
-					"baseUrl": "[parameters('Avery_ADF_KeyVault_properties_typeProperties_baseUrl')]"
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_MCM_ServiceUsers_MultiHome')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
+				"runtimeState": "Started",
+				"pipelines": [
 					{
-						"name": "For Community",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Lookup Community Ids",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Lookup Community Ids').output.value",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Call AZ Function",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "RestSource",
-											"httpRequestTimeout": "00:01:40",
-											"requestInterval": "00.00:00:00.010",
-											"requestMethod": "GET",
-											"paginationRules": {
-												"supportRFC5988": "true"
-											}
-										},
-										"sink": {
-											"type": "JsonSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "JsonWriteSettings"
-											}
-										},
-										"enableStaging": false
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_MCM_Data_Extract_CommunityId",
-											"type": "DatasetReference",
-											"parameters": {
-												"MCM_endPoint": {
-													"value": "@variables('MCMEndPoint')",
-													"type": "Expression"
-												},
-												"MCM_api_key": {
-													"value": "@variables('MCMAPIKey')",
-													"type": "Expression"
-												},
-												"FunctionCode": {
-													"value": "@variables('AzFuncCode')",
-													"type": "Expression"
-												},
-												"CommunityId": {
-													"value": "@item().MCM_CommunityID",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Yardi_Json",
-											"type": "DatasetReference",
-											"parameters": {
-												"FileType": {
-													"value": "@concat(item().HomeName, ' ', variables('MCMEndPoint'))",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Lookup Community Ids",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set Az Func Code",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set MCM API Key",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
+						"pipelineReference": {
+							"referenceName": "PL_Fusion_Move_Files_To_VM",
+							"type": "PipelineReference"
 						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    HOME_REF,\n    MCM_CommunityID,\n    HomeName\nFROM \n    [dbo].[ColdHarbourHomeID]\nWHERE\n    MCM_CommunityID IS NOT NULL\n    AND HOME_REF IN (@{variables('Home_Ref_List')})",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "Get AZ Func Code",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMDataExtractAzFunc/9ad6bb869bce44809b76c700e88d789f?api-version=7.3",
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://vault.azure.net"
-							}
-						}
-					},
-					{
-						"name": "Set Az Func Code",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get AZ Func Code",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "AzFuncCode",
-							"value": {
-								"value": "@activity('Get AZ Func Code').output.value",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Get MCM API key",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMJonCrockettAPIKey/bde96b82a47a40628426ca459ee044ec?api-version=7.3",
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://vault.azure.net"
-							}
-						}
-					},
-					{
-						"name": "Set MCM API Key",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get MCM API key",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "MCMAPIKey",
-							"value": {
-								"value": "@activity('Get MCM API key').output.value",
-								"type": "Expression"
-							}
-						}
+						"parameters": {}
 					}
 				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"AzFuncCode": {
-						"type": "String"
-					},
-					"MCMAPIKey": {
-						"type": "String"
-					},
-					"MCMEndPoint": {
-						"type": "String",
-						"defaultValue": "serviceusers"
-					},
-					"Home_Ref_List": {
-						"type": "String",
-						"defaultValue": "610,632,651,639"
-					}
-				},
-				"folder": {
-					"name": "Yardi/MCM"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_YardiStage')]",
-				"[concat(variables('factoryId'), '/datasets/DS_MCM_Data_Extract_CommunityId')]",
-				"[concat(variables('factoryId'), '/datasets/DS_Yardi_Json')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_Yardi_Json')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageAcc",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"FileType": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "Yardi"
-				},
-				"annotations": [],
-				"type": "Json",
+				"type": "ScheduleTrigger",
 				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"fileName": {
-							"value": "@concat(dataset().FileType, ' - ', formatDateTime(utcNow(), 'yyyy'),'-',formatDateTime(utcNow(), 'MM'),'-',formatDateTime(utcNow(), 'dd'), '.json')",
-							"type": "Expression"
-						},
-						"folderPath": {
-							"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
-							"type": "Expression"
-						},
-						"container": "yardi"
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2025-09-11T13:46:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								10
+							],
+							"hours": [
+								6
+							],
+							"weekDays": [
+								"Monday"
+							]
+						}
 					}
-				},
-				"schema": {}
+				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Fusion_Move_Files_To_VM')]"
 			]
 		}
 	]

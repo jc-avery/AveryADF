@@ -13,6 +13,80 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_Residents')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Resident data from GRG",
+				"activities": [
+					{
+						"name": "Copy Residents data",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE ColdHarbour.Residents",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Resident"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "Residents"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CQC_Proces_API_Results')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -405,6 +479,147 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-01T10:23:31Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Barclays_DD')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Exports the DD report for the 3 homes that bank with Barclays. Saves to container which is monitored by a logic app, which will save to share point.",
+				"activities": [
+					{
+						"name": "Lookup Home details",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "DS_Polestar_storage_csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "user",
+									"FileName": "DDReportDetails.csv"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Home",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup Home details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup Home details').output.value",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Export DD Reports",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT \n\tFundSrc_Hd.AccNo,\n    Resident.Res_Code,\n    Contact_Hd_Res.Forenames,\n    Contact_Hd_Res.Surname,\n    Locations.Loc_Desc,\n    Locations.CostCentre,\n    CASE\n        WHEN DirectD_Dt.BankAcc != '' THEN\n            DirectD_Dt.BankAcc\n        ELSE\n            FundSrc_Hd.BankAcc\n    END AS BankAcc,\n    CASE\n        WHEN DirectD_Dt.BnkAccName != '' THEN\n            DirectD_Dt.BnkAccName\n        ELSE\n            FundSrc_Hd.BnkAccName\n    END AS BnkAccName,\n    CASE\n        WHEN DirectD_Dt.BkSortCode != '' THEN\n            DirectD_Dt.BkSortCode\n        ELSE\n            isnull(Contact_Hd_FS.BkSortCode, space(8))\n    END AS BkSortCode,\n    DirectD_Dt.DDTranType,\n    isnull(DirectD_Dt.Due_Date, DirectD_Dt.Inv_Date) AS Due_Date,\n    DirectD_Dt.Submitted,\n    DirectD_Dt.Allocated,\n    DirectD_Hd.BatchNo,\n    Site.SiteId,\n    Site.SiteName,\n    DirectD_Dt.Amount\nFROM \n\tDirectD_Dt (NOLOCK)\n    JOIN DirectD_Hd (NOLOCK)\n        ON DirectD_Hd.DDHd_Ref = DirectD_Dt.DDHd_Ref\n           AND DirectD_Hd.BatchNo\n           BETWEEN 0 AND 9999999999\n    JOIN FundSrc_Hd (NOLOCK)\n        LEFT JOIN Contact_Dt AS Contact_Dt_FS (NOLOCK)\n            JOIN Contact_Hd AS Contact_Hd_FS (NOLOCK)\n                ON Contact_Hd_FS.Contact_Ref = Contact_Dt_FS.Contact_Ref\n            ON Contact_Dt_FS.Cnta_Det_Ref = FundSrc_Hd.Bank_Det_Ref\n        JOIN Resident (NOLOCK)\n            JOIN Contact_Dt AS Contact_Dt_Res (NOLOCK)\n                JOIN Contact_Hd AS Contact_Hd_Res (NOLOCK)\n                    ON Contact_Hd_Res.Contact_Ref = Contact_Dt_Res.Contact_Ref\n                ON Contact_Dt_Res.Cnta_Det_Ref = Resident.Cnta_Det_Ref\n            JOIN Room_Dt (NOLOCK)\n                JOIN Locations (NOLOCK)\n                    JOIN Site (NOLOCK)\n                        ON Site.Site_Ref = Locations.Site_Ref\n                    ON Locations.Loc_Ref = Room_Dt.Loc_Ref\n                ON Room_Dt.Room_Ref = Resident.Room_Ref\n            ON Resident.Res_Ref = FundSrc_Hd.Res_Ref\n        ON FundSrc_Hd.FS_Ref = DirectD_Dt.FS_Ref\nWHERE \n\tDirectD_Dt.Due_Date\n    BETWEEN '17530101' AND '29991231'\n    --AND DirectD_Dt.Allocated != 'X'\n    and DirectD_Dt.Submitted IS NULL\n    and DirectD_Dt.DDTranType IN ( '01', '17', '18', '19' )\n    AND Locations.Site_Ref = @{item().Site_ref}",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobStorageWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_CH_IP",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_Polestar_storage_csv",
+											"type": "DatasetReference",
+											"parameters": {
+												"Container": "user",
+												"FileName": {
+													"value": "@concat(item().HomeName, ' - DD - ',formatDateTime(utcNow(), 'MMM yyyy'), '.csv')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Cold Harbour"
+				},
+				"annotations": []
 			},
 			"dependsOn": []
 		},
@@ -8630,1805 +8845,6 @@
 				},
 				"folder": {
 					"name": "Yardi/GRG"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_Vendors')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export Vendors to YardiStage",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Clear YardiStage Vendor Table",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT 'XRR227' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XRR227.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XRR227.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XAWT01' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XAWT01.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XAWT01.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XKR117' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XKR117.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XKR117.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XWWT03' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XWWT03.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XWWT03.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XLR118' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XLR118.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XLR118.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'KNOW01' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM KNOW01.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            KNOW01.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'KNOW03' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM KNOW03.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            KNOW03.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'BOUR01' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM BOUR01.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            BOUR01.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'ZCR229' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM ZCR229.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            ZCR229.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB02' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB02.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB02.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB04' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB04.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB04.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XGR225' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XGR225.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XGR225.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XBR120' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XBR120.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XBR120.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XFR121' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XFR121.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XFR121.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XOWT04' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XOWT04.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XOWT04.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XXR228' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XXR228.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XXR228.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'ZBWT05' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM ZBWT05.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            ZBWT05.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB07' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB07.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB07.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XPWT06' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XPWT06.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XPWT06.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XQR119' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XQR119.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XQR119.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XCWT07' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XCWT07.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XCWT07.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XUWT08' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XUWT08.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XUWT08.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'ZAWT09' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM ZAWT09.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            ZAWT09.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB12' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB12.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB12.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB01' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB01.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB01.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XDWT10' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XDWT10.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XDWT10.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB05' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB05.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB05.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'KNOW02' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM KNOW02.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            KNOW02.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB03' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB03.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB03.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XER224' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XER224.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XER224.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'PEMB01' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM PEMB01.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            PEMB01.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XHWT11' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XHWT11.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XHWT11.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'SEVE01' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM SEVE01.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            SEVE01.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XIR226' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XIR226.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XIR226.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XSWT12' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XSWT12.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XSWT12.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XTWT02' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XTWT02.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XTWT02.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XYWT13' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XYWT13.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XYWT13.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB06' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB06.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB06.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XJWT14' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XJWT14.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XJWT14.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XMR122' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XMR122.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XMR122.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'WTRB11' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM WTRB11.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            WTRB11.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XZWT15' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XZWT15.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XZWT15.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XNR123' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XNR123.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XNR123.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate\n                \n                UNION ALL\nSELECT 'XVWT16' AS CompanyCode, \n                LastTransDate.tlLineDate AS LatestDate,\n                C.* \n                FROM XVWT16.CUSTSUPP AS C\n               \n                OUTER APPLY(\n\t\t            SELECT TOP 1\n\t\t\t            D.tlAcCode,\n\t\t\t            D.tlLineDate\n\t\t            FROM\n\t\t\t            XVWT16.DETAILS AS D\n\t\t            WHERE\n\t\t\t            D.tlAcCode = C.acCode COLLATE SQL_Latin1_General_CP1_CI_AS\n\t\t            ORDER BY\n\t\t\t            D.tlLineDate DESC\n\t            ) AS LastTransDate",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "CompanyCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CompanyCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LatestDate",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LatestDate",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCustSupp",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCustSupp",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCompany",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCompany",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acArea",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acArea",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAccType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAccType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acStatementTo",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acStatementTo",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acVATRegNo",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acVATRegNo",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAddressLine1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAddressLine1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAddressLine2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAddressLine2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAddressLine3",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAddressLine3",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAddressLine4",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAddressLine4",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAddressLine5",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAddressLine5",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDespAddr",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acDespAddr",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acDespAddressLine1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDespAddressLine1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDespAddressLine2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDespAddressLine2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDespAddressLine3",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDespAddressLine3",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDespAddressLine4",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDespAddressLine4",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDespAddressLine5",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDespAddressLine5",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acContact",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acContact",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acPhone",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acPhone",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acFax",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acFax",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acTheirAcc",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acTheirAcc",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acOwnTradTerm",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acOwnTradTerm",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acTradeTerms1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acTradeTerms1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acTradeTerms2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acTradeTerms2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCurrency",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acCurrency",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acVATCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acVATCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acPayTerms",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acPayTerms",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acCreditLimit",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "acCreditLimit",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "acDiscount",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "acDiscount",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "acCreditStatus",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acCreditStatus",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acCostCentre",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCostCentre",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDiscountBand",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDiscountBand",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acOrderConsolidationMode",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acOrderConsolidationMode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acDefSettleDays",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acDefSettleDays",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acSpare5",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										},
-										"sink": {
-											"name": "acSpare5",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										}
-									},
-									{
-										"source": {
-											"name": "acBalance",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "acBalance",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "acDepartment",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDepartment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acECMember",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acECMember",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acNLineCount",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acNLineCount",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acStatement",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acStatement",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acSalesGL",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acSalesGL",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acLocation",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acLocation",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAccStatus",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acAccStatus",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acPayType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acPayType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acOldBankSort",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acOldBankSort",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acOldBankAcc",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acOldBankAcc",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acBankRef",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acBankRef",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAvePay",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acAvePay",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acPhone2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acPhone2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCOSGL",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acCOSGL",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acDrCrGL",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acDrCrGL",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acLastUsed",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acLastUsed",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acInvoiceTo",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acInvoiceTo",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acSOPAutoWOff",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acSOPAutoWOff",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acFormSet",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acFormSet",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acBookOrdVal",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "acBookOrdVal",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "acDirDebMode",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acDirDebMode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acCCStart",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCCStart",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCCEnd",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCCEnd",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCCName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCCName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCCNumber",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCCNumber",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acCCSwitch",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCCSwitch",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDefSettleDisc",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "acDefSettleDisc",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "acStateDeliveryMode",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acStateDeliveryMode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acSpare2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acSpare2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acSendReader",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acSendReader",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acEBusPword",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acEBusPword",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acPostCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acPostCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAltCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAltCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUseForEbus",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acUseForEbus",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acZIPAttachments",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acZIPAttachments",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef3",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef3",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef4",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef4",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acWebLiveCatalog",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acWebLiveCatalog",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acWebPrevCatalog",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acWebPrevCatalog",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acTimeStamp",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acTimeStamp",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acVATCountryCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acVATCountryCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acSSDDeliveryTerms",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acSSDDeliveryTerms",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acInclusiveVATCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acInclusiveVATCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acSSDModeOfTransport",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acSSDModeOfTransport",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acPrivateRec",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acPrivateRec",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acLastOperator",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acLastOperator",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDocDeliveryMode",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acDocDeliveryMode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acSendHTML",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acSendHTML",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acEmailAddr",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acEmailAddr",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acOfficeType",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acOfficeType",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acDefTagNo",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acDefTagNo",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef5",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef5",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef6",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef6",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef7",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef7",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef8",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef8",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef9",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef9",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acUserDef10",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acUserDef10",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acBankSortCode",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										},
-										"sink": {
-											"name": "acBankSortCode",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										}
-									},
-									{
-										"source": {
-											"name": "acBankAccountCode",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										},
-										"sink": {
-											"name": "acBankAccountCode",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										}
-									},
-									{
-										"source": {
-											"name": "acMandateID",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										},
-										"sink": {
-											"name": "acMandateID",
-											"type": "Byte[]",
-											"physicalType": "varbinary"
-										}
-									},
-									{
-										"source": {
-											"name": "acMandateDate",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acMandateDate",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDeliveryPostCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDeliveryPostCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acSubType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acSubType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acLongAcCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acLongAcCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAllowOrderPayments",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acAllowOrderPayments",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acOrderPaymentsGLCode",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acOrderPaymentsGLCode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acCountry",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acCountry",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acDeliveryCountry",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acDeliveryCountry",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acPPDMode",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acPPDMode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acDefaultToQR",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "acDefaultToQR",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "acTaxRegion",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acTaxRegion",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acAnonymisationStatus",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acAnonymisationStatus",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "acAnonymisedDate",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAnonymisedDate",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acAnonymisedTime",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "acAnonymisedTime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "acRCEndUser",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "acRCEndUser",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "PositionId",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PositionId",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_Exchequer",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "ExchequerVendors"
-								}
-							}
-						]
-					},
-					{
-						"name": "Export Vendors",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Export Vendors to YardiStage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": {
-									"value": "SELECT \n    CompanyCode\n    ,LatestDate\n    ,acCode\n    ,acCustSupp\n    ,acCompany\n    ,acArea\n    ,acAccType\n    ,acStatementTo\n    ,acVATRegNo\n    ,acAddressLine1\n    ,acAddressLine2\n    ,acAddressLine3\n    ,acAddressLine4\n    ,acAddressLine5\n    ,acDespAddr\n    ,acDespAddressLine1\n    ,acDespAddressLine2\n    ,acDespAddressLine3\n    ,acDespAddressLine4\n    ,acDespAddressLine5\n    ,acContact\n    ,acPhone\n    ,acFax\n    ,acTheirAcc\n    ,acOwnTradTerm\n    ,acTradeTerms1\n    ,acTradeTerms2\n    ,acCurrency\n    ,acVATCode\n    ,acPayTerms\n    ,acCreditLimit\n    ,acDiscount\n    ,acCreditStatus\n    ,acCostCentre\n    ,acDiscountBand\n    ,acOrderConsolidationMode\n    ,acDefSettleDays\n    ,acSpare5\n    ,acBalance\n    ,acDepartment\n    ,acECMember\n    ,acNLineCount\n    ,acStatement\n    ,acSalesGL\n    ,acLocation\n    ,acAccStatus\n    ,acPayType\n    ,acOldBankSort\n    ,acOldBankAcc\n    ,acBankRef\n    ,acAvePay\n    ,acPhone2\n    ,acCOSGL\n    ,acDrCrGL\n    ,acLastUsed\n    ,acUserDef1\n    ,acUserDef2\n    ,acInvoiceTo\n    ,acSOPAutoWOff\n    ,acFormSet\n    ,acBookOrdVal\n    ,acDirDebMode\n    ,acCCStart\n    ,acCCEnd\n    ,acCCName\n    ,acCCNumber\n    ,acCCSwitch\n    ,acDefSettleDisc\n    ,acStateDeliveryMode\n    ,acSpare2\n    ,acSendReader\n    ,acEBusPword\n    ,acPostCode\n    ,acAltCode\n    ,acUseForEbus\n    ,acZIPAttachments\n    ,acUserDef3\n    ,acUserDef4\n    ,acWebLiveCatalog\n    ,acWebPrevCatalog\n    ,acTimeStamp\n    ,acVATCountryCode\n    ,acSSDDeliveryTerms\n    ,acInclusiveVATCode\n    ,acSSDModeOfTransport\n    ,acPrivateRec\n    ,acLastOperator\n    ,acDocDeliveryMode\n    ,acSendHTML\n    ,acEmailAddr\n    ,acOfficeType\n    ,acDefTagNo\n    ,acUserDef5\n    ,acUserDef6\n    ,acUserDef7\n    ,acUserDef8\n    ,acUserDef9\n    ,acUserDef10\n    ,acBankSortCode\n    ,acBankAccountCode\n    ,acMandateID\n    ,acMandateDate\n    ,acDeliveryPostCode\n    ,acSubType\n    ,acLongAcCode\n    ,acAllowOrderPayments\n    ,acOrderPaymentsGLCode\n    ,acCountry\n    ,acDeliveryCountry\n    ,acPPDMode\n    ,acDefaultToQR\n    ,acTaxRegion\n    ,acAnonymisationStatus\n    ,acAnonymisedDate\n    ,acAnonymisedTime\n    ,acRCEndUser\n    ,PositionId\nFROM \n    dbo.ExchequerVendors\nWHERE\n    CompanyCode IN (@{variables('CompanyCodeList')})",
-									"type": "Expression"
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "@concat('Exchequer Vendors - ', utcNow('yyyy-MM-dd'), '.csv')"
-								}
-							}
-						]
-					},
-					{
-						"name": "Clear YardiStage Vendor Table",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "List ID",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_YardiStage",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "TRUNCATE TABLE [dbo].[ExchequerVendors]"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
-						"name": "Company List",
-						"description": "Sets an array to contain the list of companies required for exporting",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "ExchequerCompanyList",
-							"value": [
-								"'XFR121'",
-								"'WTRB06'",
-								"'XYWT13'",
-								"'XMR122'"
-							]
-						}
-					},
-					{
-						"name": "List ID",
-						"description": "Converts the company IDs in the array to a list variable to be used in the SQL Query Source in Export Vendors",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Company List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "CompanyCodeList",
-							"value": {
-								"value": "@join(variables('ExchequerCompanyList'), ',')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Export All Vendors",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Export Vendors",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": {
-									"value": "SELECT \n    CompanyCode\n    ,LatestDate\n    ,acCode\n    ,acCustSupp\n    ,acCompany\n    ,acArea\n    ,acAccType\n    ,acStatementTo\n    ,acVATRegNo\n    ,acAddressLine1\n    ,acAddressLine2\n    ,acAddressLine3\n    ,acAddressLine4\n    ,acAddressLine5\n    ,acDespAddr\n    ,acDespAddressLine1\n    ,acDespAddressLine2\n    ,acDespAddressLine3\n    ,acDespAddressLine4\n    ,acDespAddressLine5\n    ,acContact\n    ,acPhone\n    ,acFax\n    ,acTheirAcc\n    ,acOwnTradTerm\n    ,acTradeTerms1\n    ,acTradeTerms2\n    ,acCurrency\n    ,acVATCode\n    ,acPayTerms\n    ,acCreditLimit\n    ,acDiscount\n    ,acCreditStatus\n    ,acCostCentre\n    ,acDiscountBand\n    ,acOrderConsolidationMode\n    ,acDefSettleDays\n    ,acSpare5\n    ,acBalance\n    ,acDepartment\n    ,acECMember\n    ,acNLineCount\n    ,acStatement\n    ,acSalesGL\n    ,acLocation\n    ,acAccStatus\n    ,acPayType\n    ,acOldBankSort\n    ,acOldBankAcc\n    ,acBankRef\n    ,acAvePay\n    ,acPhone2\n    ,acCOSGL\n    ,acDrCrGL\n    ,acLastUsed\n    ,acUserDef1\n    ,acUserDef2\n    ,acInvoiceTo\n    ,acSOPAutoWOff\n    ,acFormSet\n    ,acBookOrdVal\n    ,acDirDebMode\n    ,acCCStart\n    ,acCCEnd\n    ,acCCName\n    ,acCCNumber\n    ,acCCSwitch\n    ,acDefSettleDisc\n    ,acStateDeliveryMode\n    ,acSpare2\n    ,acSendReader\n    ,acEBusPword\n    ,acPostCode\n    ,acAltCode\n    ,acUseForEbus\n    ,acZIPAttachments\n    ,acUserDef3\n    ,acUserDef4\n    ,acWebLiveCatalog\n    ,acWebPrevCatalog\n    ,acTimeStamp\n    ,acVATCountryCode\n    ,acSSDDeliveryTerms\n    ,acInclusiveVATCode\n    ,acSSDModeOfTransport\n    ,acPrivateRec\n    ,acLastOperator\n    ,acDocDeliveryMode\n    ,acSendHTML\n    ,acEmailAddr\n    ,acOfficeType\n    ,acDefTagNo\n    ,acUserDef5\n    ,acUserDef6\n    ,acUserDef7\n    ,acUserDef8\n    ,acUserDef9\n    ,acUserDef10\n    ,acBankSortCode\n    ,acBankAccountCode\n    ,acMandateID\n    ,acMandateDate\n    ,acDeliveryPostCode\n    ,acSubType\n    ,acLongAcCode\n    ,acAllowOrderPayments\n    ,acOrderPaymentsGLCode\n    ,acCountry\n    ,acDeliveryCountry\n    ,acPPDMode\n    ,acDefaultToQR\n    ,acTaxRegion\n    ,acAnonymisationStatus\n    ,acAnonymisedDate\n    ,acAnonymisedTime\n    ,acRCEndUser\n    ,PositionId\nFROM \n    dbo.ExchequerVendors",
-									"type": "Expression"
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('Exchequer All Vendors - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"Filename": {
-						"type": "String"
-					},
-					"ExchequerCompanyList": {
-						"type": "Array"
-					},
-					"CompanyCodeList": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Yardi/Exchequer"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/XPL_CH_Bill_Profile_With_Calendar')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export billing profiles and Calendars used",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\n\tP.PRO_CODE AS profile_code,\n\tP.PRODESC AS profile_description,\n\tCALENDAR.CAL_REF AS Cal_Ref,\n\tCALENDAR.CAL_CODE AS calendar_code,\n\tCALENDAR.CAL_DESC AS calendar_description\t\nFROM \n\tFUNDSRC_HD AS ACC\n\n\tLEFT JOIN PROFILES AS P\n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN CONTACT_HD AS CONTACT\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\nWHERE\n\tP.FSTYPE = 401",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('LA Billing Profile Calendar Usage - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
 				},
 				"annotations": []
 			},
