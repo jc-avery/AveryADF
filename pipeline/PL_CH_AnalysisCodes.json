@@ -1,0 +1,111 @@
+{
+	"name": "PL_CH_AnalysisCodes",
+	"properties": {
+		"activities": [
+			{
+				"name": "UPSERT Analysis Codes",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlServerSource",
+						"sqlReaderQuery": "SELECT\t \r\n\tNominal_Code.AltAccount AS AnalysisCode, \r\n\tNominal_Code.Description AS AnalysisDescription, \r\n\tNominal_Code.Account\r\nFROM\t\t \r\n\tNominal_Code (NOLOCK) \r\nWHERE\t \r\n\tNominal_Code.RecType = 'Elephant' \r\n\tAND Nominal_Code.UseFlag <> 'X' \r\n\tAND Nominal_Code.AltAccount != ''\r\n\tAND (SiteFilter = 0 OR Noml_Ref IN (SELECT LinkKey FROM Site_Join (NOLOCK) WHERE upper(LinkTable) = 'NOMINAL_CODE' AND Site_Ref = 151)) ORDER BY Nominal_Code.Account",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "upsert",
+						"upsertSettings": {
+							"useTempDB": true,
+							"keys": [
+								"AnalysisCode"
+							]
+						},
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "AnalysisCode",
+									"type": "String",
+									"physicalType": "char"
+								},
+								"sink": {
+									"name": "AnalysisCode",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "AnalysisDescription",
+									"type": "String",
+									"physicalType": "char"
+								},
+								"sink": {
+									"name": "AnalysisDescription",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Account",
+									"type": "String",
+									"physicalType": "char"
+								},
+								"sink": {
+									"name": "Account",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_OnPrem_CH_IP",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "ColdHarbour",
+							"Table": "AnalysisCodes"
+						}
+					}
+				]
+			}
+		],
+		"folder": {
+			"name": "Cold Harbour/Children Pipelines"
+		},
+		"annotations": []
+	}
+}
