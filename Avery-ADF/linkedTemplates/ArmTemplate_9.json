@@ -13,6 +13,1110 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CQC_Upsert_HomeAssessment')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Using the location files to add assessment details.",
+				"activities": [
+					{
+						"name": "Set DateTime",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Set DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_CQC_Merged_Location_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For Each File",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Upsert to HomeCurretRating_copy1",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"additionalColumns": [
+												{
+													"name": "SourceFileName",
+													"value": {
+														"value": "@item().Name",
+														"type": "Expression"
+													}
+												},
+												{
+													"name": "RowTimeStamp",
+													"value": {
+														"value": "@variables('DateTime')",
+														"type": "Expression"
+													}
+												}
+											],
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"LocationID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['locationId']"
+													},
+													"sink": {
+														"name": "LocationID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['providerId']"
+													},
+													"sink": {
+														"name": "ProviderID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['name']"
+													},
+													"sink": {
+														"name": "HomeName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['onspdLatitude']"
+													},
+													"sink": {
+														"name": "Latitude",
+														"type": "Decimal"
+													}
+												},
+												{
+													"source": {
+														"path": "$['onspdLongitude']"
+													},
+													"sink": {
+														"name": "Longitude",
+														"type": "Decimal"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalCode']"
+													},
+													"sink": {
+														"name": "PostCode",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['numberOfBeds']"
+													},
+													"sink": {
+														"name": "NumberOfBeds",
+														"type": "Int32"
+													}
+												},
+												{
+													"source": {
+														"path": "$['localAuthority']"
+													},
+													"sink": {
+														"name": "LocalAuthority",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['lastInspection']['date']"
+													},
+													"sink": {
+														"name": "LastInspectionDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['lastReport']['publicationDate']"
+													},
+													"sink": {
+														"name": "LastReportDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['rating']"
+													},
+													"sink": {
+														"name": "OverallRating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][0]['name']"
+													},
+													"sink": {
+														"name": "KeyQuestion1",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][0]['rating']"
+													},
+													"sink": {
+														"name": "KeyQuestion1Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][1]['name']"
+													},
+													"sink": {
+														"name": "KeyQuestion2",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][1]['rating']"
+													},
+													"sink": {
+														"name": "KeyQuestion2Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][2]['name']"
+													},
+													"sink": {
+														"name": "KeyQuestion3",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][2]['rating']"
+													},
+													"sink": {
+														"name": "KeyQuestion3Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][3]['name']"
+													},
+													"sink": {
+														"name": "KeyQuestion4",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][3]['rating']"
+													},
+													"sink": {
+														"name": "KeyQuestion4Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][4]['name']"
+													},
+													"sink": {
+														"name": "KeyQuestion5",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['currentRatings']['overall']['keyQuestionRatings'][4]['rating']"
+													},
+													"sink": {
+														"name": "KeyQuestion5Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['assessmentPlanPublishedDateTime']"
+													},
+													"sink": {
+														"name": "AssessmentPublishedDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['assessmentPlanId']"
+													},
+													"sink": {
+														"name": "AssesementPlanID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['title']"
+													},
+													"sink": {
+														"name": "AssessmentTitle",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['assessmentDate']"
+													},
+													"sink": {
+														"name": "AssessmentDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['rating']"
+													},
+													"sink": {
+														"name": "AssessmentRating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['narrative']"
+													},
+													"sink": {
+														"name": "AssessmentNarrative",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][0]['name']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion1",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][0]['rating']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion1Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][1]['name']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion2",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][1]['rating']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion2Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][2]['name']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion3",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][2]['rating']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion3Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][3]['name']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion4",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][3]['rating']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion4Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][4]['name']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion5",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['assessment'][0]['ratings']['asgRatings'][0]['keyQuestionRatings'][4]['rating']"
+													},
+													"sink": {
+														"name": "AssessmentKeyQuestion5Rating",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['SourceFileName']"
+													},
+													"sink": {
+														"name": "SourceFileName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['RowTimeStamp']"
+													},
+													"sink": {
+														"name": "RowTimeStamp",
+														"type": "DateTime"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_CQC_Merged_Location_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "cqc",
+												"Table": "HomeCurrentRating"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Post Upsert proc",
+						"description": "Executes a procedure that tidies a few of the columns. Sets them to Null where blank",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "For Each File",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[cqc].[PostUpdate$HomeCurrentRating]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "CQC/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CQC_Upsert_Location')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Using the location files to add location details.",
+				"activities": [
+					{
+						"name": "Set DateTime",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Set DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_CQC_Merged_Location_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For Each File",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Upsert to Location",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"additionalColumns": [
+												{
+													"name": "SourceFileName",
+													"value": {
+														"value": "@item().Name",
+														"type": "Expression"
+													}
+												},
+												{
+													"name": "RowTimeStamp",
+													"value": {
+														"value": "@variables('DateTime')",
+														"type": "Expression"
+													}
+												}
+											],
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"LocationID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['locationId']"
+													},
+													"sink": {
+														"name": "LocationID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['providerId']"
+													},
+													"sink": {
+														"name": "ProviderID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['name']"
+													},
+													"sink": {
+														"name": "LocationName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['registrationStatus']"
+													},
+													"sink": {
+														"name": "RegistrationStatus",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['registrationDate']"
+													},
+													"sink": {
+														"name": "RegistrationDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['deregistrationDate']"
+													},
+													"sink": {
+														"name": "DeregistrationDate",
+														"type": "DateTime"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_CQC_Merged_Location_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "cqc",
+												"Table": "Location"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Post Upsert proc",
+						"description": "Executes a procedure that tidies a few of the columns. Sets them to Null where blank",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "For Each File",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[cqc].[PostUpdate$HomeCurrentRating]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "CQC/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CQC_Upsert_Provider')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Set DateTime",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateTime",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd hh:mm:ss')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Set DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_CQC_Merged_Provider_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For Each File",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Upsert to Provider Table",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"ProviderID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['providerId']"
+													},
+													"sink": {
+														"name": "ProviderID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['name']"
+													},
+													"sink": {
+														"name": "ProviderName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['brandId']"
+													},
+													"sink": {
+														"name": "BrandID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['brandName']"
+													},
+													"sink": {
+														"name": "BrandName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['registrationStatus']"
+													},
+													"sink": {
+														"name": "RegistrationStatus",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['registrationDate']"
+													},
+													"sink": {
+														"name": "RegistrationDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['deregistrationDate']"
+													},
+													"sink": {
+														"name": "DeregistrationDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['companiesHouseNumber']"
+													},
+													"sink": {
+														"name": "CompaniesHouseNo",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressLine1']"
+													},
+													"sink": {
+														"name": "Address1",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressLine2']"
+													},
+													"sink": {
+														"name": "Address2",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressTownCity']"
+													},
+													"sink": {
+														"name": "City",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalAddressCounty']"
+													},
+													"sink": {
+														"name": "County",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['postalCode']"
+													},
+													"sink": {
+														"name": "Postcode",
+														"type": "String"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_CQC_Merged_Provider_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "cqc",
+												"Table": "Provider"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "CQC/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CareBlox-Fileshare')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -14349,2643 +15453,6 @@
 				},
 				"folder": {
 					"name": "Polestar ETL Process"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Pricing_CreateOrAlter_Views')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Executes procedures that create or alter views each day.",
-				"activities": [
-					{
-						"name": "Attributes",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Pricing_vRoomAttributes",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Addons",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Attributes",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Pricing_vRoomAddons",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Pricing"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-07-19T13:59:58Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Radar_SQLTables')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "For Each DB Item",
-						"type": "ForEach",
-						"dependsOn": [],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@pipeline().parameters.DBItems",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Copy Item",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "AzureSqlSource",
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "AzureSqlSink",
-											"preCopyScript": {
-												"value": "DROP TABLE IF EXISTS \n[@{item().destination.schema}].[@{item().destination.table}]",
-												"type": "Expression"
-											},
-											"writeBehavior": {
-												"value": "@item().copySink.writeBehavior",
-												"type": "Expression"
-											},
-											"sqlWriterUseTableLock": {
-												"value": "@item().copySink.sqlWriterUseTableLock",
-												"type": "Expression"
-											},
-											"upsertSettings": {
-												"useTempDB": true
-											},
-											"tableOption": "autoCreate",
-											"disableMetricsCollection": false
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "Radar_SQL",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": {
-													"value": "@item().source.schema",
-													"type": "Expression"
-												},
-												"Table": "@item().source.table"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_AH2_TRANSFORM_DB",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "@item().destination.schema",
-												"Table": {
-													"value": "@item().destination.table",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Send Error Message",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "For Each DB Item",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "For Each DB Item"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"DBItems": {
-						"type": "array",
-						"defaultValue": [
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_AccessControl_ObjectRuleSet"
-								},
-								"destination": {
-									"schema": "Radar_AccessControl",
-									"table": "ObjectRuleSet"
-								},
-								"copySink": {
-									"writeBehavior": "insert",
-									"sqlWriterUseTableLock": true
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_AccessControl_RuleSet"
-								},
-								"destination": {
-									"schema": "Radar_AccessControl",
-									"table": "RuleSet"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_AccessControl_RuleSetRule"
-								},
-								"destination": {
-									"schema": "Radar_AccessControl",
-									"table": "RuleSetRule"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_Action"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "Action"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ActionObjectLink"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ActionObjectLink"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ActionPlanItem"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ActionPlanItem"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ActionPlanTag"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ActionPlanTag"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ActionPlanTags"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ActionPlanTags"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_Control"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "Control"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ScheduledTask"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ScheduledTask"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ScheduledTaskCategory"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ScheduledTaskCategory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ScheduledTaskTag"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ScheduledTaskTag"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_ScheduledTaskTags"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "ScheduledTaskTags"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Actions_Update"
-								},
-								"destination": {
-									"schema": "Radar_Actions",
-									"table": "Update"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Analytics_FormTag"
-								},
-								"destination": {
-									"schema": "Radar_Analytics",
-									"table": "FormTag"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_Comment"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "Comment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_EvidenceActionPlanItem"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "EvidenceActionPlanItem"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_EvidenceAttachment"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "EvidenceAttachment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_EvidenceComment"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "EvidenceComment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_Outcome"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "Outcome"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_OutcomeRequirement"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "OutcomeRequirement"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_OutcomeRequirementTemplate"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "OutcomeRequirementTemplate"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_OutcomeTemplate"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "OutcomeTemplate"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_RequirementEvidence"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "RequirementEvidence"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_RequirementEvidenceTemplate"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "RequirementEvidenceTemplate"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_ScheduledAudit"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "ScheduledAudit"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_Template"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "Template"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_Type"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "Type"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audit_TypeThreshold"
-								},
-								"destination": {
-									"schema": "Radar_Audit",
-									"table": "TypeThreshold"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_Instance"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "Instance"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_InstanceSection"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "InstanceSection"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_InstanceSectionResponse"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "InstanceSectionResponse"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_Schedule"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "Schedule"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_ScheduleLocation"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "ScheduleLocation"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_ScheduleWorkflow"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "ScheduleWorkflow"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_Template"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "Template"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_Type"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "Type"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Audits_TypeThreshold"
-								},
-								"destination": {
-									"schema": "Radar_Audits",
-									"table": "TypeThreshold"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Compliance_RecordRequirement"
-								},
-								"destination": {
-									"schema": "Radar_Compliance",
-									"table": "RecordRequirement"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Compliance_RecordVersion"
-								},
-								"destination": {
-									"schema": "Radar_Compliance",
-									"table": "RecordVersion"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Compliance_RequirementType"
-								},
-								"destination": {
-									"schema": "Radar_Compliance",
-									"table": "RequirementType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Compliance_RequirementTypeRole"
-								},
-								"destination": {
-									"schema": "Radar_Compliance",
-									"table": "RequirementTypeRole"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Compliance_RequirementTypeSchedule"
-								},
-								"destination": {
-									"schema": "Radar_Compliance",
-									"table": "RequirementTypeSchedule"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Compliance_RequirementTypeUser"
-								},
-								"destination": {
-									"schema": "Radar_Compliance",
-									"table": "RequirementTypeUser"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_Document"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "Document"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_DocumentTags"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "DocumentTags"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_DocumentVersion"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "DocumentVersion"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_DocumentVersionDownload"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "DocumentVersionDownload"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_DocumentVersionHistory"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "DocumentVersionHistory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_Folder"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "Folder"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_DocumentManagement_Tag"
-								},
-								"destination": {
-									"schema": "Radar_DocumentManagement",
-									"table": "Tag"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Attachment"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Attachment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_AttachmentDownload"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "AttachmentDownload"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Audit"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Audit"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomDataItem"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomDataItem"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomDataItemLocation"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomDataItemLocation"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomDataType"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomDataType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomEntityInstanceLocation"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomEntityInstanceLocation"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomEntityInstanceValues"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomEntityInstanceValues"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomEntityType"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomEntityType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_CustomEntityTypeField"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "CustomEntityTypeField"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Department"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Department"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_DomainObjectAccessControlRule"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "DomainObjectAccessControlRule"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_EventAccessGroupRole"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "EventAccessGroupRole"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_EventAccessGroups"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "EventAccessGroups"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_EventCategory"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "EventCategory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_EventTypeCategoryLink"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "EventTypeCategoryLink"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_IntegrationLink"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "IntegrationLink"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_ItemReference"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "ItemReference"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Location"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Location"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_LocationLocationType"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "LocationLocationType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_LocationType"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "LocationType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_LocationUser"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "LocationUser"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Module"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Module"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Notice"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Notice"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_NoticeAttachment"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "NoticeAttachment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_NotificationHistory"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "NotificationHistory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Organisation"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Organisation"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_PendingItem"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "PendingItem"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Permission"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Permission"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_PsimsSubmission"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "PsimsSubmission"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Region"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Region"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Role"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Role"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_RoleDashboardPermission"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "RoleDashboardPermission"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_RolePermission"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "RolePermission"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_ServiceUser"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "ServiceUser"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_ServiceUserLocation"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "ServiceUserLocation"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_Tag"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "Tag"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_TagLink"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "TagLink"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_User"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "User"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_UserComment"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "UserComment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_UserDepartment"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "UserDepartment"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_UserNotice"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "UserNotice"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_UserOutOfOffice"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "UserOutOfOffice"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_UserPreference"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "UserPreference"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Radar_UserRole"
-								},
-								"destination": {
-									"schema": "Radar_Radar",
-									"table": "UserRole"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_ImpactCategory"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "ImpactCategory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_ImpactDescriptor"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "ImpactDescriptor"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_Incident"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "Incident"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_IncidentRequiredFormTime"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "IncidentRequiredFormTime"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_IncidentSubType"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "IncidentSubType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_IncidentType"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "IncidentType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_IncidentTypeLocationType"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "IncidentTypeLocationType"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_LikelihoodCategory"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "LikelihoodCategory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_LikelihoodDescriptor"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "LikelihoodDescriptor"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_LinkedItem"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "LinkedItem"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_Risk"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "Risk"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_RiskCategory"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "RiskCategory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_RiskReviewUpdate"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "RiskReviewUpdate"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_ViewExceptionEvent"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "ViewExceptionEvent"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RiskManagement_ViewExceptionEventRole"
-								},
-								"destination": {
-									"schema": "Radar_RiskManagement",
-									"table": "ViewExceptionEventRole"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RootCauseAnalysis_Cause"
-								},
-								"destination": {
-									"schema": "Radar_RootCauseAnalysis",
-									"table": "Cause"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RootCauseAnalysis_ContributingFactor"
-								},
-								"destination": {
-									"schema": "Radar_RootCauseAnalysis",
-									"table": "ContributingFactor"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RootCauseAnalysis_ContributingFactorCategory"
-								},
-								"destination": {
-									"schema": "Radar_RootCauseAnalysis",
-									"table": "ContributingFactorCategory"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_RootCauseAnalysis_InvestigationEvent"
-								},
-								"destination": {
-									"schema": "Radar_RootCauseAnalysis",
-									"table": "InvestigationEvent"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Templates_Bodymap"
-								},
-								"destination": {
-									"schema": "Radar_Templates",
-									"table": "Bodymap"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Templates_FormTemplate"
-								},
-								"destination": {
-									"schema": "Radar_Templates",
-									"table": "FormTemplate"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Templates_FormTemplateInstance"
-								},
-								"destination": {
-									"schema": "Radar_Templates",
-									"table": "FormTemplateInstance"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Templates_FormTemplateInstanceValue"
-								},
-								"destination": {
-									"schema": "Radar_Templates",
-									"table": "FormTemplateInstanceValue"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Templates_FormTemplateInstanceValueExtendedData"
-								},
-								"destination": {
-									"schema": "Radar_Templates",
-									"table": "FormTemplateInstanceValueExtendedData"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Templates_FormTemplateTag"
-								},
-								"destination": {
-									"schema": "Radar_Templates",
-									"table": "FormTemplateTag"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Workflow_Definition"
-								},
-								"destination": {
-									"schema": "Radar_Workflow",
-									"table": "Definition"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Workflow_Dependency"
-								},
-								"destination": {
-									"schema": "Radar_Workflow",
-									"table": "Dependency"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Workflow_Instance"
-								},
-								"destination": {
-									"schema": "Radar_Workflow",
-									"table": "Instance"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Workflow_Selector"
-								},
-								"destination": {
-									"schema": "Radar_Workflow",
-									"table": "Selector"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Workflow_Trigger"
-								},
-								"destination": {
-									"schema": "Radar_Workflow",
-									"table": "Trigger"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							},
-							{
-								"source": {
-									"schema": "Int",
-									"table": "V_Workflow_UserTask"
-								},
-								"destination": {
-									"schema": "Radar_Workflow",
-									"table": "UserTask"
-								},
-								"copySink": {
-									"writeBehavior": null,
-									"sqlWriterUseTableLock": null
-								}
-							}
-						]
-					}
-				},
-				"folder": {
-					"name": "Radar"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Res_Forms')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy Res Forms Data",
-						"description": "AH1 Avery - AH2 YardiStage",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "SET IDENTITY_INSERT dbo.Res_Forms ON",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ID",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 18
-										},
-										"sink": {
-											"name": "ID",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 0,
-											"precision": 18
-										}
-									},
-									{
-										"source": {
-											"name": "res_no",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "res_no",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "forename",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "forename",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "surname",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "surname",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "intranet",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "intranet",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "change_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "change_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "admitted_from",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "admitted_from",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_prior_last",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "tested_prior_last",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_where",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "tested_where",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "tested_result",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "tested_result",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "symptomatic",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "symptomatic",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "symptomatic_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "symptomatic_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "isolation_Date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "isolation_Date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "isolation_end_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "isolation_end_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "days_isolated",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "days_isolated",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "protocol_followed",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "protocol_followed",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_prior",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "hospital_prior",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Hospital_lastdate",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "Hospital_lastdate",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_duration",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "hospital_duration",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_tested",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "hospital_tested",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "hospital_tested_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "hospital_rest_result",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "hospital_rest_result",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "form_type",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "form_type",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "status",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "status",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "room_no",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "room_no",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "funding_change",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "funding_change",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "dilaps_charge",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "dilaps_charge",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comp_by",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "comp_by",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comp_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "comp_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "SL_Chk_by",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "SL_Chk_by",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SL_chk_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "SL_chk_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "discharge_reason",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "discharge_reason",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comments",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "comments",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "dob",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "dob",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "SL_comments",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "SL_comments",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "NHS_No",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "NHS_No",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Nurs_res",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "Nurs_res",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Resp_Perm",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "Resp_Perm",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "disch_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "disch_date",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "paymentonadm",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 18
-										},
-										"sink": {
-											"name": "paymentonadm",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 18
-										}
-									},
-									{
-										"source": {
-											"name": "NSHIDno",
-											"type": "String",
-											"physicalType": "nchar"
-										},
-										"sink": {
-											"name": "NSHIDno",
-											"type": "String",
-											"physicalType": "nchar"
-										}
-									},
-									{
-										"source": {
-											"name": "fee",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 7
-										},
-										"sink": {
-											"name": "fee",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 7
-										}
-									},
-									{
-										"source": {
-											"name": "Date_Complete",
-											"type": "DateTimeOffset",
-											"physicalType": "datetimeoffset"
-										},
-										"sink": {
-											"name": "Date_Complete",
-											"type": "DateTimeOffset",
-											"physicalType": "datetimeoffset"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH1_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Res_Forms"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "Res_Forms"
-								}
-							}
-						]
-					},
-					{
-						"name": "SET IDENTITY INSERT OF",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Copy Res Forms Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_YardiStage",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "SET IDENTITY_INSERT dbo.Res_Forms OFF"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/YardiStage"
 				},
 				"annotations": []
 			},
