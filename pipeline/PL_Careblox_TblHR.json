@@ -1,0 +1,439 @@
+{
+	"name": "PL_Careblox_TblHR",
+	"properties": {
+		"activities": [
+			{
+				"name": "Copy to stage",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set DateString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "ParquetReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE CareBlox.stgtblHR_Records",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"tableOption": "autoCreate",
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AZStorage_careblox_parquet_file",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": "tblHR_Records$",
+							"DateString": "@variables('DateString')"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Careblox",
+							"Table": "stgtblHR_Records"
+						}
+					}
+				]
+			},
+			{
+				"name": "Set DateString",
+				"description": "Sets the date string used for Dataset property",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DateString",
+					"value": {
+						"value": "@utcNow('dd-MM-yyyy')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Upsert Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Copy to stage",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT\r\n    [HRRecordID]\r\n    ,[EmployeeID]\r\n    ,[HomeID]\r\n    ,[HRChecklistID]\r\n    ,[ItemGroupID]\r\n    ,[ItemName]\r\n    ,[ItemStatus]\r\n    ,[ItemValue1]\r\n    ,[ItemValue2]\r\n    ,[ItemReference]\r\n    ,[ItemNotes]\r\n    ,DATEADD(s, ReviewDueDate, '1970-01-01 00:00:00') AS [ReviewDueDate]\r\n    ,DATEADD(SECOND, ItemExpires / 1000000.0, CAST('1970-01-01 00:00:00' AS datetime2)) AS [ItemExpires]\r\n    ,DATEADD(ss, RequestedDate, '1970-01-01 00:00:00') AS [RequestedDate]\r\n    ,DATEADD(ss, ReceivedDate, '1970-01-01 00:00:00') AS [ReceivedDate]\r\n    ,DATEADD(ss, CreatedDate, '1970-01-01 00:00:00') AS [CreatedDate]\r\n    ,[CreatedByID]\r\n    ,DATEADD(ss, [ClosedDate], '1970-01-01 00:00:00') AS [ClosedDate]\r\n    ,[ClosedByID]\r\n    ,DATEADD(ss, LastUpdatedDate, '1970-01-01 00:00:00') AS [LastUpdatedDate]\r\n    ,[LastUpdatedByID]\r\n    ,[Deleted]\r\nFROM \r\n    CareBlox.stgtblHR_Records",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "upsert",
+						"upsertSettings": {
+							"useTempDB": true,
+							"keys": [
+								"HRRecordID"
+							]
+						},
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "HRRecordID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "HRRecordID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "EmployeeID",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "EmployeeID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "HomeID",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "HomeID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "HRChecklistID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "HRChecklistID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemGroupID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "ItemGroupID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemName",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ItemName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemStatus",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ItemStatus",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemValue1",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ItemValue1",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemValue2",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ItemValue2",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemReference",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ItemReference",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemNotes",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "ItemNotes",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ReviewDueDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "ReviewDueDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemExpires",
+									"type": "DateTime",
+									"physicalType": "datetime2"
+								},
+								"sink": {
+									"name": "ItemExpires",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "RequestedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "RequestedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "ReceivedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "ReceivedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "CreatedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "CreatedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "CreatedByID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "CreatedByID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "ClosedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "ClosedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "ClosedByID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "ClosedByID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "LastUpdatedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "LastUpdatedDate",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "LastUpdatedByID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "LastUpdatedByID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "Deleted",
+									"type": "Boolean",
+									"physicalType": "bit"
+								},
+								"sink": {
+									"name": "Deleted",
+									"type": "Boolean",
+									"physicalType": "bit"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Careblox",
+							"Table": "tblHR_Records"
+						}
+					}
+				]
+			}
+		],
+		"variables": {
+			"DateString": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Careblox/Children Pipelines"
+		},
+		"annotations": []
+	}
+}
