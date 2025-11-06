@@ -1,0 +1,249 @@
+{
+	"name": "PL_Exchequer_CompanyPeriods",
+	"properties": {
+		"activities": [
+			{
+				"name": "ForEach Company",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Company List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Company List').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Copy Company Period Data",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "SELECT \n    '@{item().ExchCode}' AS ExchCompanyCode,\n    PeriodKey,\n    ExchequerYear,\n    PeriodYear,\n    PeriodNo,\n    CalendarMonthLongName,\n    QuarterNo,\n    PeriodDescription,\n    CONVERT(DATE, CONCAT('01/', PeriodDescription), 103) AS PeriodReportDate,\n    HasTransactions,\n    IsCurrentPeriod,\n    IsCurrentYear\nFROM \n    @{item().ExchCode}.evw_Period",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "upsert",
+									"upsertSettings": {
+										"useTempDB": true,
+										"keys": [
+											"ExchCompanyCode",
+											"PeriodKey"
+										]
+									},
+									"sqlWriterUseTableLock": false,
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "ExchCompanyCode"
+											},
+											"sink": {
+												"name": "ExchCompanyCode",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "PeriodKey"
+											},
+											"sink": {
+												"name": "PeriodKey",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "ExchequerYear"
+											},
+											"sink": {
+												"name": "ExchequerYear",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "PeriodYear"
+											},
+											"sink": {
+												"name": "PeriodYear",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "PeriodNo"
+											},
+											"sink": {
+												"name": "PeriodNo",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "CalendarMonthLongName"
+											},
+											"sink": {
+												"name": "CalendarMonthLongName",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "QuarterNo"
+											},
+											"sink": {
+												"name": "QuarterNo",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "PeriodDescription"
+											},
+											"sink": {
+												"name": "PeriodDescription",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "PeriodReportDate"
+											},
+											"sink": {
+												"name": "PeriodReportDate",
+												"physicalType": "date"
+											}
+										},
+										{
+											"source": {
+												"name": "HasTransactions"
+											},
+											"sink": {
+												"name": "HasTransactions",
+												"type": "Boolean",
+												"physicalType": "bit"
+											}
+										},
+										{
+											"source": {
+												"name": "IsCurrentPeriod"
+											},
+											"sink": {
+												"name": "IsCurrentPeriod",
+												"type": "Boolean",
+												"physicalType": "bit"
+											}
+										},
+										{
+											"source": {
+												"name": "IsCurrentYear"
+											},
+											"sink": {
+												"name": "IsCurrentYear",
+												"type": "Boolean",
+												"physicalType": "bit"
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OnPrem_Exchequer",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "n/a",
+										"Table": "n/a"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_AH2_TRANSFORM_DB",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "Exchequer",
+										"Table": "CompanyPeriods"
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Company List",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode \nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\nORDER BY\n\tHomeId ASC",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			}
+		],
+		"folder": {
+			"name": "Exchequer/Child Pipelines"
+		},
+		"annotations": []
+	}
+}
