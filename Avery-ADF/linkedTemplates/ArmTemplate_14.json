@@ -1936,6 +1936,318 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/XPL_Yardi_CH_IP_LedgerDetails')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Ledger and comments",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set SITE_REF",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\t \n\t'@{variables('Home_Ref')}' AS HOME_REF,\n\tSite.SiteId AS siteid,\n\tSite.SiteName as sitename, \n\tRESIDENT.RES_CODE as resident_no,\n\tInvPosting.account_No, \n\tInvPosting.Cre_DateT AS created_date, \n\tInvPosting.Inv_Date AS transaction_date,\n\tCASE \n\t\tWHEN InvPosting.Tran_Type = 'U' THEN 'Receipt'\n\t\tWHEN InvPosting.Tran_Type = 'I' THEN 'Invoice'\n\t\tWHEN InvPosting.Tran_Type = 'C' THEN 'Credit'\n\t\tWHEN InvPosting.Tran_Type = 'J' THEN 'Adjustment'\n\t\tELSE ''\n\tEND AS transaction_type,\n\tInvPosting.Ref1 AS transaction_ref1, \n\tInvPosting.Ref2 AS transaction_ref2, \n\tInvPosting.Value AS transaction_value, \n\tInvPosting.Balance AS transaction_balance, \n\tMemo,\n\tUSERCOMM AS UserComment\nFROM\t\t \n\tInvPosting (NOLOCK) \n\t\n\tJOIN Site (NOLOCK) \n\t\tON Site.Site_Ref = InvPosting.Site_Ref\n\n\tLEFT JOIN RESIDENT (NOLOCK)\n\t\tON RESIDENT.RES_REF = INVPOSTING.RES_REF\nWHERE\t\n\tInvPosting.Site_Ref  = '@{variables('SITE_REF')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Home_Ref'), ' - Full Ledger Comments - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Lookup Home",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, SITE_REF FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": true
+						}
+					},
+					{
+						"name": "Set SITE_REF",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Lookup Home",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "SITE_REF",
+							"value": {
+								"value": "@activity('Lookup Home').output.firstRow.SITE_REF",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String"
+					},
+					"SITE_REF": {
+						"type": "Integer"
+					}
+				},
+				"folder": {
+					"name": "Yardi/CHIP"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_WebHook')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Runs the child pipelines that move and process files generated by the webhook/azure function",
+				"activities": [
+					{
+						"name": "Move Files",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "X_PL_YourHippo_Move_WebHook_files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Process Users",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Move Files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "X_PL_YourHippo_Process_WebHook_User_Files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Process Results",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Process Users",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "X_PL_YourHippo_Process_WebHook_Result_files",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobFileShare')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AveryblobFileShare",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureFileStorageLocation"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion_Archive')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('archive/', formatDateTime(utcNow(), 'yyyy'), '/', formatDateTime(utcNow(), 'MM'), '/', formatDateTime(utcNow(), 'dd'), '/')\n",
+							"type": "Expression"
+						},
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/SCH_EveryDay_1am')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -2252,76 +2564,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_Fusion_Tables')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy data1",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "MySqlSource"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "FusionMySQL",
-								"type": "DatasetReference",
-								"parameters": {
-									"TableName": "cp_assessment_completed"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Fusion",
-									"Table": "new"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/Fusion"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_TransactionData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2524,7 +2766,11 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/Averyblob_Fusion')]",
+				"[concat(variables('factoryId'), '/datasets/AveryblobFileShare')]",
+				"[concat(variables('factoryId'), '/datasets/Averyblob_Fusion_Archive')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_GRG_Refresh_TRANSFORM')]",
@@ -2764,6 +3010,49 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/SCH_MTWTF_5am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Exchequer_Details",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2025-11-11T09:44:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								5
+							],
+							"weekDays": [
+								"Monday",
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_2am')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -2850,259 +3139,6 @@
 				}
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_10pm')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Scheduled to trigger once at 10pm, on Mon, Tue, Wed, Thu, Fri",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Homes",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_SalariedStaff",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Agency_HomeName",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Pricing_CreateOrAlter_Views",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Avery_RLS_TRANSFORM",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Agency_WAC",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2024-03-05T21:55:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								22
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Wednesday",
-								"Thursday",
-								"Friday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_Monthly_Once_1st_5am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Once a month on the 1st at 5am",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_CQC_Proces_API_Results",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Month",
-						"interval": 1,
-						"startTime": "2024-10-25T09:24:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								5
-							],
-							"monthDays": [
-								1
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_Monthly_Once_27th')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Executes at 19:45 on the 27th of each Month for the Exchequer Company Access audit report.",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_CompanyAccessAudit",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Month",
-						"interval": 1,
-						"startTime": "2024-06-27T14:25:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								45
-							],
-							"hours": [
-								19
-							],
-							"monthDays": [
-								27
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Fusion_MondayTransfer')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Runs the pipeline to move files from fusion to the file share so they can be loaded onto the VM",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Fusion_Move_Files_To_VM",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2025-09-11T13:46:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								10
-							],
-							"hours": [
-								6
-							],
-							"weekDays": [
-								"Monday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Fusion_Move_Files_To_VM')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_5am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_GRG_Refresh_TRANSFORM",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_AEMS_Post_Transfer_DuplicateClear",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_CareBlox_Data_Load",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2024-03-19T14:52:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								5
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_GRG_Refresh_TRANSFORM')]"
-			]
 		}
 	]
 }
