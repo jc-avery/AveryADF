@@ -1936,6 +1936,527 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_GRG_Data_SingleHome')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Extracts data Yardi require to csv files for a single home",
+				"activities": [
+					{
+						"name": "Export Rooms",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Filename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    AmendDateTime,\n    CreateDateTime,\n    HOME_REF,\n    OLOC_REF,\n    OROOM_REF,\n    ROOM_CAT,\n    ROOM_CAT_DESC,\n    ROOM_CODE,\n    ROOM_DESC,\n    ROOM_NO_BEDS,\n    ROOM_REF,\n    ROOM_TYPE,\n    ROOM_TYPE_DESC,\n    CHARGEPERIOD,\n    CURRENTRATE,\n    RATEDATE,\n    ROOM_UDF1,\n    ROOM_UDF2,\n    ROOM_UDF3,\n    ROOM_UDF4,\n    USEFLAG\nFROM \n    dbo.ROOMS\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Rooms -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Look up Home name",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT TOP 1 HomeName FROM Avery.HOME WHERE ColdHarbourHOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Set Filename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Look up Home name",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Filename",
+							"value": {
+								"value": "@activity('Look up Home name').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Export Residents",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Rooms",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    ADANAL_DEC\n    ,ADDRESS1\n    ,ADDRESS2\n    ,ADDRESS3\n    ,ADDRESS4\n    ,ADMSN_ANAL\n    ,ADMSN_TYPE\n    ,ADM_REASON\n    ,ADTYP_DEC\n    ,ANAL_GROUP\n    ,AUTHORITY\n    ,AmendDateTime\n    ,BIRTHDATE\n    ,CARECAT\n    ,CONTSIGNED\n    ,CreateDateTime\n    ,DISABILITY\n    ,ENQ_REF\n    ,HOME\n    ,HOME_REF\n    ,LASTADDATE\n    ,LASTDIDATE\n    ,LOC_DESC\n    ,LOC_REF\n    ,MARKETING\n    ,NINUMBER\n    ,OCC_IGNORE\n    ,ORES_REF\n    ,ORIGADDATE\n    ,POSTCODE\n    ,RELIGION\n    ,RESPAYINT\n    ,RES_CODE\n    --,RES_FNAME\n    ,CASE \n\t\tWHEN CHARINDEX('&', RES_FNAME) > 0 THEN RES_FNAME\n        WHEN CHARINDEX(' and ', RES_FNAME) > 0 THEN RES_FNAME\n\t\tWHEN CHARINDEX('-', RES_FNAME) > 0 THEN RES_FNAME\n        WHEN RES_FNAME LIKE ' %' AND LTRIM(RTRIM(RES_FNAME)) NOT LIKE '%[(\"'']%' THEN LTRIM(RES_FNAME)\n        WHEN LTRIM(RTRIM(RES_FNAME)) LIKE '% %' AND LTRIM(RTRIM(RES_FNAME)) NOT LIKE '%[(\"'']%' THEN RES_FNAME\n        WHEN RES_FNAME = '.' THEN ''\n        WHEN RES_FNAME = '*' THEN ''\n\t\tELSE (SUBSTRING(LTRIM(RES_FNAME), 1, CHARINDEX(' ', LTRIM(RES_FNAME) + ' ')))\n\tEND AS RES_FNAME\n    ,RES_REF\n    ,CASE \n        WHEN LTRIM(RES_SNAME) = '.' THEN ''\n        WHEN RES_FNAME = '*' THEN ''\n        ELSE LTRIM(RES_SNAME)\n    END AS RES_SNAME\n    ,ROOM\n    ,ROOMCAT\n    ,ROOM_DESC\n    ,ROOM_TYPE\n    ,SEX\n    ,STATUS\n    ,TEL_NO1\n    ,TEL_NO2\n    ,TITLE\n    ,USERDEF\n    ,AUTHCODE\n    ,DOUBLEINS\n    ,FIRSTAWARE\n    ,FIRSTVISIT\n    ,REAL_FNAME\n    ,REAL_SNAME\n    ,REAL_TITLE\n    ,SIGIND\n    ,THIRDPARTY\n    ,USERFIELD1\n    ,USERFIELD2\n    ,USERFIELD3\n    ,NHSNUMBER\n    ,ALTCOMMS\n    ,ALTCOMMS_REF\n    ,ASS_ACTBY\n    ,ASS_ACTBY_REF\n    ,ASS_ACTDT\n    ,CONNECTION\n    ,CONNECTIONDET\n    ,CONNECTION_REF\n    ,FUNDERREF\n    ,LANGUAGE\n    ,LANGUAGE_REF\n    ,MOVEDINFROM\n    ,MOVEDINFROM_REF\n    ,PATIENTREF\n    ,PICID\n    ,PREVCODE\n\t,CASE \n\t\tWHEN CHARINDEX('\"', RES_FNAME) > 0 THEN\n\t\t\tLTRIM(SUBSTRING(\n\t\t\t\tRES_FNAME, \n\t\t\t\tCHARINDEX('\"',RES_FNAME, 1) + 1,\n\t\t\t\tCHARINDEX('\"', RES_FNAME, CHARINDEX('\"', RES_FNAME) + 1) - CHARINDEX('\"', RES_FNAME) - 1))\n\t\tWHEN CHARINDEX('(', RES_FNAME) > 0 THEN\n\t\t\tLTRIM(SUBSTRING(\n\t\t\t\tRES_FNAME, \n\t\t\t\tCHARINDEX('(',RES_FNAME, 1) + 1,\n\t\t\t\tCHARINDEX(')', RES_FNAME, CHARINDEX('(', RES_FNAME) + 1) - CHARINDEX('(', RES_FNAME) - 1))\n\t\tWHEN CHARINDEX('''', RES_FNAME) > 0 THEN\n\t\t\tLTRIM(SUBSTRING(\n\t\t\t\tRES_FNAME, \n\t\t\t\tCHARINDEX('''',RES_FNAME, 1) + 1,\n\t\t\t\tCHARINDEX('''', RES_FNAME, CHARINDEX('''', RES_FNAME) + 1) - CHARINDEX('''', RES_FNAME) - 1))\n\t\tELSE ''\n\tEND AS Preferred_Name\nFROM \n    dbo.RESIDENT\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Residents -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Resident Contacts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Residents",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    Address1\n    ,Address2\n    ,Address3\n    ,Address4\n    ,AmendDateTime\n    ,Cont_SubType\n    ,Cont_SubTypeDec\n    ,CreateDateTime\n    ,REPLACE(REPLACE(REPLACE(LTRIM(Forenames), '.', ''), ',', ''), '*', '') AS Forenames\n    ,GRGApp_GrGsRef\n    ,GRGrep_Cnta_Det_Ref\n    ,Gen_Comments\n    ,PostCode\n    ,RelType\n    ,RelTypeDec\n    ,Res_Ref\n    ,REPLACE(REPLACE(REPLACE(LTRIM(Surname), '.', ''), ',', ''), '*', '') AS Surname\n    ,Tel_No1\n    ,Tel_No2\n    ,TitleDec\n    ,oCnta_Det_Ref\n    ,Email\n    ,LASTUPDATE\nFROM \n    dbo.RESCONTACTS\nWHERE\n    Res_Ref IN (SELECT ORES_REF FROM RESIDENT WHERE HOME_REF = '@{variables('Home_Ref')}')",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Resident Contacts -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Resident Movement",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Resident Contacts",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    ACTDEATHDT\n    ,ADANAL_DEC\n    ,ADTYP_DEC\n    ,AD_REF\n    ,AmendDateTime\n    ,CAUSE\n    ,CAUSEDEATH\n    ,CreateDateTime\n    ,DATE\n    ,DISCHDECEAS\n    ,DISDEST\n    ,DISREASON\n    ,DISTYPE\n    ,DOCTOR\n    ,FINALDISCH\n    ,HOME_REF\n    ,INITIALADM\n    ,INOUT\n    ,LOC_REF\n    ,MOVE_REF\n    ,PLACE\n    ,REASON\n    ,RES_REF\n    ,ROOM\n    ,ROOM_TYPE\n    ,TIME\n    ,MOVE_TIME\n    ,ANALCHANGE\n    ,COMPOSITE\n    ,MOVESUB_REF\n    ,PREVDISDEST\n    ,PREVDISTYPE\nFROM \n    dbo.ADMIN_DISCHARGE\nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Resident Movement -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Accounts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Resident Movement",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    ACCNO\n    ,ACCSUFFIX\n    ,ACCTYPE\n    ,ACCTYPE2\n    ,ACCTYPE_DECODE\n    ,ACC_REF\n    ,AmendDateTime\n    ,CALENDAR\n    ,CAL_REF\n    ,CHGPER\n    ,Cnta_Det_Ref\n    ,Cont_Ref\n    ,CreateDateTime\n    ,DAILYRATE\n    ,ENDDATE\n    ,FINALINV\n    ,FS_REF\n    ,FUNDSOURCE\n    ,HOME_REF\n    ,LASTRATEDT\n    ,ORIGREF\n    ,PENSBOOK\n    ,PROFILE\n    ,RATE\n    ,RECGRP\n    ,RECGRPDESC\n    ,RELACCREF\n    ,RES_REF\n    ,RecType\n    ,STARTDATE\n    ,SUFFIXSUPERCEDED\n    ,ANAL3\n    ,ATTENTION\n    ,AUTHORISED\n    ,CONSULTANT\n    ,CRCONTROL\n    ,DEBTORCODE\n    ,FUNDREQEDI\n    ,FURC_DEC\n    ,INPFUNDAPR\n    ,LOCALITY\n    ,NURFUNDAPR\n    ,RECONCILED\n    ,BANKACC\n    ,BANKACCNAME\n    ,BANKADDRESS1\n    ,BANKADDRESS2\n    ,BANKADDRESS3\n    ,BANKADDRESS4\n    ,BANKNAME\n    ,BANKPOSTCODE\n    ,BANKSORTCODE\n    ,BANKSTREF\n    ,BANKTRTYPE\n    ,DDMANDREF\n    ,SOCOLDAY\n    ,SOCOLLECT\n    ,SOVALUE\n    ,USAGE\n    ,CALCODE\n    ,PCTDESC\n    ,REVDATE\nFROM \n    ACCOUNT \nWHERE\n    HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Accounts -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Export Fund Source Contacts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Export Accounts",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    Address1\n    ,Address2\n    ,Address3\n    ,Address4\n    ,AmendDateTime\n    ,CreateDateTime\n    ,EMAIL\n    ,FundSourceName\n    ,GRGApp_GrGsRef\n    ,GRGrep_Cnta_Det_Ref\n    ,Inv_Narrative\n    ,PostCode\n    ,Tel_No1\n    ,Tel_No2\n    ,oCnta_Det_Ref\n    ,CQUIN\n    ,CQUIN_REF\n    ,CQUIN_TYPE\n    ,EDICONTACT\n    ,PAYDAYS\n    ,PAYDAYSDOM\n    ,PAYDAYSDOMDESC\n    ,PAYMONTH\n    ,PAYMONTHDESC\nFROM \n    dbo.FSCONTACTS\nWHERE\n    GRGApp_GrGsRef = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_GRG",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat(variables('Filename'), ' - Fund Source Contacts -', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"Filename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Yardi/GRG"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Yardi_Vendors')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -4945,49 +5466,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-04-05T14:58:56Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_MTWTF_5am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_Details",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2025-11-11T09:44:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								5
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Wednesday",
-								"Thursday",
-								"Friday"
-							]
-						}
-					}
-				}
 			},
 			"dependsOn": []
 		}
