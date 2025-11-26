@@ -13,6 +13,274 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_AEMS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Look up Values",
+						"type": "Lookup",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "AEMS Enquiry",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set HomeName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set IntranetID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    ID\n    ,AEMS_ID\n    ,aems_version\n    ,homeID\n    ,uploadedBy\n    ,managerEmailed\n    ,enquiryStatus\n    ,enquiryID\n    ,initialEnquiry\n    ,enquirerSalutation\n    ,enquirerLastName AS enquirerFirstName\n    ,enquirerFirstName AS enquirerLastName \n    ,enquirerSalutationTwo\n    ,enquirerLastNameTwo \n    ,enquirerFirstNameTwo \n    ,enquiryDate\n    ,enquirerRelationshipToResident\n    ,en_areacode\n    ,enquirerTelephone \n    ,enquiry_mobile \n    ,enquirerEmail \n    ,enquirerAddress  AS nokAddress\n    ,enquirerAddressOne AS nokAddressOne\n    ,enquirerAddressTwo  AS nokAddressTwo\n    ,enquirerAddressThree  AS nokAddressThree \n    ,enquiry_postcode \n    ,enquiry_postcode_two \n    ,residentSalutation\n    ,residentFirstName \n    ,residentLastName \n    ,residentDOB \n    ,residentSalutationTwo\n    ,residentFirstNameTwo\n    ,residentLastNameTwo\n    ,residentDOBTwo\n    ,residentNOK\n    ,residentAddress \n    ,residentAddressOne \n    ,residentAddressTwo \n    ,residentAddressThree \n    ,residentPostcode \n    ,residentTelephone \n    ,residentCareCategory\n    ,residentFundingCategory\n    ,residentCareCategoryTwo\n    ,funding_total\n    ,residentFunding\n    ,residentFundingTwo\n    --,enquiryDetails \n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiryDetails), '\"', '') AS enquiryDetails\n    ,enquiryType\n    ,responseTime\n    ,responseCurrentStatus\n    ,responseNeeded\n    ,responseAmountTried\n    ,followUpDate\n    ,followUpReason\n    ,uploadToCH\n    ,admissionDate\n    ,enquiryClosed\n    ,managerContacted\n    ,homeVisit\n    ,assessmentBooked\n    ,assesmentComplete\n    ,admission\n    ,homeVisitBooked\n    ,admissionBooked\n    ,video_booked\n    ,video_complete\n    ,homeVisitRequested\n    ,assesmentRequested\n    ,newEnquiry\n    ,cameFrom\n    ,enquirer_address \n    ,enquirer_postcode \n    ,lng\n    ,lat\n    ,enquirer_area\n    ,enquirer_county\n    ,nok_name\n    ,nok_surname\n    ,nok_county\n    ,nok_relation\n    ,nok_telephone\n    ,nok_mobile\n    ,nok_address\n    ,resident_county\n    ,nok_Salutation\n    ,newsletter_receive\n    ,newsletter_email\n    ,enquiry_urgent\n    ,optOut\n    ,type_news\n    ,type_mag\n    ,type_other\n    ,gp_name\n    ,gp_address\n    ,gp_telephone\n    ,gp_requested\n    ,gp_received\n    ,website\n    ,brochure\n    ,brochure_requestID\n    ,entryMethod\n    ,current_action_id\n    ,column_hash\n    ,receiveMarketing\n    ,willTopUp\n    ,enquiry_entered_from\n    ,enquiry_closed_reason\n    ,enquiry_deleted\n    ,enquiry_weight\nFROM \n    AEMS.AEMS_Enquiries AS E\nWHERE \n    E.homeID IN (@{variables('IntranetID')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('AEMS Enquiry - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set HomeName",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "HomeName",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set IntranetID",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IntranetID",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.IntranetID",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "AEMS Enquiry Actions",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "AEMS Enquiry",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    A.ID\n    ,A.AEMS_ID\n    ,enquiry_setBy\n    ,enquiry_id\n    ,enquiry_dateRequired\n    ,enquiry_reason\n    ,enquiry_contact\n    ,enquiry_actionComplete\n    ,enquiry_actionInserted\n    ,enquiry_actionCompleteDate\n    ,enquiry_actionCompleteBy\n    ,enquiry_homeID\n    ,enquiry_missed\n    ,enquiry_missedEmail\n    ,enquiry_missedEmailDate\n    ,enquiry_initialContact\n    ,enquiry_flag\n    ,enquiry_critical\n    --,REPLACE(enquiry_details, '\"', '')\n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiry_details), '\"', '') AS enquiry_details\n    ,enquiry_picked_up\n    ,enquiry_assigned_to\n    ,enquiry_assigned_when\n    ,enquiry_action_call_handler\n    ,enquiry_new\nFROM \n    AEMS.AEMS_Enquiries_Actions AS A\n\n    INNER JOIN AEMS.AEMS_Enquiries AS E\n        ON E.AEMS_ID = A.enquiry_id\n        AND E.homeID = A.enquiry_homeID\n    WHERE\n        A.enquiry_homeID IN (@{variables('IntranetID')})\n        ",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('AEMS Enquiry Actions - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"HomeName": {
+						"type": "String"
+					},
+					"IntranetID": {
+						"type": "String",
+						"defaultValue": "7581,83,7596,7598"
+					}
+				},
+				"folder": {
+					"name": "Yardi/AEMS"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Yardi_AEMS_BackUp')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -6412,42 +6680,6 @@
 			"properties": {
 				"linkedServiceName": {
 					"referenceName": "OnPrem_Coldharbour",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Schema": {
-						"type": "string"
-					},
-					"Table": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "OnPrem"
-				},
-				"annotations": [],
-				"type": "SqlServerTable",
-				"schema": [],
-				"typeProperties": {
-					"schema": {
-						"value": "@dataset().Schema",
-						"type": "Expression"
-					},
-					"table": {
-						"value": "@dataset().Table",
-						"type": "Expression"
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_IP')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "OnPrem_ColdHarbour_IP",
 					"type": "LinkedServiceReference"
 				},
 				"parameters": {
