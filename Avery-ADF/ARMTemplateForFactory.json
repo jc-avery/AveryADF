@@ -33265,7 +33265,8 @@
 				"description": "The Details (Ledger) from Exchequer",
 				"activities": [
 					{
-						"name": "Company List",
+						"name": "Company List and current period",
+						"description": "List company codes and current period details, including the current exchequer year to be used in refreshing the details data",
 						"type": "Lookup",
 						"dependsOn": [
 							{
@@ -33286,7 +33287,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode \nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+								"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\n\nSELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @CurrentPeriod\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -33343,7 +33344,7 @@
 						"type": "ForEach",
 						"dependsOn": [
 							{
-								"activity": "Company List",
+								"activity": "Company List and current period",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -33352,7 +33353,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"items": {
-								"value": "@activity('Company List').output.value",
+								"value": "@activity('Company List and current period').output.value",
 								"type": "Expression"
 							},
 							"batchCount": 10,
@@ -33373,7 +33374,7 @@
 										"source": {
 											"type": "SqlServerSource",
 											"sqlReaderQuery": {
-												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,'@{item().IntranetID}' AS IntranetID\n\t,'@{item().Homename}' AS Homename\n\t,L.[tlFolioNum]\n\t,L.[tlLineNo]\n\t,L.[tlRunNo]\n\t,L.[tlGLCode]\n\t,L.[tlNominalMode]\n\t,L.[tlCurrency]\n\t,L.[tlYear]\n\t,L.[tlPeriod]\n\t,L.[tlDepartment]\n\t,L.[tlCostCentre]\n\t,L.[tlDocType]\n\t,L.[tlQty]\n\t,L.[tlQtyMul]\n\t,L.[tlNetValue]\n\t,L.[tlDiscount]\n\t,L.[tlVATCode]\n\t,L.[tlVATAmount]\n\t,L.[tlPaymentCode]\n\t,L.[tlOldPBal]\n\t,L.[tlRecStatus]\n\t,L.[tlDiscFlag]\n\t,L.[tlQtyWOFF]\n\t,L.[tlQtyDel]\n\t,L.[tlCost]\n\t,L.[tlAcCode]\n\t,L.[tlLineDate]\n\t,L.[tlItemNo]\n\t,L.[tlDescription]\n\t,L.[tlJobCode]\n\t,L.[tlAnalysisCode]\n\t,L.[tlOurRef]\n\t,L.[tlPreviousBalance]\n\t,L.[PositionId] AS DetailsPositionId\n\t,H.thYourRef\n\t,H.thLongYourRefTrans\n\t,H.thOurRef\n\t,H.thPostedDate\n\t,H.thCreationDate\n\t,H.thDueDate\n\t,H.PositionId AS DocumentPositionId\nFROM \n\t@{item().ExchCode}.DETAILS AS L\n\n\tLEFT JOIN @{item().ExchCode}.DOCUMENT AS H\n\t\tON H.thOurRef = L.tlOurRef\nWHERE\n\tL.tlYear = 125",
+												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,'@{item().IntranetID}' AS IntranetID\n\t,'@{item().Homename}' AS Homename\n\t,L.[tlFolioNum]\n\t,L.[tlLineNo]\n\t,L.[tlRunNo]\n\t,L.[tlGLCode]\n\t,L.[tlNominalMode]\n\t,L.[tlCurrency]\n\t,L.[tlYear]\n\t,L.[tlPeriod]\n\t,L.[tlDepartment]\n\t,L.[tlCostCentre]\n\t,L.[tlDocType]\n\t,L.[tlQty]\n\t,L.[tlQtyMul]\n\t,L.[tlNetValue]\n\t,L.[tlDiscount]\n\t,L.[tlVATCode]\n\t,L.[tlVATAmount]\n\t,L.[tlPaymentCode]\n\t,L.[tlOldPBal]\n\t,L.[tlRecStatus]\n\t,L.[tlDiscFlag]\n\t,L.[tlQtyWOFF]\n\t,L.[tlQtyDel]\n\t,L.[tlCost]\n\t,L.[tlAcCode]\n\t,L.[tlLineDate]\n\t,L.[tlItemNo]\n\t,L.[tlDescription]\n\t,L.[tlJobCode]\n\t,L.[tlAnalysisCode]\n\t,L.[tlOurRef]\n\t,L.[tlPreviousBalance]\n\t,L.[PositionId] AS DetailsPositionId\n\t,H.thYourRef\n\t,H.thLongYourRefTrans\n\t,H.thOurRef\n\t,H.thPostedDate\n\t,H.thCreationDate\n\t,H.thDueDate\n\t,H.PositionId AS DocumentPositionId\nFROM \n\t@{item().ExchCode}.DETAILS AS L\n\n\tLEFT JOIN @{item().ExchCode}.DOCUMENT AS H\n\t\tON H.thOurRef = L.tlOurRef\nWHERE\n\tL.tlYear = '@{item().ExchequerYear}'",
 												"type": "Expression"
 											},
 											"queryTimeout": "02:00:00",
@@ -52453,7 +52454,7 @@
 								"referenceName": "DS_Sona_Initial_File",
 								"type": "DatasetReference",
 								"parameters": {
-									"Filename": "users - All Pages (minus pg 10).json"
+									"Filename": "Sona All Users.json"
 								}
 							}
 						],
@@ -52546,7 +52547,7 @@
 								"referenceName": "DS_Sona_Initial_File",
 								"type": "DatasetReference",
 								"parameters": {
-									"Filename": "users - All Pages (minus pg 10).json"
+									"Filename": "Sona All Users.json"
 								}
 							}
 						],
@@ -78029,13 +78030,6 @@
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Artisan",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
 							"referenceName": "PL_CH_Residents",
 							"type": "PipelineReference"
 						},
@@ -78075,7 +78069,6 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Artisan')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_CH_Residents')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_CH_TransactionData')]"
 			]
