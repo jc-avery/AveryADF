@@ -898,11 +898,11 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details_CurrentYear')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "The Details (Ledger) from Exchequer",
+				"description": "The Details (Ledger) from Exchequer for the current financial year",
 				"activities": [
 					{
 						"name": "Company List and current period",
@@ -1562,6 +1562,43 @@
 											}
 										}
 									]
+								},
+								{
+									"name": "Delete Current Year",
+									"description": "Runs the Procedure DeleteDetails$CompanyAndYear to delete the companies current year data that was collected in the previous activity",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy Data to AH2",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "NonQuery",
+												"text": {
+													"value": "EXEC Exchequer.DeleteDetails$CompanyAndYear @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = '@{item().ExchCode}'",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
 								}
 							]
 						}
@@ -1571,7 +1608,7 @@
 						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Delete Current Year",
+								"activity": "For Each Company",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -2198,39 +2235,6 @@
 						]
 					},
 					{
-						"name": "Delete Current Year",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "For Each Company",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "EXEC Exchequer.Delete$CurrentYear"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
 						"name": "Clear stage Table Pre",
 						"type": "Script",
 						"dependsOn": [],
@@ -2249,7 +2253,7 @@
 						"typeProperties": {
 							"scripts": [
 								{
-									"type": "Query",
+									"type": "NonQuery",
 									"text": "EXEC Exchequer.Clear$STG_Details"
 								}
 							],
@@ -2282,7 +2286,7 @@
 						"typeProperties": {
 							"scripts": [
 								{
-									"type": "Query",
+									"type": "NonQuery",
 									"text": "EXEC Exchequer.Clear$STG_Details"
 								}
 							],
