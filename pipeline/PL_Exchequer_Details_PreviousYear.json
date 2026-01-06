@@ -1,11 +1,11 @@
 {
-	"name": "PL_Exchequer_Details_CurrentYear",
+	"name": "PL_Exchequer_Details_PreviousYear",
 	"properties": {
-		"description": "The Details (Ledger) from Exchequer for the current financial year",
+		"description": "The Details (Ledger) from Exchequer for the previous financial Year",
 		"activities": [
 			{
-				"name": "Company List and current period",
-				"description": "List company codes and current period details, including the current exchequer year to be used in refreshing the details data",
+				"name": "Company List and Previous Year",
+				"description": "List company codes and the previous year, used to refresh the details data for the previous financial year BEFORE running the Current Fin Year",
 				"type": "Lookup",
 				"dependsOn": [
 					{
@@ -26,7 +26,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\n\nSELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @CurrentPeriod\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+						"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @PreviousYear AS DATE = DATEFROMPARTS(YEAR(DATEADD(YEAR,-1,@Today)), MONTH(@Today), 1)\n\nSELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @PreviousYear\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
@@ -83,7 +83,7 @@
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "Company List and current period",
+						"activity": "Company List and Previous Year",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -92,7 +92,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@activity('Company List and current period').output.value",
+						"value": "@activity('Company List and Previous Year').output.value",
 						"type": "Expression"
 					},
 					"batchCount": 10,
@@ -663,8 +663,8 @@
 							]
 						},
 						{
-							"name": "Delete Current Year",
-							"description": "Runs the Procedure DeleteDetails$CompanyAndYear to delete the companies current year data that was collected in the previous activity",
+							"name": "Delete Previous Year Data",
+							"description": "Runs the Procedure DeleteDetails$CompanyAndYear to delete the companies previous year data that was collected in the previous activity",
 							"type": "Script",
 							"dependsOn": [
 								{
@@ -690,10 +690,7 @@
 								"scripts": [
 									{
 										"type": "NonQuery",
-										"text": {
-											"value": "EXEC Exchequer.DeleteDetails$CompanyAndYear @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = '@{item().ExchCode}'",
-											"type": "Expression"
-										}
+										"text": "EXEC Exchequer.DeleteDetails$CompanyAndYear @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = @{item().ExchCode}"
 									}
 								],
 								"scriptBlockExecutionTimeout": "02:00:00"
@@ -703,7 +700,7 @@
 				}
 			},
 			{
-				"name": "Insert Current Year Data",
+				"name": "Insert Previous Year Data",
 				"type": "Copy",
 				"dependsOn": [
 					{
@@ -1364,7 +1361,7 @@
 				"type": "Script",
 				"dependsOn": [
 					{
-						"activity": "Insert Current Year Data",
+						"activity": "Insert Previous Year Data",
 						"dependencyConditions": [
 							"Completed"
 						]
