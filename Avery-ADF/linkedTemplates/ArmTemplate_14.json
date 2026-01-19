@@ -13,6 +13,639 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_PostedTransactions')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies the posted transactions from On Prem CH to Transform",
+				"activities": [
+					{
+						"name": "Copy to Stage",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": "SELECT \n\tInvPosting.POST_REF,\n\tSite.SiteId AS siteid,\n\tSite.SiteName as sitename, \n\tP.PRODESC AS AccProfile,\n\tCONCAT(RTRIM(CONTACT.FORENAMES), RTRIM(CONTACT.SURNAME)) AS FundSourceName,\n\tInvPosting.account_No AS AccNo, \n\tR.RES_CODE AS RES_CODE,\n\tInvPosting.CRE_DATET AS CreatedAt,\n\tInvPosting.DUE_DATE AS DueDate,\n\tInvPosting.INV_DATE AS TransactionDate,\n\tCASE \n\t\tWHEN InvPosting.Tran_Type = 'U' THEN 'Receipt - To account'\n\t\tWHEN InvPosting.Tran_Type = 'I' THEN 'Invoice'\n\t\tWHEN InvPosting.Tran_Type = 'C' THEN 'Credit'\n\t\tWHEN InvPosting.Tran_Type = 'J' THEN 'Adjustment'\n\t\tWHEN InvPosting.Tran_Type = 'R' THEN 'Receipt - To transaction'\n\t\tWHEN InvPosting.Tran_Type = 'N' THEN 'System Receipt'\n\t\tELSE ''\n\tEND AS TransactionType,\n\tInvPosting.Ref1 AS Reference1, \n\tInvPosting.Ref2 AS Reference2, \n\tInvPosting.Value AS TransactionValue, \n\tInvPosting.Balance AS TransactionBalance\n\t,INVPOSTING.TRAN_TYPE\n\t,INVPOSTING.AN_CODE1 AS AnalysisCode\n\t,INVPOSTING.USERCOMM AS UserComment\nFROM \n\tInvPosting WITH (NOLOCK)\n\t\n\tLEFT JOIN FUNDSRC_HD AS ACC WITH (NOLOCK)\n\t\tON ACC.ACCNO = InvPosting.ACCOUNT_NO\n\t\tAND ACC.ENDDATE IS NULL\n\n\tLEFT JOIN CONTACT_HD AS CONTACT WITH (NOLOCK) \n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN PROFILES AS P WITH (NOLOCK)\n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN RESIDENT AS R WITH (NOLOCK)\n\t\tON R.RES_REF = INVPOSTING.RES_REF\n\n\tLEFT JOIN Site WITH (NOLOCK)\n\t\tON Site.Site_Ref = InvPosting.Site_Ref",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE ColdHarbour.STGPostedTransactions",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "siteid",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "SiteID",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "sitename",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "SiteName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AccProfile",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "AccProfile",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "FundSourceName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "FundSourceName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedAt",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "CreatedAt",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "DueDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "DueDate",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "TransactionDate",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										},
+										"sink": {
+											"name": "TransactionValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionBalance",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										},
+										"sink": {
+											"name": "TransactionBalance",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										}
+									},
+									{
+										"source": {
+											"name": "AnalysisCode",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "AnalysisCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "UserComment",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "UserComment",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "STGPostedTransactions"
+								}
+							}
+						]
+					},
+					{
+						"name": "Upsert to PostedTransactions",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Wait",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\n    STGPostedTransactions.POST_REF\n    ,STGPostedTransactions.SiteID\n    ,HOME.HOME_REF\n    ,STGPostedTransactions.SiteName\n    ,STGPostedTransactions.AccProfile\n    ,STGPostedTransactions.FundSourceName\n    ,STGPostedTransactions.AccNo\n    ,STGPostedTransactions.RES_CODE\n    ,STGPostedTransactions.CreatedAt\n    ,STGPostedTransactions.DueDate\n    ,STGPostedTransactions.TransactionDate\n    ,STGPostedTransactions.TransactionType\n    ,STGPostedTransactions.Reference1\n    ,STGPostedTransactions.Reference2\n    ,STGPostedTransactions.TransactionValue\n    ,STGPostedTransactions.TransactionBalance\n    ,STGPostedTransactions.AnalysisCode\n    ,STGPostedTransactions.UserComment\nFROM \n    ColdHarbour.STGPostedTransactions\n\n    LEFT JOIN GRG.HOME\n        ON HOME.SiteID = STGPostedTransactions.SiteID",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"POST_REF"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "POST_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "SiteID",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "SiteID",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "SiteName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "SiteName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AccProfile",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AccProfile",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "FundSourceName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "FundSourceName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AccNo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedAt",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "CreatedAt",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "DueDate",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "DueDate",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionDate",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "TransactionDate",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "TransactionType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Reference1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Reference2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										},
+										"sink": {
+											"name": "TransactionValue",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										}
+									},
+									{
+										"source": {
+											"name": "TransactionBalance",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										},
+										"sink": {
+											"name": "TransactionBalance",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 9,
+											"precision": 19
+										}
+									},
+									{
+										"source": {
+											"name": "AnalysisCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AnalysisCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "UserComment",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "UserComment",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "PostedTransactions"
+								}
+							}
+						]
+					},
+					{
+						"name": "Wait",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Copy to Stage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 5
+						}
+					},
+					{
+						"name": "Clear STG table",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Upsert to PostedTransactions",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "TRUNCATE TABLE ColdHarbour.STGPostedTransactions"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Cold Harbour/Children Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_Residents')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -9467,67 +10100,6 @@
 					"name": "MCM"
 				},
 				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Pricing')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Pipeline to update Pricing tables outside GRG refresh Window",
-				"activities": [
-					{
-						"name": "Upsert Coldharbour Rooms",
-						"description": "Updates the ColdHarbour.Rooms table from the Polestar DB. Polestar DB is a replication of the GRG database (CH reporting suite/DB)",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_ColdHarbour_Rooms",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update Occupancy",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Upsert Coldharbour Rooms",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_ColdHarbour_RoomsWithInHomeResidents",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-10T09:35:49Z"
 			},
 			"dependsOn": []
 		}

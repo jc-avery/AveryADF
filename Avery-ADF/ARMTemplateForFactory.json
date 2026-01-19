@@ -54456,6 +54456,8 @@
 					{
 						"name": "Copy Verifile DBS Data",
 						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -54655,6 +54657,62 @@
 								}
 							}
 						]
+					},
+					{
+						"name": "Verifile Combined Report",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "ExcelSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Migration_Excel",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "SonaMigration",
+									"Table": "VerifileCombinedReport"
+								}
+							}
+						]
 					}
 				],
 				"policy": {
@@ -54672,7 +54730,177 @@
 				"[concat(variables('factoryId'), '/datasets/DS_Sona_Avery_Immigration_file')]",
 				"[concat(variables('factoryId'), '/datasets/DS_Sona_Verifile_RTW_Data')]",
 				"[concat(variables('factoryId'), '/datasets/DS_Sona_Verifile_DBS')]",
-				"[concat(variables('factoryId'), '/datasets/DS_Sona_RTW_Mapping')]"
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_RTW_Mapping')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Migration_Excel')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Parent_OrgUnits')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Parent OrgUnits",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['org_id']"
+										},
+										"sink": {
+											"name": "OrgUnits_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['name']"
+										},
+										"sink": {
+											"name": "name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['timezone']"
+										},
+										"sink": {
+											"name": "timezone",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['is_base_entity']"
+										},
+										"sink": {
+											"name": "is_base_entity",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['org_unit_type']['id']"
+										},
+										"sink": {
+											"name": "org_unit_type_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['org_unit_type']['name']"
+										},
+										"sink": {
+											"name": "org_unit_type_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['accounting_cost_code']"
+										},
+										"sink": {
+											"name": "accounting_cost_code",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['average_hourly_rate']"
+										},
+										"sink": {
+											"name": "average_hourly_rate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['paycaptain_company_id']"
+										},
+										"sink": {
+											"name": "paycaptain_company_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['data']['parent_org_unit']['id']"
+										},
+										"sink": {
+											"name": "parent_org_unit_id",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": ""
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Initial_File",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": "merged_parent_orgs3.json"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_OrgUnits"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Initial API Files"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Initial_File')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
@@ -80287,172 +80515,32 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Parent_OrgUnits')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
+			"name": "[concat(parameters('factoryName'), '/DS_Sona_Migration_Excel')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"activities": [
-					{
-						"name": "Parent OrgUnits",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['org_id']"
-										},
-										"sink": {
-											"name": "OrgUnits_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['timezone']"
-										},
-										"sink": {
-											"name": "timezone",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['is_base_entity']"
-										},
-										"sink": {
-											"name": "is_base_entity",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['org_unit_type']['id']"
-										},
-										"sink": {
-											"name": "org_unit_type_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['org_unit_type']['name']"
-										},
-										"sink": {
-											"name": "org_unit_type_name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['accounting_cost_code']"
-										},
-										"sink": {
-											"name": "accounting_cost_code",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['average_hourly_rate']"
-										},
-										"sink": {
-											"name": "average_hourly_rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['paycaptain_company_id']"
-										},
-										"sink": {
-											"name": "paycaptain_company_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['data']['parent_org_unit']['id']"
-										},
-										"sink": {
-											"name": "parent_org_unit_id",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": ""
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "merged_parent_orgs3.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_OrgUnits"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
 				},
 				"folder": {
-					"name": "Sona/Initial API Files"
+					"name": "Sona"
 				},
-				"annotations": []
+				"annotations": [],
+				"type": "Excel",
+				"typeProperties": {
+					"sheetName": "Sheet1",
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": "Verifile data for Sona - Combined report (checks) 16-01-2026.xlsx",
+						"container": "sona"
+					},
+					"firstRowAsHeader": true
+				},
+				"schema": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_Sona_Initial_File')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
 			]
 		}
 	]
