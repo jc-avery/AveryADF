@@ -13,6 +13,71 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox-Fileshare')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copy care blox zip files to file share",
+				"activities": [
+					{
+						"name": "Copy Zip files",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_careblox_Binary",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Careblox/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-10T11:21:25Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_CareBlox-SQL-upsert')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -9920,6 +9985,8 @@
 					{
 						"name": "YE Mar Budget 1 Staging",
 						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -10359,7 +10426,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "WITH BudgetData AS(\nSELECT \n    H.IntranetID,\n    S.BudgetType,\n    S.ExchCode,\n    S.GLCode,\n    S.GLDesc,\n    P.BudgetDate,\n    S.YearEnd,\n    TRY_CAST(P.Amount AS NUMERIC(18,5)) AS BudgetAmount\nFROM \n    Exchequer.STGBudgets AS S\n\n    LEFT JOIN Avery.HomeDetails H\n        ON H.ExchCode = S.ExchCode\n\n    CROSS APPLY (VALUES\n        (S.Period1Date, S.Period1Value),\n        (S.Period2Date, S.Period2Value),\n        (S.Period3Date, S.Period3Value),\n        (S.Period4Date, S.Period4Value),\n        (S.Period5Date, S.Period5Value),\n        (S.Period6Date, S.Period6Value),\n        (S.Period7Date, S.Period7Value),\n        (S.Period8Date, S.Period8Value),\n        (S.Period9Date, S.Period9Value),\n        (S.Period10Date, S.Period10Value),\n        (S.Period11Date, S.Period11Value),\n        (S.Period12Date, S.Period12Value)\n    ) AS P(BudgetDate, Amount)\n\nWHERE \n    S.ExchCode IS NOT NULL\n    AND P.BudgetDate IS NOT NULL\n)\n\nSELECT \n    CAST(\n        CAST(BudgetData.IntranetID AS VARCHAR(4)) + \n        CAST(BudgetData.BudgetType AS VARCHAR(1)) +\n        CAST(BudgetData.GLCode AS VARCHAR(6)) + \n        CONVERT(VARCHAR(8), CAST(BudgetData.BudgetDate AS DATE), 112) \n    AS BIGINT) AS BudgetCompositeKey,\n    *\nFROM\n    BudgetData\nORDER BY\n    IntranetID ASC,\n    GLCode ASC,\n    BudgetDate ASC,\n    BudgetType ASC",
+								"sqlReaderQuery": "WITH BudgetData AS(\nSELECT \n    H.IntranetID,\n    S.BudgetType,\n    S.ExchCode,\n    S.GLCode,\n    S.GLDesc,\n    P.BudgetDate,\n    S.YearEnd,\n    TRY_CAST(P.Amount AS NUMERIC(18,5)) AS BudgetAmount\nFROM \n    Exchequer.STG_Budgets AS S\n\n    LEFT JOIN Avery.HomeDetails H\n        ON H.ExchCode = S.ExchCode\n\n    CROSS APPLY (VALUES\n        (S.Period1Date, S.Period1Value),\n        (S.Period2Date, S.Period2Value),\n        (S.Period3Date, S.Period3Value),\n        (S.Period4Date, S.Period4Value),\n        (S.Period5Date, S.Period5Value),\n        (S.Period6Date, S.Period6Value),\n        (S.Period7Date, S.Period7Value),\n        (S.Period8Date, S.Period8Value),\n        (S.Period9Date, S.Period9Value),\n        (S.Period10Date, S.Period10Value),\n        (S.Period11Date, S.Period11Value),\n        (S.Period12Date, S.Period12Value)\n    ) AS P(BudgetDate, Amount)\n\nWHERE \n    S.ExchCode IS NOT NULL\n    AND P.BudgetDate IS NOT NULL\n)\n\nSELECT \n    CAST(\n        CAST(BudgetData.IntranetID AS VARCHAR(4)) + \n        CAST(BudgetData.BudgetType AS VARCHAR(1)) +\n        CAST(BudgetData.GLCode AS VARCHAR(6)) + \n        CONVERT(VARCHAR(8), CAST(BudgetData.BudgetDate AS DATE), 112) \n    AS BIGINT) AS BudgetCompositeKey,\n    *\nFROM\n    BudgetData\nORDER BY\n    IntranetID ASC,\n    GLCode ASC,\n    BudgetDate ASC,\n    BudgetType ASC",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -10519,6 +10586,8 @@
 					{
 						"name": "YE Dec Budget 1 Staging",
 						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
 								"activity": "YE Mar Budget 1 Staging",
@@ -10946,6 +11015,8 @@
 					{
 						"name": "Budget 2 Staging",
 						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
 								"activity": "YE Dec Budget 1 Staging",
@@ -16753,144 +16824,6 @@
 							}
 						]
 					}
-				},
-				"folder": {
-					"name": "Radar"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Radar_XML_Form_Labels')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy data1",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "ExcelSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "TemplateName",
-											"type": "String",
-											"physicalType": "String"
-										},
-										"sink": {
-											"name": "FormTemplateName",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "FormTitle",
-											"type": "String",
-											"physicalType": "String"
-										},
-										"sink": {
-											"name": "FormTitle",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Version",
-											"type": "String",
-											"physicalType": "String"
-										},
-										"sink": {
-											"name": "Version",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "FieldName",
-											"type": "String",
-											"physicalType": "String"
-										},
-										"sink": {
-											"name": "FieldName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "FieldLabel",
-											"type": "String",
-											"physicalType": "String"
-										},
-										"sink": {
-											"name": "FieldLabel",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Excel",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "radar",
-									"FileName": "Form_Fields_Output v2.xlsx",
-									"WorkSheet": "Sheet1"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Radar_Templates",
-									"Table": "FormTemplateLabels"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
 				},
 				"folder": {
 					"name": "Radar"
