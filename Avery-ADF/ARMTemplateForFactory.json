@@ -36337,6 +36337,260 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Fusion_DataImportCheck')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Checks the data load from Fusion to our own instance of the Fusion MySQL DB",
+				"activities": [
+					{
+						"name": "Latest Assessment DateTime",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT completed_completed FROM fusion_avery.cp_assessment_completed ORDER BY completed_completed DESC LIMIT 1"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Assessment Record Count",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT COUNT(*) AS AssessmentCount FROM fusion_avery.cp_assessment_completed;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Resident Record Count",
+						"description": "",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Stored procedure1",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT COUNT(*) AS ResidentCount FROM fusion_avery.serviceuser;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stored procedure1",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Latest Assessment DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Assessment Record Count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Fusion].[Insert$DataTransferCheck]",
+							"storedProcedureParameters": {
+								"ColumnName": {
+									"value": "completed_completed ",
+									"type": "String"
+								},
+								"LatestDateTime": {
+									"value": {
+										"value": "@activity('Latest Assessment DateTime').output.firstRow.completed_completed ",
+										"type": "Expression"
+									},
+									"type": "DateTime"
+								},
+								"RecordCount": {
+									"value": {
+										"value": "@activity('Assessment Record Count').output.firstRow.AssessmentCount ",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"TableName": {
+									"value": "cp_assessment_completed",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Latest Resident In",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Stored procedure1",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT DateIn FROM fusion_avery.serviceuser ORDER BY ServiceUser_ID DESC LIMIT 1;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stored procedure2",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Resident Record Count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Latest Resident In",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Fusion].[Insert$DataTransferCheck]",
+							"storedProcedureParameters": {
+								"ColumnName": {
+									"value": "DateIn",
+									"type": "String"
+								},
+								"LatestDateTime": {
+									"value": {
+										"value": "@activity('Latest Resident In').output.firstRow.DateIn",
+										"type": "Expression"
+									},
+									"type": "DateTime"
+								},
+								"RecordCount": {
+									"value": {
+										"value": "@activity('Resident Record Count').output.firstRow.ResidentCount",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"TableName": {
+									"value": "serviceuser",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Fusion"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/FusionMySQL')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Fusion_Move_Files_To_VM')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -79224,6 +79478,47 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Exchequer_Details')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Monday_0830am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Fusion_DataImportCheck",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-02-23T17:51:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								8
+							],
+							"weekDays": [
+								"Monday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Fusion_DataImportCheck')]"
 			]
 		},
 		{

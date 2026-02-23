@@ -4767,6 +4767,257 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Fusion_DataImportCheck')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Checks the data load from Fusion to our own instance of the Fusion MySQL DB",
+				"activities": [
+					{
+						"name": "Latest Assessment DateTime",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT completed_completed FROM fusion_avery.cp_assessment_completed ORDER BY completed_completed DESC LIMIT 1"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Assessment Record Count",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT COUNT(*) AS AssessmentCount FROM fusion_avery.cp_assessment_completed;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Resident Record Count",
+						"description": "",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Stored procedure1",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT COUNT(*) AS ResidentCount FROM fusion_avery.serviceuser;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stored procedure1",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Latest Assessment DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Assessment Record Count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Fusion].[Insert$DataTransferCheck]",
+							"storedProcedureParameters": {
+								"ColumnName": {
+									"value": "completed_completed ",
+									"type": "String"
+								},
+								"LatestDateTime": {
+									"value": {
+										"value": "@activity('Latest Assessment DateTime').output.firstRow.completed_completed ",
+										"type": "Expression"
+									},
+									"type": "DateTime"
+								},
+								"RecordCount": {
+									"value": {
+										"value": "@activity('Assessment Record Count').output.firstRow.AssessmentCount ",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"TableName": {
+									"value": "cp_assessment_completed",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Latest Resident In",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Stored procedure1",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT DateIn FROM fusion_avery.serviceuser ORDER BY ServiceUser_ID DESC LIMIT 1;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stored procedure2",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Resident Record Count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Latest Resident In",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Fusion].[Insert$DataTransferCheck]",
+							"storedProcedureParameters": {
+								"ColumnName": {
+									"value": "DateIn",
+									"type": "String"
+								},
+								"LatestDateTime": {
+									"value": {
+										"value": "@activity('Latest Resident In').output.firstRow.DateIn",
+										"type": "Expression"
+									},
+									"type": "DateTime"
+								},
+								"RecordCount": {
+									"value": {
+										"value": "@activity('Resident Record Count').output.firstRow.ResidentCount",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"TableName": {
+									"value": "serviceuser",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Fusion"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_GRG_ACCOUNT')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -10231,95 +10482,6 @@
 					"name": "Yardi/YardiStage"
 				},
 				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Homes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies Homes table from AH1 to AH2 and also updates HomesID's in TRANSFORM_DB Avery.HomeID",
-				"activities": [
-					{
-						"name": "Copy AH1 data to AH2",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AH1_Homes-AH2_Homes",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update HomeID table",
-						"description": "Updates Avery.HomeDetails table in the TRANSFORM_DB with latest data ",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy AH1 data to AH2",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Transform_HomeDetails",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update Occupancy on AH2",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Update HomeID table",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AH1_Occupancy",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Avery"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-10T09:35:49Z"
 			},
 			"dependsOn": []
 		}
