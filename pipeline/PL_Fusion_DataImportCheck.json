@@ -237,7 +237,7 @@
 				}
 			},
 			{
-				"name": "Lookup1",
+				"name": "Results Lookup",
 				"type": "Lookup",
 				"dependsOn": [
 					{
@@ -258,7 +258,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "SELECT *\r\nFROM\r\n    Fusion.DataTransferCheck",
+						"sqlReaderQuery": "SELECT \n    TableName, \n    LatestDateTime, \n    RecordDiff\nFROM\n    Fusion.DataTransferCheck\nWHERE\n    CAST(CheckDate AS DATE) = CAST(GETDATE() AS DATE)",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
@@ -278,7 +278,7 @@
 				"type": "ExecutePipeline",
 				"dependsOn": [
 					{
-						"activity": "Lookup1",
+						"activity": "For Each Result",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -296,19 +296,65 @@
 					"waitOnCompletion": true,
 					"parameters": {
 						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-						"Message": "Fusion Data Transfer Message",
+						"Message": {
+							"value": "@concat(\n    '<b>Fusion Data Checked:</b><br/><br/>',\n    join(variables('EmailMessage'), '<br/>')\n)",
+							"type": "Expression"
+						},
 						"Colour": "Yellow",
-						"PipelineName": "@pipeline().Pipeline",
-						"PipelineRunID": "@pipeline().RunId",
-						"pStepFailed": {
-							"value": "\"\"",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
 							"type": "Expression"
 						},
 						"Subject": "Fusion Data Transfer"
 					}
 				}
+			},
+			{
+				"name": "For Each Result",
+				"description": "Add to a table to be given to the email Activity",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Results Lookup",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Results Lookup').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Append Result to Var",
+							"type": "AppendVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "EmailMessage",
+								"value": {
+									"value": "@concat(\n    'Table: ', item().TableName,\n    ' | Record Diff: ', string(item().RecordDiff),\n    ' | LatestDateTime: ', formatDateTime(item().LatestDateTime,'yyyy-MM-dd')\n)",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
 			}
 		],
+		"variables": {
+			"EmailMessage": {
+				"type": "Array"
+			}
+		},
 		"folder": {
 			"name": "Fusion"
 		},
