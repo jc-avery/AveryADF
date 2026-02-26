@@ -28862,7 +28862,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblEmpJobs"
+								"pStepFailed": "STGtblEmpJobs",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -28902,7 +28903,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblEmployees"
+								"pStepFailed": "STGtblEmployees",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -28942,7 +28944,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblPayrollData"
+								"pStepFailed": "STGtblPayrollData",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -28982,7 +28985,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblPeriods"
+								"pStepFailed": "STGtblPeriods",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -29022,7 +29026,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblRates"
+								"pStepFailed": "STGtblRates",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -29062,7 +29067,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblShifts"
+								"pStepFailed": "STGtblShifts",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -29102,7 +29108,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblTAData"
+								"pStepFailed": "STGtblTAData",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -29142,7 +29149,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "tblHome"
+								"pStepFailed": "tblHome",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -29644,7 +29652,8 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": "STGtblCalender"
+								"pStepFailed": "STGtblCalender",
+								"Subject": "Pipeline Activity Failed"
 							}
 						}
 					},
@@ -36066,7 +36075,7 @@
 						}
 					},
 					{
-						"name": "Lookup1",
+						"name": "Results Lookup",
 						"type": "Lookup",
 						"dependsOn": [
 							{
@@ -36087,7 +36096,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT *\r\nFROM\r\n    Fusion.DataTransferCheck",
+								"sqlReaderQuery": "SELECT \n    TableName, \n    LatestDateTime, \n    RecordDiff\nFROM\n    Fusion.DataTransferCheck\nWHERE\n    CAST(CheckDate AS DATE) = CAST(GETDATE() AS DATE)",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -36107,7 +36116,7 @@
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Lookup1",
+								"activity": "For Each Result",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -36125,7 +36134,10 @@
 							"waitOnCompletion": true,
 							"parameters": {
 								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Fusion Data Transfer Message",
+								"Message": {
+									"value": "@concat(\n    '<b>Fusion Data Checked:</b><br/><br/>',\n    join(variables('EmailMessage'), '<br/>')\n)",
+									"type": "Expression"
+								},
 								"Colour": "Yellow",
 								"PipelineName": {
 									"value": "@pipeline().Pipeline",
@@ -36135,17 +36147,54 @@
 									"value": "@pipeline().RunId",
 									"type": "Expression"
 								},
-								"pStepFailed": {
-									"value": "\"\"",
-									"type": "Expression"
-								},
 								"Subject": "Fusion Data Transfer"
 							}
+						}
+					},
+					{
+						"name": "For Each Result",
+						"description": "Add to a table to be given to the email Activity",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Results Lookup",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Results Lookup').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Append Result to Var",
+									"type": "AppendVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "EmailMessage",
+										"value": {
+											"value": "@concat(\n    'Table: ', item().TableName,\n    ' | Record Diff: ', string(item().RecordDiff),\n    ' | LatestDateTime: ', formatDateTime(item().LatestDateTime,'yyyy-MM-dd')\n)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
 						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EmailMessage": {
+						"type": "Array"
+					}
 				},
 				"folder": {
 					"name": "Fusion"
@@ -65022,7 +65071,7 @@
 							"headers": {},
 							"url": "https://prod-03.uksouth.logic.azure.com:443/workflows/0a68dc6512a34064a348fc3ae0b5f808/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=roREdR40o4TL4LlAWfBRXFl4FqFOifD2bKaIC-yucN4",
 							"body": {
-								"value": "{\n    \"emailTo\": \"@{pipeline().parameters.EmailTo}\",\n     \"message\": \"@{pipeline().parameters.Message}\",\n    \"colour\": \"@{pipeline().parameters.Colour}\",\n    \"pipelineName\": \"@{pipeline().parameters.PipelineName}\",\n    \"pipelineRunId\": \"@{pipeline().parameters.PipelineRunID}\",\n    \"stepFailed\": \"@{pipeline().parameters.pStepFailed}\",\n    \"time\": \"@{utcNow()}\",\n    \"subject\": \"@{pipeline().parameters.Subject}\"}\"\n}",
+								"value": "{\n    \"emailTo\": \"@{pipeline().parameters.EmailTo}\",\n     \"message\": \"@{pipeline().parameters.Message}\",\n    \"colour\": \"@{pipeline().parameters.Colour}\",\n    \"pipelineName\": \"@{pipeline().parameters.PipelineName}\",\n    \"pipelineRunId\": \"@{pipeline().parameters.PipelineRunID}\",\n    \"stepFailed\": \"@{pipeline().parameters.pStepFailed}\",\n    \"time\": \"@{utcNow()}\",\n    \"subject\": \"@{pipeline().parameters.Subject}\"\n}",
 								"type": "Expression"
 							}
 						}
@@ -65053,8 +65102,7 @@
 						"defaultValue": "Pipeline RunID"
 					},
 					"pStepFailed": {
-						"type": "string",
-						"defaultValue": "Step Failed"
+						"type": "string"
 					},
 					"Subject": {
 						"type": "string",
