@@ -21,6 +21,361 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_User_Files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get User File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Does WebhookFiles User files exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Json_User_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "Process File List",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get User File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get User File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Process User Files",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": false,
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"UserID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['data']['user']['id']"
+													},
+													"sink": {
+														"name": "UserID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['employee_number']"
+													},
+													"sink": {
+														"name": "EmployeeNumber",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['created_at']"
+													},
+													"sink": {
+														"name": "CreatedDateTime",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['start_date']"
+													},
+													"sink": {
+														"name": "StartDate",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['name']"
+													},
+													"sink": {
+														"name": "UserName",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['email']"
+													},
+													"sink": {
+														"name": "Email",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['gender']['description']"
+													},
+													"sink": {
+														"name": "Gender",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['job_title']"
+													},
+													"sink": {
+														"name": "JobTitle",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['role']['name']"
+													},
+													"sink": {
+														"name": "UserRole",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['primaryEntity']['id']"
+													},
+													"sink": {
+														"name": "PrimaryEntityID",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['user']['status']['name']"
+													},
+													"sink": {
+														"name": "UserStatus",
+														"type": "String"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_YourHippo_WebHook_Json_User_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "YourHippo",
+												"Table": "Users"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Archive Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Process File List",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles', '/', 'User')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles', '/', 'Archive', '/', 'User')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Does WebhookFiles User files exists",
+						"description": "Checks there are files to process. If there are it will succeeds and carry on, if not it fails with custom failure message",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "webhook$user*.json",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Json_User_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "No Files failure",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "Does WebhookFiles User files exists",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "No User files to process",
+							"errorCode": "404"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/xPL_ColdHarbour_Rooms')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2700,125 +3055,6 @@
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
 						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Cold Harbour/Children Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_AnalysisCodes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "UPSERT Analysis Codes",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT\t \r\n\tNominal_Code.AltAccount AS AnalysisCode, \r\n\tNominal_Code.Description AS AnalysisDescription, \r\n\tNominal_Code.Account\r\nFROM\t\t \r\n\tNominal_Code (NOLOCK) \r\nWHERE\t \r\n\tNominal_Code.RecType = 'Elephant' \r\n\tAND Nominal_Code.UseFlag <> 'X' \r\n\tAND Nominal_Code.AltAccount != ''\r\n\tAND (SiteFilter = 0 OR Noml_Ref IN (SELECT LinkKey FROM Site_Join (NOLOCK) WHERE upper(LinkTable) = 'NOMINAL_CODE' AND Site_Ref = 151)) ORDER BY Nominal_Code.Account",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AnalysisCode"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AnalysisCode",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AnalysisCode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "AnalysisDescription",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AnalysisDescription",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Account",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "Account",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "AnalysisCodes"
-								}
-							}
-						]
 					}
 				],
 				"policy": {
