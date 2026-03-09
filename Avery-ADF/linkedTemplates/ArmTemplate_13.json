@@ -21,6 +21,344 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_Result_files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get Result File List",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Does WebhookFiles Result files exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Json_Result_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "Process File List",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Result File List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Result File List').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Process Result Files",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": false,
+												"wildcardFileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												},
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"ResultID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"path": "$['data']['result']['id']"
+													},
+													"sink": {
+														"name": "ResultID",
+														"type": "Int32"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['passed']"
+													},
+													"sink": {
+														"name": "Passed",
+														"type": "Boolean"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['grade']"
+													},
+													"sink": {
+														"name": "Grade",
+														"type": "String"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['score']"
+													},
+													"sink": {
+														"name": "Score",
+														"type": "Decimal"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['completed_at']"
+													},
+													"sink": {
+														"name": "CompletedAt",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['expires_at']"
+													},
+													"sink": {
+														"name": "ExpiresAt",
+														"type": "DateTime"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['has_expired']"
+													},
+													"sink": {
+														"name": "HasExpired",
+														"type": "Boolean"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['course']['id']"
+													},
+													"sink": {
+														"name": "CourseID",
+														"type": "Int32"
+													}
+												},
+												{
+													"source": {
+														"path": "$['data']['result']['user']['id']"
+													},
+													"sink": {
+														"name": "UserID",
+														"type": "String"
+													}
+												}
+											],
+											"collectionReference": ""
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_YourHippo_WebHook_Json_Result_File",
+											"type": "DatasetReference",
+											"parameters": {}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "YourHippo",
+												"Table": "StageResults"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Archive Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Process File List",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"dataIntegrationUnits": 4
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles', '/', 'Result')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": {
+										"value": "@concat('WebhookFiles', '/', 'Archive', '/', 'Result')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Does WebhookFiles Result files exists",
+						"description": "Checks there are files to process. If there are it will succeeds and carry on, if not it fails with custom failure message",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "webhook$result*.json",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Json_Result_File",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						}
+					},
+					{
+						"name": "No Files failure",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "Does WebhookFiles Result files exists",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "No Result files to process",
+							"errorCode": "404"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/X_PL_YourHippo_Process_WebHook_User_Files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2058,6 +2396,358 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_All_Users')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Loads All users from the file created by the Azure App",
+				"activities": [
+					{
+						"name": "Users",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE Sona.STG_Users",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['work_email']"
+										},
+										"sink": {
+											"name": "work_email",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['last_name']"
+										},
+										"sink": {
+											"name": "last_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['external_id']"
+										},
+										"sink": {
+											"name": "external_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['marital_status']"
+										},
+										"sink": {
+											"name": "marital_status",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['active']"
+										},
+										"sink": {
+											"name": "active",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['preferred_name']"
+										},
+										"sink": {
+											"name": "preferred_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['final_date_of_employment']"
+										},
+										"sink": {
+											"name": "final_date_of_employment",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['middle_name']"
+										},
+										"sink": {
+											"name": "middle_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['exclude_from_payroll']"
+										},
+										"sink": {
+											"name": "exclude_from_payroll",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['administrative_org_unit']['id']"
+										},
+										"sink": {
+											"name": "administrative_org_unit_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['agency']['id']"
+										},
+										"sink": {
+											"name": "agency_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['first_name']"
+										},
+										"sink": {
+											"name": "first_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['title']"
+										},
+										"sink": {
+											"name": "title",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['legal_first_name']"
+										},
+										"sink": {
+											"name": "legal_first_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['organisation_user_id']"
+										},
+										"sink": {
+											"name": "organisation_user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sex']"
+										},
+										"sink": {
+											"name": "sex",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['identifies_as']"
+										},
+										"sink": {
+											"name": "identifies_as",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['date_of_birth']"
+										},
+										"sink": {
+											"name": "date_of_birth",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['state']"
+										},
+										"sink": {
+											"name": "state",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_All_users",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": "Sona All Users.json"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Users"
+								}
+							}
+						]
+					},
+					{
+						"name": "Users_types_of_work",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Users",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE Sona.STG_Users_Types_Of_work",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['organisation_user_id']"
+										},
+										"sink": {
+											"name": "organisation_user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['types_of_work'][0]['id']"
+										},
+										"sink": {
+											"name": "user_types_pf_work_ido",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_All_users",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": "Sona All Users.json"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Users_Types_Of_work"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2488,586 +3178,6 @@
 				"lastPublishTime": "2024-10-03T15:41:31Z"
 			},
 			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Broadshield_Process_Data')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Uses the daily Json files from Broadshield API to update the Current table with an Upsert operation. And add new/updated records to the History tables.",
-				"activities": [
-					{
-						"name": "Update Current data",
-						"description": "Upserts data from the JSON files to the current tables",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_JSON_SQL_Current",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Create History records",
-						"description": "Inserts any new or updated records into the history tables.",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Update Current data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_BroadShield_JSON_SQL_History",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Broadshield"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-08T10:01:01Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_Allocation')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Transfers the allocation data from CH to Transform_DB",
-				"activities": [
-					{
-						"name": "Copy Data to STG",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT\r\n\tAllocations.[AL_DET_REF]\r\n\t,Allocations.[AL_ACCOUNT] AS AccNo\r\n\t,Allocations.[AL_CREDATT] AS CreatedAt\r\n\t,Allocations.[AL_DATE] AS TransactionDate\r\n\t,Allocations.[AL_PAYDAY] AS DateAllocated\r\n\t,Allocations.[AL_PAYIND]\r\n\t,Allocations.[AL_POSTREF] AS POST_REF\r\n\t,Allocations.[AL_REF1] AS Reference1\r\n\t,Allocations.[AL_REF2] AS Reference2\r\n\t,Allocations.[AL_TYPE] \r\n\t,CASE \r\n\t\tWHEN Allocations.[AL_TYPE] = 'A' THEN 'Adjustment - System'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'C' THEN 'Credit'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'I' THEN 'Invoice'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'J' THEN 'Adjustment - User'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'R' THEN 'Receipt'\r\n\t\tWHEN Allocations.[AL_TYPE] = 'N' THEN 'Adjustment - System'\r\n\t\tELSE ''\r\n\tEND AS TransactionType\r\n\t,Allocations.[AL_VAL] AS AllocationValue\r\n\t,Allocations.[MEMO] AS AllocationMemo\r\nFROM \r\n\tInvAlloc AS Allocations WITH (NOLOCK)",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE ColdHarbour.STGAllocations",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AL_DET_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "AL_DET_REF",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "AccNo",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AccNo",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedAt",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreatedAt",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "TransactionDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "TransactionDate",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "DateAllocated",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "DateAllocated",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "AL_PAYIND",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AL_PAYIND",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "POST_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "POST_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "AL_TYPE",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AL_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Reference1",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "Reference1",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Reference2",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "Reference2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TransactionType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TransactionType",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AllocationValue",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 9,
-											"precision": 19
-										},
-										"sink": {
-											"name": "AllocationValue",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 9,
-											"precision": 19
-										}
-									},
-									{
-										"source": {
-											"name": "AllocationMemo",
-											"type": "String",
-											"physicalType": "text"
-										},
-										"sink": {
-											"name": "AllocationMemo",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "STGAllocations"
-								}
-							}
-						]
-					},
-					{
-						"name": "Wait1",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Copy Data to STG",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 5
-						}
-					},
-					{
-						"name": "Upsert",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Wait1",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AL_DET_REF"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AL_DET_REF",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "AL_DET_REF",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "AccNo",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AccNo",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedAt",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreatedAt",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "TransactionDate",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "TransactionDate",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "DateAllocated",
-											"type": "DateTime",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "DateAllocated",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "AL_PAYIND",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AL_PAYIND",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "POST_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "POST_REF",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Reference1",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Reference1",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Reference2",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Reference2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AL_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AL_TYPE",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TransactionType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TransactionType",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AllocationValue",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 9,
-											"precision": 19
-										},
-										"sink": {
-											"name": "AllocationValue",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 9,
-											"precision": 19
-										}
-									},
-									{
-										"source": {
-											"name": "AllocationMemo",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AllocationMemo",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "STGAllocations"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "Allocations"
-								}
-							}
-						]
-					},
-					{
-						"name": "Clear STG table",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Upsert",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "TRUNCATE TABLE ColdHarbour.STGAllocations"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Cold Harbour/Children Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
 		}
 	]
 }
