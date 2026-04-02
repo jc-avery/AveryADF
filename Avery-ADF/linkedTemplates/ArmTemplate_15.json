@@ -13,6 +13,461 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Fusion_DataImportCheck')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Checks the data load from Fusion to our own instance of the Fusion MySQL DB",
+				"activities": [
+					{
+						"name": "Latest Assessment DateTime",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT completed_completed FROM fusion_avery.cp_assessment_completed ORDER BY completed_completed DESC LIMIT 1"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Assessment Record Count",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT COUNT(*) AS AssessmentCount FROM fusion_avery.cp_assessment_completed;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Resident Record Count",
+						"description": "",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT COUNT(*) AS ResidentCount FROM fusion_avery.serviceuser;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "Assessment Table Details",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Latest Assessment DateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Assessment Record Count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Fusion].[Insert$DataTransferCheck]",
+							"storedProcedureParameters": {
+								"ColumnName": {
+									"value": "completed_completed ",
+									"type": "String"
+								},
+								"LatestDateTime": {
+									"value": {
+										"value": "@activity('Latest Assessment DateTime').output.firstRow.completed_completed ",
+										"type": "Expression"
+									},
+									"type": "DateTime"
+								},
+								"RecordCount": {
+									"value": {
+										"value": "@activity('Assessment Record Count').output.firstRow.AssessmentCount ",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"TableName": {
+									"value": "cp_assessment_completed",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Latest Resident In",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "MySqlSource",
+								"query": "SELECT DateIn FROM fusion_avery.serviceuser ORDER BY ServiceUser_ID DESC LIMIT 1;"
+							},
+							"dataset": {
+								"referenceName": "FusionMySQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"TableName": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "ServiceUser Table Details",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Resident Record Count",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Latest Resident In",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Fusion].[Insert$DataTransferCheck]",
+							"storedProcedureParameters": {
+								"ColumnName": {
+									"value": "DateIn",
+									"type": "String"
+								},
+								"LatestDateTime": {
+									"value": {
+										"value": "@activity('Latest Resident In').output.firstRow.DateIn",
+										"type": "Expression"
+									},
+									"type": "DateTime"
+								},
+								"RecordCount": {
+									"value": {
+										"value": "@activity('Resident Record Count').output.firstRow.ResidentCount",
+										"type": "Expression"
+									},
+									"type": "Int32"
+								},
+								"TableName": {
+									"value": "serviceuser",
+									"type": "String"
+								}
+							}
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Results Lookup",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Assessment Table Details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "ServiceUser Table Details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    TableName, \n    LatestDateTime, \n    RecordDiff\nFROM\n    Fusion.DataTransferCheck\nWHERE\n    CAST(CheckDate AS DATE) = CAST(GETDATE() AS DATE)",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Send Email",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "For Each Result",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": {
+									"value": "@concat(\n    '<b>Fusion Data Checked:</b><br/><br/>',\n    join(variables('EmailMessage'), '<br/>')\n)",
+									"type": "Expression"
+								},
+								"Colour": "Yellow",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"Subject": "Fusion Data Transfer"
+							}
+						}
+					},
+					{
+						"name": "For Each Result",
+						"description": "Add to a table to be given to the email Activity",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Results Lookup",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Results Lookup').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Append Result to Var",
+									"type": "AppendVariable",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "EmailMessage",
+										"value": {
+											"value": "@concat(\n    'Table: ', item().TableName,\n    ' | Record Diff: ', string(item().RecordDiff),\n    ' | LatestDateTime: ', formatDateTime(item().LatestDateTime,'yyyy-MM-dd')\n)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Execute Assessment Failure Email",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Assessment Record Count",
+								"dependencyConditions": [
+									"Failed"
+								]
+							},
+							{
+								"activity": "Latest Assessment DateTime",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": {
+									"value": "Failed to lookup Assessment Record Count/Latest DateTime",
+									"type": "Expression"
+								},
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Assessment Lookups",
+								"Subject": "Fusion Data Transfer - Activity Failed"
+							}
+						}
+					},
+					{
+						"name": "Execute Resident Failure Email",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Resident Record Count",
+								"dependencyConditions": [
+									"Failed"
+								]
+							},
+							{
+								"activity": "Latest Resident In",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": {
+									"value": "Failed to lookup Resident Record Count/Latest Admission Date",
+									"type": "Expression"
+								},
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Resident Lookups",
+								"Subject": "Fusion Data Transfer - Activity Failed"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EmailMessage": {
+						"type": "Array"
+					}
+				},
+				"folder": {
+					"name": "Fusion"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_GRG_ACCOUNT')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -10362,86 +10817,6 @@
 				},
 				"folder": {
 					"name": "Yardi/Exchequer"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/XPL_CH_Bill_Profile_With_Calendar')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export billing profiles and Calendars used",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\n\tP.PRO_CODE AS profile_code,\n\tP.PRODESC AS profile_description,\n\tCALENDAR.CAL_REF AS Cal_Ref,\n\tCALENDAR.CAL_CODE AS calendar_code,\n\tCALENDAR.CAL_DESC AS calendar_description\t\nFROM \n\tFUNDSRC_HD AS ACC\n\n\tLEFT JOIN PROFILES AS P\n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN CONTACT_HD AS CONTACT\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\nWHERE\n\tP.FSTYPE = 401",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('LA Billing Profile Calendar Usage - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
 				},
 				"annotations": []
 			},
