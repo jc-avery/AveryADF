@@ -13,6 +13,92 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Execute Pipeline1",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Remove CR and LF",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_AEMS_Enquiries_Export",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Execute Pipeline2",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Execute Pipeline1",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_AEMS_Export_PBData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Remove CR and LF",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[AEMS].[Enquiries$RemoveHiddenCharacters]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "AEMS"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-04-29T16:06:59Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Artisan')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3159,7 +3245,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details_83050FIX')]",
+			"name": "[concat(parameters('factoryName'), '/xPL_Exchequer_Details_83050FIX')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -5272,6 +5358,42 @@
 										],
 										"scriptBlockExecutionTimeout": "02:00:00"
 									}
+								},
+								{
+									"name": "Log Retry",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy Data to AH2",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "EXEC Exchequer.DetailsRetry$LogFailure @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = '@{item().ExchCode}'",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
 								}
 							]
 						}
@@ -5283,7 +5405,7 @@
 							{
 								"activity": "For Each Company",
 								"dependencyConditions": [
-									"Succeeded"
+									"Completed"
 								]
 							}
 						],
@@ -6684,6 +6806,39 @@
 										],
 										"scriptBlockExecutionTimeout": "02:00:00"
 									}
+								},
+								{
+									"name": "Log Retry",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy Data to AH2",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": "EXEC Exchequer.DetailsRetry$LogFailure @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = '@{item().ExchCode}'"
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
 								}
 							]
 						}
@@ -6695,7 +6850,7 @@
 							{
 								"activity": "For Each Company",
 								"dependencyConditions": [
-									"Succeeded"
+									"Completed"
 								]
 							}
 						],
@@ -7376,210 +7531,6 @@
 								}
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"Exch_Schema": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Exchequer/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Users')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Export the Users from the Exchequer System for all companies in the Homes table",
-				"activities": [
-					{
-						"name": "Company List and Previous Year",
-						"description": "List company codes and the previous year, used to refresh the details data for the previous financial year BEFORE running the Current Fin Year",
-						"type": "Lookup",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n\tHomeID, \n\tHomename, \n\tExchCode\nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "For Each Company",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Company List and Previous Year",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Company List and Previous Year').output.value",
-								"type": "Expression"
-							},
-							"isSequential": true,
-							"activities": [
-								{
-									"name": "Copy Users to AH2",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,M.varCode1Trans1 AS UserName\n\t,M.UserName AS FullName\n\t,M.EmailAddr\nFROM \n\t@{item().ExchCode}.MLOCSTK AS M\nWHERE \n\tM.RecPfix = 'P' \n\tAND M.SubType = 'D'\nORDER BY \n\tM.varCode1Trans1 ASC",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "AzureSqlSink",
-											"writeBehavior": "upsert",
-											"upsertSettings": {
-												"useTempDB": true,
-												"keys": [
-													"ExchCompanyCode",
-													"UserName"
-												]
-											},
-											"sqlWriterUseTableLock": false,
-											"disableMetricsCollection": false
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"mappings": [
-												{
-													"source": {
-														"name": "ExchCompanyCode",
-														"type": "String",
-														"physicalType": "varchar"
-													},
-													"sink": {
-														"name": "ExchCompanyCode",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "UserName",
-														"type": "String",
-														"physicalType": "varchar"
-													},
-													"sink": {
-														"name": "UserName",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "FullName",
-														"type": "String",
-														"physicalType": "varchar"
-													},
-													"sink": {
-														"name": "FullName",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "EmailAddr",
-														"type": "String",
-														"physicalType": "varchar"
-													},
-													"sink": {
-														"name": "Email",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "HomeID",
-														"type": "String",
-														"physicalType": "varchar"
-													},
-													"sink": {
-														"name": "HomeID",
-														"type": "Int32",
-														"physicalType": "int"
-													}
-												}
-											],
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_Exchequer",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_AH2_TRANSFORM_DB",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "Exchequer",
-												"Table": "ExchequerUsers"
-											}
-										}
-									]
-								}
-							]
 						}
 					}
 				],
