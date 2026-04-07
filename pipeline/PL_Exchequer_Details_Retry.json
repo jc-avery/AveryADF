@@ -1,0 +1,141 @@
+{
+	"name": "PL_Exchequer_Details_Retry",
+	"properties": {
+		"description": "Retries those companies that failed and were logged for a retry from the PL_Exchequer_Details Pipeline",
+		"activities": [
+			{
+				"name": "Retry Previous Fin Year",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Exchequer_Details_Retry_PreviousYear",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Retry Current FIN Year",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Wait 60s",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Exchequer_Details_Retry_CurrentYear",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Wait 60s",
+				"type": "Wait",
+				"dependsOn": [
+					{
+						"activity": "Retry Previous Fin Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"waitTimeInSeconds": 60
+				}
+			},
+			{
+				"name": "Prev Yr Email Notification",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Retry Previous Fin Year",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
+						"Colour": "Red",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "Retry Previous Fin Year"
+					}
+				}
+			},
+			{
+				"name": "Current Yr Email Notification",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Retry Current FIN Year",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
+						"Colour": "Red",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "Retry Current Fin Year"
+					}
+				}
+			}
+		],
+		"folder": {
+			"name": "Exchequer"
+		},
+		"annotations": []
+	}
+}
