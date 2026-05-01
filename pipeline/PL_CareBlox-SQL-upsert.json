@@ -205,13 +205,9 @@
 						}
 					},
 					"sink": {
-						"type": "ParquetSink",
-						"storeSettings": {
-							"type": "AzureBlobStorageWriteSettings"
-						},
-						"formatSettings": {
-							"type": "ParquetWriteSettings"
-						}
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false
 					},
 					"enableStaging": false,
 					"translator": {
@@ -431,8 +427,12 @@
 				],
 				"outputs": [
 					{
-						"referenceName": "DS_AZStorage_careblox_parquet",
-						"type": "DatasetReference"
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "CareBlox",
+							"Table": "tblTypes"
+						}
 					}
 				]
 			},
@@ -4513,6 +4513,724 @@
 				"userProperties": [],
 				"typeProperties": {
 					"message": "tblAbsenceCodes Error",
+					"errorCode": "101"
+				}
+			},
+			{
+				"name": "tblEmpContracts",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "tblAbsenceCodes",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"additionalColumns": [
+							{
+								"name": "SourceFileName",
+								"value": "$$FILEPATH"
+							}
+						],
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "ParquetReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "upsert",
+						"upsertSettings": {
+							"useTempDB": true,
+							"keys": [
+								"LocalID"
+							]
+						},
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "LocalID",
+									"type": "Int64",
+									"physicalType": "INT64"
+								},
+								"sink": {
+									"name": "LocalID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "ContractID",
+									"type": "Int64",
+									"physicalType": "INT64"
+								},
+								"sink": {
+									"name": "ContractID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "ContractName",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "ContractName",
+									"type": "String",
+									"physicalType": "nvarchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ContractDescription",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "ContractDescription",
+									"type": "String",
+									"physicalType": "nvarchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AvailableTo",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "AvailableTo",
+									"type": "String",
+									"physicalType": "nvarchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AvailableToGroup",
+									"type": "Int64",
+									"physicalType": "INT64"
+								},
+								"sink": {
+									"name": "AvailableToGroup",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "SourceFileName",
+									"type": "String"
+								},
+								"sink": {
+									"name": "SourceFileName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AZStorage_careblox_parquet_file",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": "tblEmpContracts$",
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Careblox",
+							"Table": "tblEmpContracts"
+						}
+					}
+				]
+			},
+			{
+				"name": "tblEmpContracts Error",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "tblEmpContracts",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": {
+							"value": "@activity('tblEmpContracts').output.errors[0].Message",
+							"type": "Expression"
+						},
+						"Colour": "Red",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "tblEmpContracts"
+					}
+				}
+			},
+			{
+				"name": "tblEmpContracts Failure",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "tblEmpContracts Error",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": "tblEmpContracts Error",
+					"errorCode": "101"
+				}
+			},
+			{
+				"name": "tblBreakRules",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "tblEmpContracts",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "ParquetSource",
+						"additionalColumns": [
+							{
+								"name": "SourceFileName",
+								"value": "$$FILEPATH"
+							}
+						],
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "ParquetReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "upsert",
+						"upsertSettings": {
+							"useTempDB": true,
+							"keys": [
+								"AutoID"
+							]
+						},
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "AutoID",
+									"type": "Int64",
+									"physicalType": "INT64"
+								},
+								"sink": {
+									"name": "AutoID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "RuleNo",
+									"type": "Int64",
+									"physicalType": "INT64"
+								},
+								"sink": {
+									"name": "RuleNo",
+									"type": "Byte",
+									"physicalType": "tinyint"
+								}
+							},
+							{
+								"source": {
+									"name": "RuleTitle",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "RuleTitle",
+									"type": "String",
+									"physicalType": "nvarchar"
+								}
+							},
+							{
+								"source": {
+									"name": "RuleDescription",
+									"type": "String",
+									"physicalType": "UTF8"
+								},
+								"sink": {
+									"name": "RuleDescription",
+									"type": "String",
+									"physicalType": "nvarchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AvailableToGroup",
+									"type": "Int64",
+									"physicalType": "INT64"
+								},
+								"sink": {
+									"name": "AvailableToGroup",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "SourceFileName",
+									"type": "String"
+								},
+								"sink": {
+									"name": "SourceFileName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AZStorage_careblox_parquet_file",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": "tblBreakRules$",
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Careblox",
+							"Table": "tblBreakRules"
+						}
+					}
+				]
+			},
+			{
+				"name": "tblBreakRules Error",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "tblBreakRules",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": {
+							"value": "@activity('tblBreakRules').output.errors[0].Message",
+							"type": "Expression"
+						},
+						"Colour": "Red",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "tblBreakRules"
+					}
+				}
+			},
+			{
+				"name": "tblBreakRules Failure",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "tblBreakRules Error",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": "tblBreakRules Error",
+					"errorCode": "101"
+				}
+			},
+			{
+				"name": "tblAbsenceHours",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "tblBreakRules",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT [AbsenceHoursID]\n      ,[AbsenceRecordID]\n      ,[LocationID]\n      ,[EmployeeID]\n      ,[RecordType]\n      ,DATEADD(SECOND, [ShiftStart] % 86400, DATEADD(DAY, [ShiftStart] / 86400, '1970-01-01 00:00:00')) AS [ShiftStart]\n      ,DATEADD(SECOND, [ShiftStart] % 86400, DATEADD(DAY, [ShiftStart] / 86400, '1970-01-01 00:00:00')) AS [ShiftEnd]\n      ,[Minutes]\n      ,[Status]\n      ,[RoleID]\n      ,[TypeID]\n      ,[Rate]\n      ,[SourceFileName]\n  FROM [CareBlox].[STGtblAbsenceHours]\n\n\n",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "upsert",
+						"upsertSettings": {
+							"useTempDB": true,
+							"keys": [
+								"AbsenceHoursID"
+							]
+						},
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "AbsenceHoursID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "AbsenceHoursID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								}
+							},
+							{
+								"source": {
+									"name": "AbsenceRecordID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								},
+								"sink": {
+									"name": "AbsenceRecordID",
+									"type": "Int64",
+									"physicalType": "bigint"
+								}
+							},
+							{
+								"source": {
+									"name": "LocationID",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "LocationID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "EmployeeID",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "EmployeeID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "RecordType",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "RecordType",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ShiftStart",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "ShiftStart",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "ShiftEnd",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								},
+								"sink": {
+									"name": "ShiftEnd",
+									"type": "DateTime",
+									"physicalType": "datetime"
+								}
+							},
+							{
+								"source": {
+									"name": "Minutes",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "Minutes",
+									"type": "Double",
+									"physicalType": "float"
+								}
+							},
+							{
+								"source": {
+									"name": "Status",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "Status",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "RoleID",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "RoleID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "TypeID",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "TypeID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "Rate",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "Rate",
+									"type": "Double",
+									"physicalType": "float"
+								}
+							},
+							{
+								"source": {
+									"name": "SourceFileName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "SourceFileName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB_Query",
+						"type": "DatasetReference"
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "CareBlox",
+							"Table": "tblAbsenceHours"
+						}
+					}
+				]
+			},
+			{
+				"name": "tblAbsenceHours Error",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "tblAbsenceHours",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "UT_Send_Email_Param",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+						"Message": {
+							"value": "@activity('tblAbsenceHours').output.errors[0].Message",
+							"type": "Expression"
+						},
+						"Colour": "Red",
+						"PipelineName": {
+							"value": "@pipeline().Pipeline",
+							"type": "Expression"
+						},
+						"PipelineRunID": {
+							"value": "@pipeline().RunId",
+							"type": "Expression"
+						},
+						"pStepFailed": "tblAbsenceHours"
+					}
+				}
+			},
+			{
+				"name": "tblAbsenceHours Failure",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "tblAbsenceHours Error",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": "tblAbsenceHours Error",
 					"errorCode": "101"
 				}
 			}
