@@ -6,20 +6,638 @@
 			"type": "string",
 			"metadata": "Data Factory name",
 			"defaultValue": "Avery-ADF"
-		},
-		"AveryblobFileShare_connectionString": {
-			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'AveryblobFileShare'"
-		},
-		"AveryblobStorageAccount_connectionString": {
-			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'AveryblobStorageAccount'"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_AllResults')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ResultID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "ResultID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['passed']"
+										},
+										"sink": {
+											"name": "Passed",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "$['score']"
+										},
+										"sink": {
+											"name": "Score",
+											"type": "Decimal"
+										}
+									},
+									{
+										"source": {
+											"path": "$['completed_at']"
+										},
+										"sink": {
+											"name": "CompletedAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['expires_at']"
+										},
+										"sink": {
+											"name": "ExpiresAt",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['course']['id']"
+										},
+										"sink": {
+											"name": "CourseID",
+											"type": "Int32"
+										}
+									},
+									{
+										"source": {
+											"path": "$['user']['id']"
+										},
+										"sink": {
+											"name": "UserID",
+											"type": "String"
+										}
+									}
+								]
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_AllResults",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "Results"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Compliance')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Loads the monthly Compliance report to stage and updates compliance table and inserts snapshot of the compliance data into snapshot table. Ran manually due to the delivery of the report from Yourhippo needing to be manually donwloaded.",
+				"activities": [
+					{
+						"name": "Insert into Stage",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "ExcelSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "Entity",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "Entity",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Staff",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "Staff",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Compliance",
+											"type": "String",
+											"physicalType": "String"
+										},
+										"sink": {
+											"name": "ComplianceScore",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_YourHippo_ComplianceReport",
+								"type": "DatasetReference",
+								"parameters": {
+									"File": "2026-04-09/Compliance Report-Jon Crockett-14_47 09-04-2026.xlsx"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "STG_MonthlyCompliance"
+								}
+							}
+						]
+					},
+					{
+						"name": "Upsert Current Compliance",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Insert into Stage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\n    E.HomeID,\n    D.Homename,\n    MAX(C.Staff) AS StaffCount,\n    --C.ComplianceScore,\n    --TRY_CONVERT(NUMERIC(4,2), REPLACE(C.ComplianceScore,)\n    MAX(TRY_CONVERT(NUMERIC(4,2),REPLACE(C.ComplianceScore, '%', '')) / 100) AS ComplianceScore\nFROM \n    YourHippo.STG_MonthlyCompliance AS C\n\n    LEFT JOIN YourHippo.Entity AS E\n        ON E.EntityName = C.Entity\n\n    LEFT JOIN Avery.HomeDetails AS D\n        ON D.HomeID = E.HomeID\nWHERE\n    D.HomeID IS NOT NULL\nGROUP BY\n    E.HomeID,\n    D.Homename",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"HomeID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Homename",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "StaffCount",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "StaffCount",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ComplianceScore",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 6,
+											"precision": 8
+										},
+										"sink": {
+											"name": "ComplianceScore",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 4
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "CurrentCompliance"
+								}
+							}
+						]
+					},
+					{
+						"name": "Compliance SnapShot",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Upsert Current Compliance",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"additionalColumns": [
+									{
+										"name": "SnapShotDataParam",
+										"value": {
+											"value": "@pipeline().parameters.SnapshotDate",
+											"type": "Expression"
+										}
+									}
+								],
+								"sqlReaderQuery": "DECLARE @Now AS DATETIME = GETDATE()\nDECLARE @SnapShotDate AS DATE = DATEADD(DAY, -1, @Now)\n\nSELECT\n    --@SnapShotDate AS SnapShotDate, --Using Parameter in Pipeline as will be run manually\n    @Now AS SnapShotTaken,\n    E.HomeID,\n    D.Homename,\n    MAX(C.Staff) AS StaffCount,\n    --C.ComplianceScore,\n    --TRY_CONVERT(NUMERIC(4,2), REPLACE(C.ComplianceScore,)\n    MAX(TRY_CONVERT(NUMERIC(4,2),REPLACE(C.ComplianceScore, '%', '')) / 100) AS ComplianceScore\nFROM \n    YourHippo.STG_MonthlyCompliance AS C\n\n    LEFT JOIN YourHippo.Entity AS E\n        ON E.EntityName = C.Entity\n\n    LEFT JOIN Avery.HomeDetails AS D\n        ON D.HomeID = E.HomeID\nWHERE\n    D.HomeID IS NOT NULL\nGROUP BY\n    E.HomeID,\n    D.Homename",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "SnapShotDataParam",
+											"type": "String"
+										},
+										"sink": {
+											"name": "SnapshotDate",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "SnapShotTaken",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "SnapShotTaken",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Homename",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "HomeName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "StaffCount",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "StaffCount",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ComplianceScore",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 6,
+											"precision": 8
+										},
+										"sink": {
+											"name": "ComplianceScore",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 3
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "YourHippo",
+									"Table": "ComplianceSnapshot"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"SnapshotDate": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Delete_Archive_Files')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Deletes files older than 4 days from the archive to prevent build up",
+				"activities": [
+					{
+						"name": "Delete Result Archive Files",
+						"type": "Delete",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": "WebhookFiles/Archive/Result"
+								}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": false,
+								"modifiedDatetimeStart": {
+									"value": "@addDays(utcNow(), -20 )",
+									"type": "Expression"
+								},
+								"modifiedDatetimeEnd": {
+									"value": "@addDays(utcNow(), -4 )",
+									"type": "Expression"
+								},
+								"enablePartitionDiscovery": false
+							}
+						}
+					},
+					{
+						"name": "Delete User Archive",
+						"type": "Delete",
+						"dependsOn": [
+							{
+								"activity": "Delete Result Archive Files",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_YourHippo_WebHook_Files",
+								"type": "DatasetReference",
+								"parameters": {
+									"Folder": "WebhookFiles/Archive/User"
+								}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": false,
+								"modifiedDatetimeStart": {
+									"value": "@addDays(utcNow(), -20 )",
+									"type": "Expression"
+								},
+								"modifiedDatetimeEnd": {
+									"value": "@addDays(utcNow(), -4 )",
+									"type": "Expression"
+								},
+								"enablePartitionDiscovery": false
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Move_WebHook_Files_Step1')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
@@ -4844,70 +5462,6 @@
 						"value": "@dataset().Table",
 						"type": "Expression"
 					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/FusionMySQL')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "OnPremFusionMySQL",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"TableName": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "Fusion"
-				},
-				"annotations": [],
-				"type": "MySqlTable",
-				"schema": [],
-				"typeProperties": {
-					"tableName": {
-						"value": "@dataset().TableName",
-						"type": "Expression"
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AveryblobFileShare')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureFileStorage",
-				"typeProperties": {
-					"connectionString": "[parameters('AveryblobFileShare_connectionString')]",
-					"fileShare": "averyblobfileshare"
-				},
-				"connectVia": {
-					"referenceName": "AveryVirtualNetworkIntegrationRuntime",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/AveryblobStorageAccount')]",
-			"type": "Microsoft.DataFactory/factories/linkedServices",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"type": "AzureBlobStorage",
-				"typeProperties": {
-					"connectionString": "[parameters('AveryblobStorageAccount_connectionString')]"
-				},
-				"connectVia": {
-					"referenceName": "AveryVirtualNetworkIntegrationRuntime",
-					"type": "IntegrationRuntimeReference"
 				}
 			},
 			"dependsOn": []

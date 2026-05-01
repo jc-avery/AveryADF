@@ -13,6 +13,811 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_JobRoles')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT ID\n      ,Job_Code\n      ,ISNULL(Job_Category, '') AS JobCategory\n      ,ISNULL(job_cat2, '') AS JobCategory2\n      ,ISNULL(Description, '') AS JobDesctiption\n      ,ISNULL(SupportType, '') AS SupportType\n  FROM dbo.WeeklyHrs_Cat\n",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "SET IDENTITY_INSERT Avery.JobRole ON ",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ID",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 0,
+											"precision": 18
+										},
+										"sink": {
+											"name": "JobRoleID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Job_Code",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "JobCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "JobCategory",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "JobCategory",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "JobCategory2",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "JobCategory2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "JobDesctiption",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "JobDescription",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "SupportType",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "SupportType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH1_Avery_Homes",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Avery",
+									"Table": "JobRole"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Avery/Children Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-08-05T09:36:07Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_MCM_GetData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Call AZ Function",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Az Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set MCM API Key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:05:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Data_Extract_CommunityId",
+								"type": "DatasetReference",
+								"parameters": {
+									"MCM_endPoint": {
+										"value": "@pipeline().parameters.EndPoint",
+										"type": "Expression"
+									},
+									"MCM_api_key": {
+										"value": "@variables('MCMAPIKey')",
+										"type": "Expression"
+									},
+									"FunctionCode": {
+										"value": "@variables('AzFuncCode')",
+										"type": "Expression"
+									},
+									"CommunityId": {
+										"value": "@pipeline().parameters.CommunityID",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": {
+										"value": "@pipeline().parameters.EndPoint",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Get AZ Func Code",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Set End Point",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMDataExtractAzFunc/9ad6bb869bce44809b76c700e88d789f?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set Az Func Code",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get AZ Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "AzFuncCode",
+							"value": {
+								"value": "@activity('Get AZ Func Code').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get MCM API key",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Set End Point",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMJonCrockettAPIKey/bde96b82a47a40628426ca459ee044ec?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set MCM API Key",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get MCM API key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCMAPIKey",
+							"value": {
+								"value": "@activity('Get MCM API key').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set End Point",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set Community Id",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCMEndPoint",
+							"value": "nutritionreport"
+						}
+					},
+					{
+						"name": "Set Community Id",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "CommunityId",
+							"value": "04b8b5cb-f680-4aa1-b3ec-12ddb04b8d7d"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"CommunityID": {
+						"type": "string"
+					},
+					"EndPoint": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"AzFuncCode": {
+						"type": "String"
+					},
+					"MCMAPIKey": {
+						"type": "String"
+					},
+					"MCMEndPoint": {
+						"type": "String"
+					},
+					"CommunityId": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "MCM/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_MaintenanceApp_AH1Tables')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "ForEach Maintenance App Table",
+						"description": "Run a copy activity to copy data from AH1 to AH2",
+						"type": "ForEach",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.item_list",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Copy Data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"preCopyScript": {
+												"value": "TRUNCATE TABLE\n[@{item().destination.schema}].[@{item().destination.table}]",
+												"type": "Expression"
+											},
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_AH1_Avery",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": {
+													"value": "@item().source.schema",
+													"type": "Expression"
+												},
+												"Table": {
+													"value": "@item().source.table",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_MaintenanceApp",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": {
+													"value": "@item().destination.schema",
+													"type": "Expression"
+												},
+												"Table": {
+													"value": "@item().destination.table",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"item_list": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Master"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Master"
+								},
+								"copySink": {
+									"writeBehavior": "insert",
+									"sqlWriterUseTableLock": true
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_NurseCallLocations"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_NurseCallLocations"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Result Sets"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Result Sets"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_ResultSets"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_ResultSets"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Rooms"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Rooms"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Schedule"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Schedule"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "DailyChecks_ABT_Dropdown"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "DailyChecks_ABT_Dropdown"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "DailyChecks_Admins"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "DailyChecks_Admins"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "DailyChecks_CVlog"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "DailyChecks_CVlog"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "DailyChecks_MAP"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "DailyChecks_MAP"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "DailyChecks_Master"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "DailyChecks_Master"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "DailyChecks_Mlog"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "DailyChecks_Mlog"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_CallPoints"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_CallPoints"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_DoorsSensors"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_DoorsSensors"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_FEBlankets"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_FEBlankets"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_FireAlarms"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_FireAlarms"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Floors"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Floors"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Forms"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Forms"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Hoists"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Hoists"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							},
+							{
+								"source": {
+									"schema": "dbo",
+									"table": "Checks_Inventory_General"
+								},
+								"destination": {
+									"schema": "dbo",
+									"table": "Checks_Inventory_General"
+								},
+								"copySink": {
+									"writeBehavior": null,
+									"sqlWriterUseTableLock": null
+								}
+							}
+						]
+					}
+				},
+				"folder": {
+					"name": "Maintenance App/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_MaintenanceApp_HomesDetails')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -7045,472 +7850,6 @@
 								"parameters": {
 									"Schema": "Sona",
 									"Table": "STG_Jobs"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_OrgUnits')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "OrgUnits",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"OrgUnits_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "OrgUnits_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['timezone']"
-										},
-										"sink": {
-											"name": "timezone",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['is_base_entity']"
-										},
-										"sink": {
-											"name": "is_base_entity",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['org_unit_type']['id']"
-										},
-										"sink": {
-											"name": "org_unit_type_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['org_unit_type']['name']"
-										},
-										"sink": {
-											"name": "org_unit_type_name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['accounting_cost_code']"
-										},
-										"sink": {
-											"name": "accounting_cost_code",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['average_hourly_rate']"
-										},
-										"sink": {
-											"name": "average_hourly_rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['paycaptain_company_id']"
-										},
-										"sink": {
-											"name": "paycaptain_company_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['parent_org_unit']['id']"
-										},
-										"sink": {
-											"name": "parent_org_unit_id",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": ""
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona All Org_Units 2026-02-09.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_OrgUnits"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_OrgUnitsTypes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "OrgUnitsTypes",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "OrgUnitsTypes_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['parent_org_unit_type']['id']"
-										},
-										"sink": {
-											"name": "parent_org_unit_type_id",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": ""
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "org_unit_types - All Pages.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_OrgUnitsTypes"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_RatesOfPay')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "RatesOfPay",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "RatesOfPay_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['label']"
-										},
-										"sink": {
-											"name": "label",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['start_date']"
-										},
-										"sink": {
-											"name": "start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['idx']"
-										},
-										"sink": {
-											"name": "idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['user_id']"
-										},
-										"sink": {
-											"name": "user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['finish_date']"
-										},
-										"sink": {
-											"name": "finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['org_unit_id']"
-										},
-										"sink": {
-											"name": "org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['organisation_user_id']"
-										},
-										"sink": {
-											"name": "organisation_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_period_id']"
-										},
-										"sink": {
-											"name": "employment_period_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['type_of_work_id']"
-										},
-										"sink": {
-											"name": "type_of_work_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['rate']"
-										},
-										"sink": {
-											"name": "rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['pay_type']"
-										},
-										"sink": {
-											"name": "pay_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_period_idx']"
-										},
-										"sink": {
-											"name": "employment_period_idx",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "rates_of_pay - All Pages.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_RatesOfPay"
 								}
 							}
 						]
