@@ -40526,6 +40526,7 @@
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Checks to see if a file was received today, if it was, stage and upsert the data",
 				"activities": [
 					{
 						"name": "If Condition1",
@@ -40546,9 +40547,16 @@
 							},
 							"ifTrueActivities": [
 								{
-									"name": "Copy data1",
+									"name": "Stage Data",
 									"type": "Copy",
-									"dependsOn": [],
+									"dependsOn": [
+										{
+											"activity": "Pre Clear STage",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
 									"policy": {
 										"timeout": "0.12:00:00",
 										"retry": 0,
@@ -40887,6 +40895,461 @@
 											}
 										}
 									]
+								},
+								{
+									"name": "Upsert Data",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Stage Data",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"additionalColumns": [
+												{
+													"name": "DateLoaded",
+													"value": {
+														"value": "@variables('Today')",
+														"type": "Expression"
+													}
+												}
+											],
+											"sqlReaderQuery": "SELECT\n    M.HomeID\n    ,M.Homename\n    ,A.[LocationName]\n    ,[UnitName]\n    ,[ShiftID]\n    ,[ShiftWorkerType]\n    ,TRY_CONVERT(DATE, [ShiftStartWeek], 103) AS [ShiftStartWeek]\n    ,TRY_CONVERT(DATE, [ShiftStartDate], 103) AS [ShiftStartDate]\n    ,TRY_CAST([ShiftStartTimeofDay] AS TIME) AS [ShiftStartTimeofDay]\n    ,TRY_CONVERT(DATE, [ShiftEndDate], 103) AS [ShiftEndDate]\n    ,TRY_CAST([ShiftEndTimeofDay] AS TIME) AS [ShiftEndTimeofDay]\n    ,[ShiftTimePeriod]\n    ,CASE WHEN [OneToOne] = 'Yes' THEN 'TRUE' ELSE 'FALSE' END AS [OneToOne]\n    ,[ShiftReason]\n    ,[Status]\n    ,[WorkedByTier]\n    ,TRY_CAST([ApprovedApplicationCost] AS NUMERIC(6,2)) AS [ApprovedApplicationCost]\n    ,TRY_CAST([PostedShiftHours] AS NUMERIC(6,2)) AS [PostedShiftHours]\n    ,CASE WHEN [ApprovedLowestCost] = 'Yes' THEN 'TRUE' ELSE 'FALSE' END AS [ApprovedLowestCost]\n    ,[TimesheetID]\n    ,[TimesheetedHours]\n    ,[TimesheetedHoursminusPostedShiftHours]\n    ,CASE WHEN [Invoiced] = 'Yes' THEN 'TRUE' ELSE 'FALSE' END AS [Invoiced]\n    ,[ReleasedBy]\n    ,TRY_CAST([TotalCostIncludingExpenses] AS NUMERIC(6,2)) AS [TotalCostIncludingExpenses]\n    ,A.[RowID]\nFROM \n    [Florence].[STG_Accural] AS A\n\n    LEFT JOIN Florence.LocationMapping AS M\n        ON M.LocationName = A.LocationName\nWHERE\n    A.ShiftID IS NOT NULL",
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"ShiftID"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "Homename",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "HomeName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LocationName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "LocationName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "UnitName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "UnitName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftID",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ShiftID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftWorkerType",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ShiftWorkerType",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftStartWeek",
+														"type": "Date",
+														"physicalType": "date"
+													},
+													"sink": {
+														"name": "ShiftStartWeek",
+														"type": "Date",
+														"physicalType": "date"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftStartDate",
+														"type": "Date",
+														"physicalType": "date"
+													},
+													"sink": {
+														"name": "ShiftStartDate",
+														"type": "Date",
+														"physicalType": "date"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftStartTimeofDay",
+														"type": "TimeSpan",
+														"physicalType": "time"
+													},
+													"sink": {
+														"name": "ShiftStartTimeofDay",
+														"type": "TimeSpan",
+														"physicalType": "time"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftEndDate",
+														"type": "Date",
+														"physicalType": "date"
+													},
+													"sink": {
+														"name": "ShiftEndDate",
+														"type": "Date",
+														"physicalType": "date"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftEndTimeofDay",
+														"type": "TimeSpan",
+														"physicalType": "time"
+													},
+													"sink": {
+														"name": "ShiftEndTimeofDay",
+														"type": "TimeSpan",
+														"physicalType": "time"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftTimePeriod",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ShiftTimePeriod",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "OneToOne",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "OneToOne",
+														"type": "Boolean",
+														"physicalType": "bit"
+													}
+												},
+												{
+													"source": {
+														"name": "ShiftReason",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ShiftReason",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "Status",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "Status",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "WorkedByTier",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "WorkedByTier",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ApprovedApplicationCost",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													},
+													"sink": {
+														"name": "ApprovedApplicationCost",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													}
+												},
+												{
+													"source": {
+														"name": "PostedShiftHours",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													},
+													"sink": {
+														"name": "PostedShiftHours",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													}
+												},
+												{
+													"source": {
+														"name": "ApprovedLowestCost",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ApprovedLowestCost",
+														"type": "Boolean",
+														"physicalType": "bit"
+													}
+												},
+												{
+													"source": {
+														"name": "TimesheetID",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "TimesheetID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "TimesheetedHours",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "TimesheetedHours",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													}
+												},
+												{
+													"source": {
+														"name": "TimesheetedHoursminusPostedShiftHours",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "TimesheetedHoursminusPostedShiftHours",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													}
+												},
+												{
+													"source": {
+														"name": "Invoiced",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "Invoiced",
+														"type": "Boolean",
+														"physicalType": "bit"
+													}
+												},
+												{
+													"source": {
+														"name": "ReleasedBy",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ReleasedBy",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "TotalCostIncludingExpenses",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													},
+													"sink": {
+														"name": "TotalCostIncludingExpenses",
+														"type": "Decimal",
+														"physicalType": "decimal",
+														"scale": 2,
+														"precision": 6
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Florence",
+												"Table": "Accural"
+											}
+										}
+									]
+								},
+								{
+									"name": "Clear STage",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Upsert Data",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": "TRUNCATE TABLE [Florence].[STG_Accural]"
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Pre Clear STage",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": "TRUNCATE TABLE [Florence].[STG_Accural]"
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
 								}
 							]
 						}
@@ -40949,7 +41412,7 @@
 						"typeProperties": {
 							"variableName": "Today",
 							"value": {
-								"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'-',formatDateTime(utcNow(), 'MM'),'-22' )",
+								"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'-',formatDateTime(utcNow(), 'MM'),'-',formatDateTime(utcNow(), 'dd') )",
 								"type": "Expression"
 							}
 						}
@@ -40971,7 +41434,8 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_Polestar_Storage_CheckFileExistence')]",
 				"[concat(variables('factoryId'), '/datasets/DS_Florence_AccuralFile')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
@@ -92181,6 +92645,13 @@
 							"type": "PipelineReference"
 						},
 						"parameters": {}
+					},
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Florence_AccuralReport",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
 					}
 				],
 				"type": "ScheduleTrigger",
@@ -92204,7 +92675,8 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_YourHippo_Process_Merged_Files')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_Data')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_MaintenanceApp_Refresh')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_MaintenanceApp_Refresh')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Florence_AccuralReport')]"
 			]
 		},
 		{
