@@ -13,6 +13,202 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Hydra_Output_File')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Downloads the Output file that Hydra generate from their FTP to an Azure Fileshare.",
+				"activities": [
+					{
+						"name": "Download File",
+						"description": "Downloads radar-output.xml file from Hydra FTP to azure blob storage",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Remove Existing File",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "FtpReadSettings",
+									"recursive": true,
+									"useBinaryTransfer": true,
+									"disableChunking": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Hydra_RadarFile",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Radar_AzureStorage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Date": {
+										"value": "@variables('Date')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Remove Existing File",
+						"description": "Deletes any previous radar-output.xml file on the fileshare before copying the new one there.",
+						"type": "Delete",
+						"dependsOn": [
+							{
+								"activity": "Set Date",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_PolestarStorageAcc_Fileshare_radar_output_xml",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureFileStorageReadSettings",
+								"recursive": false,
+								"wildcardFileName": "radar-output*.xml",
+								"enablePartitionDiscovery": false
+							}
+						}
+					},
+					{
+						"name": "Copy file to fileshare",
+						"description": "",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Download File",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureFileStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Radar_AzureStorage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Date": {
+										"value": "@variables('Date')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare_radar_output_xml",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "Set Date",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Date",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Date": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Radar"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-07-01T09:10:05Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Insert_ExchequerCompanyAccess')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -7251,626 +7447,6 @@
 								"parameters": {
 									"Schema": "Sona",
 									"Table": "STG_ContractedHours"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_EmploymentPeriods')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "EmploymentPeriods",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['active']"
-										},
-										"sink": {
-											"name": "active",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "EmploymentPeriods_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['start_date']"
-										},
-										"sink": {
-											"name": "start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['idx']"
-										},
-										"sink": {
-											"name": "idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['job_id']"
-										},
-										"sink": {
-											"name": "job_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['organisation_id']"
-										},
-										"sink": {
-											"name": "organisation_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['user_id']"
-										},
-										"sink": {
-											"name": "user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['finish_date']"
-										},
-										"sink": {
-											"name": "finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['organisation_user_id']"
-										},
-										"sink": {
-											"name": "organisation_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['period']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_period",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['hours']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_hours",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['days']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_days",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['start_date']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['idx']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['org_unit_id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['finish_date']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['colour_coding']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_colour_coding",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['type_of_work_id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_type_of_work_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['monthly_period_starts_at']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_monthly_period_starts_at",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['weekly_period_starts_at']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_weekly_period_starts_at",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_length_days']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_length_days",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_start']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_start",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['name']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['employment_type']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['pay_period_start']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_start",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['pay_period_type']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['payroll_rule']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_payroll_rule",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['employment_basis']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_basis",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['start_date']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['idx']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['finish_date']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['rate']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['pay_type']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_pay_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['primary_org_unit_id']"
-										},
-										"sink": {
-											"name": "primary_org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employee_number']"
-										},
-										"sink": {
-											"name": "employee_number",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['continuous_employment_start_date']"
-										},
-										"sink": {
-											"name": "continuous_employment_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['level_id']"
-										},
-										"sink": {
-											"name": "level_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['job_grade_id']"
-										},
-										"sink": {
-											"name": "job_grade_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['reports_to_user_id']"
-										},
-										"sink": {
-											"name": "reports_to_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['reports_to_org_user_id']"
-										},
-										"sink": {
-											"name": "reports_to_org_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['starter_declaration']"
-										},
-										"sink": {
-											"name": "starter_declaration",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_plan_four']"
-										},
-										"sink": {
-											"name": "student_loan_plan_four",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_plan_one']"
-										},
-										"sink": {
-											"name": "student_loan_plan_one",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_plan_two']"
-										},
-										"sink": {
-											"name": "student_loan_plan_two",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_post_graduate']"
-										},
-										"sink": {
-											"name": "student_loan_post_graduate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['tupe']"
-										},
-										"sink": {
-											"name": "tupe",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona All Employment Periods 2026-04-14.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_EmploymentPeriods"
-								}
-							}
-						]
-					},
-					{
-						"name": "EmploymentPeriods_TypesOfWork",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "EmploymentPeriods",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "employment_period_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "type_of_work_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['name']"
-										},
-										"sink": {
-											"name": "type_of_work_name",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['types_of_work']",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona All Employment Periods 2026-04-14.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_EmploymentPeriods_TypesOfWork"
 								}
 							}
 						]
