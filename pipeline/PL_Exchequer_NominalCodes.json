@@ -1,0 +1,259 @@
+{
+	"name": "PL_Exchequer_NominalCodes",
+	"properties": {
+		"description": "Export the Nominal Codes (GL Codes) from exchequer for each Company",
+		"activities": [
+			{
+				"name": "Company List",
+				"description": "List company codes ",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT\n\tHomeID, \n\tHomename, \n\tExchCode\nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "For Each Company",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Company List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Company List').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Copy Users to AH2",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"sqlReaderQuery": {
+										"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,glCode\n\t,glName\n\t,glParent\n\t,glType\n\t,glAltCode\n\t,glClass\n\t,glNomStr\n\t,glInactive\nFROM \n\t@{item().ExchCode}.NOMINAL\nORDER BY \n\tglCode ASC",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "AzureSqlSink",
+									"writeBehavior": "upsert",
+									"upsertSettings": {
+										"useTempDB": true,
+										"keys": [
+											"ExchCompanyCode",
+											"HomeID",
+											"glCode"
+										]
+									},
+									"sqlWriterUseTableLock": false,
+									"disableMetricsCollection": false
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "ExchCompanyCode",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "ExchCompanyCode",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "HomeID",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "HomeID",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "glCode",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "glCode",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "glName",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "glName",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "glParent",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "glParent",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "glType",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "glType",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "glAltCode",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "glAltCode",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "glClass",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "glClass",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										},
+										{
+											"source": {
+												"name": "glNomStr",
+												"type": "String",
+												"physicalType": "varchar"
+											},
+											"sink": {
+												"name": "glNomStr",
+												"type": "String",
+												"physicalType": "varchar"
+											}
+										},
+										{
+											"source": {
+												"name": "glInactive",
+												"type": "Int32",
+												"physicalType": "int"
+											},
+											"sink": {
+												"name": "glInactive",
+												"type": "Int32",
+												"physicalType": "int"
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OnPrem_Exchequer",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "n/a",
+										"Table": "n/a"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_AH2_TRANSFORM_DB",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "Exchequer",
+										"Table": "NominalCodes"
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"Exch_Schema": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Exchequer/Child Pipelines"
+		},
+		"annotations": []
+	}
+}
