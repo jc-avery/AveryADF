@@ -1,0 +1,300 @@
+{
+	"name": "PL_Sona_Full_WeeklyHrs_Data",
+	"properties": {
+		"description": "Gets the previous week data for Shifts and Paylines",
+		"activities": [
+			{
+				"name": "Set EndDateTime",
+				"description": "Set Today as end date time at 23:59:59",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "EndDateTime",
+					"value": {
+						"value": "@concat(\n    formatDateTime(\n        addDays(utcNow(), mul(-1, dayOfWeek(utcNow()))),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set StartDateTime",
+				"description": "Set Start day to be 3 days prior to today at 00:00:00",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "StartDateTime",
+					"value": {
+						"value": "@concat(\n    formatDateTime(\n        addDays(utcNow(), sub(mul(-1, dayOfWeek(utcNow())), 6)),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Get Shifts Data",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set EndDateTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set StartDateTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Sona_GetFullWeekData",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EndPoint": "shifts",
+						"MinStartDate": {
+							"value": "@variables('StartDateTime')",
+							"type": "Expression"
+						},
+						"MaxStartDate": {
+							"value": "@variables('EndDateTime')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Get PayLines Data",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Get Shifts Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Sona_GetFullWeekData",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EndPoint": "paylines",
+						"MinStartDate": {
+							"value": "@variables('StartDateTime')",
+							"type": "Expression"
+						},
+						"MaxStartDate": {
+							"value": "@variables('EndDateTime')",
+							"type": "Expression"
+						}
+					}
+				}
+			},
+			{
+				"name": "Stage Data",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Pre Clear Stage Tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Upsert To Final Tables",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Stage Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Pre Clear Stage Tables",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Get PayLines Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AH2_TRANSFORM_DB",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "EXEC Sona.Clear$StageTables"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Post Clear Stage Tables",
+				"type": "Script",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Update AH1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AH2_TRANSFORM_DB",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "EXEC Sona.Clear$StageTables"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Update AH1",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Remove Duplicate Paylines",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Remove Duplicate Paylines",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Upsert To Final Tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AH2_TRANSFORM_DB",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "EXEC Sona.Remove$DuplicatePaylines"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			}
+		],
+		"variables": {
+			"EndDateTime": {
+				"type": "String"
+			},
+			"StartDateTime": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Sona"
+		},
+		"annotations": []
+	}
+}
