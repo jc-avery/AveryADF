@@ -1,13 +1,19 @@
 {
-	"name": "PL_NurseCall_Intercall_CopyFile",
+	"name": "PL_NurseCall_StageData_InterCall",
 	"properties": {
 		"activities": [
 			{
-				"name": "Copy Files",
+				"name": "Stage Data",
 				"type": "Copy",
 				"dependsOn": [
 					{
 						"activity": "Set vDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set vFilename",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -23,41 +29,56 @@
 				"userProperties": [],
 				"typeProperties": {
 					"source": {
-						"type": "BinarySource",
+						"type": "DelimitedTextSource",
 						"storeSettings": {
-							"type": "AzureFileStorageReadSettings",
-							"recursive": false,
-							"wildcardFileName": "intercall_download_*.csv",
-							"deleteFilesAfterCompletion": true
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
 						},
 						"formatSettings": {
-							"type": "BinaryReadSettings"
+							"type": "DelimitedTextReadSettings"
 						}
 					},
 					"sink": {
-						"type": "BinarySink",
-						"storeSettings": {
-							"type": "AzureBlobStorageWriteSettings"
-						}
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"tableOption": "autoCreate",
+						"disableMetricsCollection": false
 					},
-					"enableStaging": false
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
 				},
 				"inputs": [
 					{
-						"referenceName": "DS_polestar_storage_fileshare_binary",
-						"type": "DatasetReference"
+						"referenceName": "DS_NurseCall_Csv",
+						"type": "DatasetReference",
+						"parameters": {
+							"Directory": {
+								"value": "@variables('vDirectory')",
+								"type": "Expression"
+							},
+							"Filename": {
+								"value": "@variables('vFilename')",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"outputs": [
 					{
-						"referenceName": "DS_Polestar_Storage",
+						"referenceName": "DS_AH2_TRANSFORM_DB",
 						"type": "DatasetReference",
 						"parameters": {
-							"Container": "nursecalls",
-							"Directory": {
-								"value": "@variables('vDirectory')",
-								"type": "Expression"
-							}
+							"Schema": "InterCall",
+							"Table": "STG_InterCall"
 						}
 					}
 				]
@@ -103,6 +124,30 @@
 						"type": "Expression"
 					}
 				}
+			},
+			{
+				"name": "Set vFilename",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set vYesterday",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vFilename",
+					"value": {
+						"value": "@concat('intercall_download_',formatDateTime(variables('vYesterday'), 'yyyyMMdd'),'.csv')",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"variables": {
@@ -110,6 +155,9 @@
 				"type": "String"
 			},
 			"vYesterday": {
+				"type": "String"
+			},
+			"vFilename": {
 				"type": "String"
 			}
 		},
