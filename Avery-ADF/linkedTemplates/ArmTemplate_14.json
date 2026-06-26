@@ -21,6 +21,581 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/xPL_ColdHarbour_Rooms')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Extracts the Rooms from the Polestar DB on AH2, to a table in Avery DB on AH2",
+				"activities": [
+					{
+						"name": "Rooms",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ROOM_REF"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ROOM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CAT",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_CAT",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CAT_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOM_CAT_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "ROOM_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_NO_BEDS",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_NO_BEDS",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "CHARGEPERIOD",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CHARGEPERIOD",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CURRENTRATE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										},
+										"sink": {
+											"name": "CURRENTRATE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										}
+									},
+									{
+										"source": {
+											"name": "RATEDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "RATEDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "USEFLAG",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "USEFLAG",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Polestar",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Rooms"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "Rooms"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Pricing/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-09-05T11:40:20Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_ColdHarbour_RoomsWithInHomeResidents')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies data from the view in Polestar to Avery DB. Lists all rooms in CH and the active resident record assigned to that home",
+				"activities": [
+					{
+						"name": "Refresh Data",
+						"description": "Truncates table in Avery DB and Inserts data from Polestar DB using the view.",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    [ROOM_REF]\n    ,[ROOM_CODE]\n    ,[ROOM_DESC]\n    ,[USEFLAG]\n    ,[HOME_REF]\n    ,[RES_REF]\n    ,[RES_CODE]\n    ,[ResidentStatus]\n    ,[Firstname]\n    ,[Surname]\n    ,[AdmissionAnalysis]\n    ,[AdmissionType]\n    ,[ResidentAdmissionReason]\n    ,[AnalysisGroup]\n    ,ResidentsAssigned\nFROM \n    [dbo].[vRoomsWithInHomeResidentDetails]\nORDER BY\n    Home_Ref ASC,\n    ROOM_Ref ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE ColdHarbour.RoomsWithInHomeResidentDetails",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ROOM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "ROOM_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "USEFLAG",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "USEFLAG",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "RES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ResidentStatus",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ResidentStatus",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Firstname",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Firstname",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Surname",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Surname",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AdmissionAnalysis",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AdmissionAnalysis",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AdmissionType",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AdmissionType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ResidentAdmissionReason",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ResidentAdmissionReason",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "AnalysisGroup",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "AnalysisGroup",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ResidentsAssigned",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ResidentsAssigned",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Polestar",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "RoomsWithInHomeResidentDetails"
+								}
+							}
+						]
+					},
+					{
+						"name": "Update Room Occupancy",
+						"description": "Updates the Pricing.Room tables occupancy using the refreshed data",
+						"type": "SqlServerStoredProcedure",
+						"dependsOn": [
+							{
+								"activity": "Refresh Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"storedProcedureName": "[[Pricing].[Update$RoomOccupancyFromCH]"
+						},
+						"linkedServiceName": {
+							"referenceName": "AH2_Avery",
+							"type": "LinkedServiceReference"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Pricing"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T09:21:26Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_MCM_Communities')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Download Community list",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Communities",
+								"type": "DatasetReference",
+								"parameters": {
+									"APIKey": "x",
+									"Query": "/OrganisationApi/Communities"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": "x"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "MCM"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/xPL_MCM_GetData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1180,309 +1755,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy Files",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureFileStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "intercall_download_*.csv",
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_polestar_storage_fileshare_binary",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Polestar_Storage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "nursecalls",
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Sets directory save location in azure storage account used in sink of copy",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vYesterday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vYesterday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vYesterday",
-							"value": {
-								"value": "@addDays(utcNow(), -1)",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vYesterday": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Nurse Calls/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_StageData_InterCall')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Stage Data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set vFilename",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "DelimitedTextSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "DelimitedTextReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_NurseCall_Csv",
-								"type": "DatasetReference",
-								"parameters": {
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									},
-									"Filename": {
-										"value": "@variables('vFilename')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "InterCall",
-									"Table": "STG_InterCall"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Sets directory save location in azure storage account used in sink of copy",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vYesterday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vYesterday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vYesterday",
-							"value": {
-								"value": "@addDays(utcNow(), -1)",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vFilename",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vYesterday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vFilename",
-							"value": {
-								"value": "@concat('intercall_download_',formatDateTime(variables('vYesterday'), 'yyyyMMdd'),'.csv')",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vYesterday": {
-						"type": "String"
-					},
-					"vFilename": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Nurse Calls/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -2480,125 +2752,6 @@
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
 						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Cold Harbour/Children Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CH_AnalysisCodes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "UPSERT Analysis Codes",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT\t \r\n\tNominal_Code.AltAccount AS AnalysisCode, \r\n\tNominal_Code.Description AS AnalysisDescription, \r\n\tNominal_Code.Account\r\nFROM\t\t \r\n\tNominal_Code (NOLOCK) \r\nWHERE\t \r\n\tNominal_Code.RecType = 'Elephant' \r\n\tAND Nominal_Code.UseFlag <> 'X' \r\n\tAND Nominal_Code.AltAccount != ''\r\n\tAND (SiteFilter = 0 OR Noml_Ref IN (SELECT LinkKey FROM Site_Join (NOLOCK) WHERE upper(LinkTable) = 'NOMINAL_CODE' AND Site_Ref = 151)) ORDER BY Nominal_Code.Account",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AnalysisCode"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AnalysisCode",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AnalysisCode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "AnalysisDescription",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "AnalysisDescription",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Account",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "Account",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "ColdHarbour",
-									"Table": "AnalysisCodes"
-								}
-							}
-						]
 					}
 				],
 				"policy": {

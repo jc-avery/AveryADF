@@ -53352,6 +53352,376 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy file to Blob Storage",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_NurseCall_Intercall_CopyFile",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Stage Intercall Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Copy file to Blob Storage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_NurseCall_StageData_InterCall",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Nurse Calls"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_Intercall_CopyFile')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_StageData_InterCall')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "intercall_download_*.csv",
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_polestar_storage_fileshare_binary",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Polestar_Storage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "nursecalls",
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vDirectory",
+						"description": "Sets directory save location in azure storage account used in sink of copy",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vYesterday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vYesterday",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vYesterday",
+							"value": {
+								"value": "@addDays(utcNow(), -1)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vYesterday": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_polestar_storage_fileshare_binary')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Polestar_Storage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_StageData_InterCall')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Stage Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set vFilename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "InterCall",
+									"Table": "STG_InterCall"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vDirectory",
+						"description": "Sets directory save location in azure storage account used in sink of copy",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vYesterday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vYesterday",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vYesterday",
+							"value": {
+								"value": "@addDays(utcNow(), -1)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFilename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vYesterday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFilename",
+							"value": {
+								"value": "@concat('intercall_download_',formatDateTime(variables('vYesterday'), 'yyyyMMdd'),'.csv')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vYesterday": {
+						"type": "String"
+					},
+					"vFilename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_NurseCall_Csv')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Polestar_Occupancy')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -59481,7 +59851,7 @@
 				"activities": [
 					{
 						"name": "Set EndDateTime",
-						"description": "Set Today as end date time at 23:59:59",
+						"description": "Find the most recent Sunday and set the time to 23:59:59\n\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -59499,7 +59869,7 @@
 					},
 					{
 						"name": "Set StartDateTime",
-						"description": "Set Start day to be 3 days prior to today at 00:00:00",
+						"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\n\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -59708,6 +60078,8 @@
 					{
 						"name": "Update AH1",
 						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
 								"activity": "Remove Duplicate Paylines",
@@ -92069,6 +92441,78 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_NurseCall_Csv')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Directory": {
+						"type": "string"
+					},
+					"Filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().Filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"container": "nursecalls"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": [
+					{
+						"name": "Home",
+						"type": "String"
+					},
+					{
+						"name": "DateTimeEvent",
+						"type": "String"
+					},
+					{
+						"name": "CallPointID",
+						"type": "String"
+					},
+					{
+						"name": "RoomNo",
+						"type": "String"
+					},
+					{
+						"name": "Event",
+						"type": "String"
+					},
+					{
+						"name": "User",
+						"type": "String"
+					},
+					{
+						"name": "UserText",
+						"type": "String"
+					}
+				]
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_GRG')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -95651,6 +96095,30 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_polestar_storage_fileshare_binary')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageFileshare",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "Generic"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureFileStorageLocation"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageFileshare')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_polestarstorageacc_XML_filename')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -96563,16 +97031,8 @@
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
+				"runtimeState": "Stopped",
+				"pipelines": [],
 				"type": "ScheduleTrigger",
 				"typeProperties": {
 					"recurrence": {
@@ -96594,9 +97054,7 @@
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SCH_Everyday_1145AM')]",
@@ -96767,6 +97225,52 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Exchequer_Details_Retry')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_MTWTFS_930PM')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-06-26T08:15:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								21
+							],
+							"weekDays": [
+								"Monday",
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday",
+								"Saturday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
 			]
 		},
 		{
@@ -98305,472 +98809,6 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy Files",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureFileStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "intercall_download_*.csv",
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_polestar_storage_fileshare_binary",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Polestar_Storage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "nursecalls",
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Sets directory save location in azure storage account used in sink of copy",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vYesterday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vYesterday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vYesterday",
-							"value": {
-								"value": "@addDays(utcNow(), -1)",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vYesterday": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Nurse Calls/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_polestar_storage_fileshare_binary')]",
-				"[concat(variables('factoryId'), '/datasets/DS_Polestar_Storage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_polestar_storage_fileshare_binary')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageFileshare",
-					"type": "LinkedServiceReference"
-				},
-				"folder": {
-					"name": "Generic"
-				},
-				"annotations": [],
-				"type": "Binary",
-				"typeProperties": {
-					"location": {
-						"type": "AzureFileStorageLocation"
-					}
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageFileshare')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_StageData_InterCall')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Stage Data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set vFilename",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "DelimitedTextSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "DelimitedTextReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_NurseCall_Csv",
-								"type": "DatasetReference",
-								"parameters": {
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									},
-									"Filename": {
-										"value": "@variables('vFilename')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "InterCall",
-									"Table": "STG_InterCall"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Sets directory save location in azure storage account used in sink of copy",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vYesterday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vYesterday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vYesterday",
-							"value": {
-								"value": "@addDays(utcNow(), -1)",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vFilename",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vYesterday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vFilename",
-							"value": {
-								"value": "@concat('intercall_download_',formatDateTime(variables('vYesterday'), 'yyyyMMdd'),'.csv')",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vYesterday": {
-						"type": "String"
-					},
-					"vFilename": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Nurse Calls/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_NurseCall_Csv')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_NurseCall_Csv')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageAcc",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Directory": {
-						"type": "string"
-					},
-					"Filename": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "DelimitedText",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"fileName": {
-							"value": "@dataset().Filename",
-							"type": "Expression"
-						},
-						"folderPath": {
-							"value": "@dataset().Directory",
-							"type": "Expression"
-						},
-						"container": "nursecalls"
-					},
-					"columnDelimiter": ",",
-					"escapeChar": "\\",
-					"firstRowAsHeader": true,
-					"quoteChar": "\""
-				},
-				"schema": [
-					{
-						"name": "Home",
-						"type": "String"
-					},
-					{
-						"name": "DateTimeEvent",
-						"type": "String"
-					},
-					{
-						"name": "CallPointID",
-						"type": "String"
-					},
-					{
-						"name": "RoomNo",
-						"type": "String"
-					},
-					{
-						"name": "Event",
-						"type": "String"
-					},
-					{
-						"name": "User",
-						"type": "String"
-					},
-					{
-						"name": "UserText",
-						"type": "String"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy file to Blob Storage",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_NurseCall_Intercall_CopyFile",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Stage Intercall Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy file to Blob Storage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_NurseCall_StageData_InterCall",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Nurse Calls"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_Intercall_CopyFile')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_StageData_InterCall')]"
 			]
 		}
 	]
