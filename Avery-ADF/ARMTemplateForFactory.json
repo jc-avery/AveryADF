@@ -60599,7 +60599,7 @@
 			"properties": {
 				"activities": [
 					{
-						"name": "Process All Users",
+						"name": "Stage All Users",
 						"description": "Insert into stage tables and upsert tables",
 						"type": "ExecutePipeline",
 						"dependsOn": [
@@ -60641,6 +60641,30 @@
 								"EndPoint": "all_users"
 							}
 						}
+					},
+					{
+						"name": "Upsert From Stage",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage All Users",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_All_Users",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
 					}
 				],
 				"policy": {
@@ -60653,7 +60677,8 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_All_Users')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_All_Users')]"
 			]
 		},
 		{
@@ -62333,13 +62358,8 @@
 							},
 							"sink": {
 								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"ShiftTypes_id"
-									]
-								},
+								"preCopyScript": "TRUNCATE TABLE Sona.STG_ShiftTypes",
+								"writeBehavior": "insert",
 								"sqlWriterUseTableLock": false,
 								"tableOption": "autoCreate",
 								"disableMetricsCollection": false
@@ -62353,7 +62373,8 @@
 											"path": "$['id']"
 										},
 										"sink": {
-											"name": "ShiftTypes_id"
+											"name": "ShiftTypes_id",
+											"type": "String"
 										}
 									},
 									{
@@ -62492,7 +62513,7 @@
 								"referenceName": "DS_Sona_Initial_File",
 								"type": "DatasetReference",
 								"parameters": {
-									"Filename": "Sona All Shift Types 2026-02-10.json"
+									"Filename": "Sona All Shift Types 2026-07-02.json"
 								}
 							}
 						],
@@ -65368,6 +65389,113 @@
 					{
 						"name": "Set Date",
 						"description": "Sets the date variable used in source dataset",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Json_WeeklyHrs')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_Emp_Periods')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Inserts the Emp_Periods data to stage tables",
+				"activities": [
+					{
+						"name": "Stage Emp Periods",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set DateString",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Json_WeeklyHrs",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "emp_periods$",
+									"DateString": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_EmploymentPeriods"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set DateString",
+						"description": "Sets the date string used for Dataset property",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -68352,6 +68480,39 @@
 								}
 							}
 						]
+					},
+					{
+						"name": "Remove ShiftType Duplicates",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Upsert ShiftTypes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Remove$DuplicateShiftTypes"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
 					}
 				],
 				"policy": {
@@ -68363,7 +68524,8 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
