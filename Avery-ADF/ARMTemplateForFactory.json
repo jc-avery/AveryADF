@@ -2214,6 +2214,30 @@
 				}
 			]
 		},
+		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack": {
+			"type": "int",
+			"defaultValue": 1
+		},
+		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType": {
+			"type": "string",
+			"defaultValue": "WeeklyHrs_PrevWeek"
+		},
+		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack": {
+			"type": "int",
+			"defaultValue": 2
+		},
+		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType": {
+			"type": "string",
+			"defaultValue": "WeeklyHrs_2WeekPrior"
+		},
+		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack": {
+			"type": "int",
+			"defaultValue": 3
+		},
+		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType": {
+			"type": "string",
+			"defaultValue": "WeeklyHrs_3WeekPrior"
+		},
 		"AveryAzureBlobFileSharePrivateEndPoint_properties_privateLinkResourceId": {
 			"type": "string",
 			"defaultValue": "/subscriptions/1463136a-d925-4b90-abc6-6236a477d62f/resourceGroups/Avery/providers/Microsoft.Storage/storageAccounts/averyblob"
@@ -2229,6 +2253,14 @@
 		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
 			"type": "string",
 			"defaultValue": "blob"
+		},
+		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack": {
+			"type": "int",
+			"defaultValue": 0
+		},
+		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType": {
+			"type": "string",
+			"defaultValue": "FullWeekData"
 		}
 	},
 	"variables": {
@@ -59843,6 +59875,102 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_AbsenceSubTypes')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "AbsenceSubTypeID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['name']"
+										},
+										"sink": {
+											"name": "AbsenceSubTypeName",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Initial_File",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": "Sona Absence SubType Time in lieu - Unpaid.json"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "AbsenceSubType"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Initial API Files"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Initial_File')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Sona_AbsenceTypes')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -59949,7 +60077,288 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Full_WeeklyHrs_Data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Absences')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Stage Absences",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"Absence_ID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "Absence_ID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_id']"
+										},
+										"sink": {
+											"name": "User_ID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['starts_at']"
+										},
+										"sink": {
+											"name": "Starts_at",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['ends_at']"
+										},
+										"sink": {
+											"name": "Ends_at",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['absence_type_id']"
+										},
+										"sink": {
+											"name": "absence_type_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['absence_subtype_id']"
+										},
+										"sink": {
+											"name": "absence_subtype_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_internal_id']"
+										},
+										"sink": {
+											"name": "user_internal_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['current_employee_number']"
+										},
+										"sink": {
+											"name": "current_employee_number",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['is_paid']"
+										},
+										"sink": {
+											"name": "is_paid",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_API_Response",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "Sona Absences"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Absences"
+								}
+							}
+						]
+					},
+					{
+						"name": "Stage Absences Missed Shifts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Stage Absences",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"Absence_ID",
+										"Linked_Shift_ID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['absence_id']"
+										},
+										"sink": {
+											"name": "Absence_ID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['user_id']"
+										},
+										"sink": {
+											"name": "User_ID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['linked_shift_id']"
+										},
+										"sink": {
+											"name": "Linked_Shift_ID",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['shift_start_datetime']"
+										},
+										"sink": {
+											"name": "start_datetime",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "$['shift_end_datetime']"
+										},
+										"sink": {
+											"name": "end_datetime",
+											"type": "DateTime"
+										}
+									}
+								],
+								"collectionReference": ""
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_API_Response",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "flattened_linked_shifts"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Absences_Missied_Shifts"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_API_Response')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_Full_WeeklyHrs_Data')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -59957,7 +60366,7 @@
 				"activities": [
 					{
 						"name": "Set EndDateTime",
-						"description": "Find the most recent Sunday and set the time to 23:59:59\n\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
+						"description": "Find the most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -59975,7 +60384,7 @@
 					},
 					{
 						"name": "Set StartDateTime",
-						"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\n\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
+						"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -60066,7 +60475,7 @@
 						}
 					},
 					{
-						"name": "Stage Data",
+						"name": "Stage Data and Remove Old Payline Records",
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
@@ -60094,7 +60503,7 @@
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Stage Data",
+								"activity": "Stage Data and Remove Old Payline Records",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -60210,6 +60619,8 @@
 					{
 						"name": "Remove Duplicate Paylines",
 						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
 								"activity": "Upsert To Final Tables",
@@ -60243,6 +60654,347 @@
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EndDateTime": {
+						"type": "String"
+					},
+					"StartDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetFullWeekData')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Full_WeeklyHr_data')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHr_data')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_ViewTransfer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Full_WeeklyHrs_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Gets the data for Shifts and Paylines for weekly hrs, a set number of weeks ago using parameters",
+				"activities": [
+					{
+						"name": "Set EndDateTime",
+						"description": "Find the 2nd most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.\n\nThen Subtract 7 days",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EndDateTime",
+							"value": {
+								"value": "@concat(\n    formatDateTime(\n        addDays(\n            addDays(\n                utcNow(),\n                mul(-1, dayOfWeek(utcNow()))\n            ),\n            mul(pipeline().parameters.WeeksBack, -7)\n        ),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set StartDateTime",
+						"description": "Set the start date to be 6 days before the calculated end date",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set EndDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "StartDateTime",
+							"value": {
+								"value": "@concat(\n    formatDateTime(\n        addDays(variables('EndDateTime'), -6),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get Shifts Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Set StartDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_GetFullWeekData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "shifts",
+								"MinStartDate": {
+									"value": "@variables('StartDateTime')",
+									"type": "Expression"
+								},
+								"MaxStartDate": {
+									"value": "@variables('EndDateTime')",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Get PayLines Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_GetFullWeekData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "paylines",
+								"MinStartDate": {
+									"value": "@variables('StartDateTime')",
+									"type": "Expression"
+								},
+								"MaxStartDate": {
+									"value": "@variables('EndDateTime')",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stage Data and Remove Old Payline Records",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Pre Clear Stage Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Upsert To Final Tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage Data and Remove Old Payline Records",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Pre Clear Stage Tables",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Get PayLines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clear$StageTables"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Post Clear Stage Tables",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Update AH1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clear$StageTables"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Update AH1",
+						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Remove Duplicate Paylines",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Remove Duplicate Paylines",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Upsert To Final Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Remove$DuplicatePaylines"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"WeeksBack": {
+						"type": "int"
+					},
+					"FileNameType": {
+						"type": "string"
+					}
 				},
 				"variables": {
 					"EndDateTime": {
@@ -60505,9 +61257,9 @@
 							}
 						],
 						"policy": {
-							"timeout": "0.12:00:00",
+							"timeout": "0.15:00:00",
 							"retry": 0,
-							"retryIntervalInSeconds": 30,
+							"retryIntervalInSeconds": 60,
 							"secureOutput": false,
 							"secureInput": false
 						},
@@ -60566,7 +61318,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"FileName": {
-										"value": "@concat('FullWeekData-', pipeline().parameters.EndPoint)",
+										"value": "@concat(pipeline().parameters.FileName, '-', pipeline().parameters.EndPoint)",
 										"type": "Expression"
 									}
 								}
@@ -60677,6 +61429,9 @@
 						"type": "string"
 					},
 					"MaxStartDate": {
+						"type": "string"
+					},
+					"FileName": {
 						"type": "string"
 					}
 				},
@@ -67040,7 +67795,10 @@
 								"referenceName": "DS_Sona_Json_WeeklyHrs",
 								"type": "DatasetReference",
 								"parameters": {
-									"FileName": "FullWeekData-paylines$",
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-paylines$')",
+										"type": "Expression"
+									},
 									"DateString": {
 										"value": "@variables('DateString')",
 										"type": "Expression"
@@ -67232,7 +67990,10 @@
 								"referenceName": "DS_Sona_Json_WeeklyHrs",
 								"type": "DatasetReference",
 								"parameters": {
-									"FileName": "FullWeekData-shifts$",
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-shifts$')",
+										"type": "Expression"
+									},
 									"DateString": {
 										"value": "@variables('DateString')",
 										"type": "Expression"
@@ -67335,7 +68096,10 @@
 								"referenceName": "DS_Sona_Json_WeeklyHrs",
 								"type": "DatasetReference",
 								"parameters": {
-									"FileName": "FullWeekData-shifts$",
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-shifts$')",
+										"type": "Expression"
+									},
 									"DateString": {
 										"value": "@variables('DateString')",
 										"type": "Expression"
@@ -67353,10 +68117,55 @@
 								}
 							}
 						]
+					},
+					{
+						"name": "Removed edited Paylines",
+						"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Stage Paylines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Stage Shifts_shift_breaks Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"FileName": {
+						"type": "string"
+					}
 				},
 				"variables": {
 					"DateString": {
@@ -67370,7 +68179,8 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_Sona_Json_WeeklyHrs')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
@@ -98767,16 +99577,8 @@
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
+				"runtimeState": "Stopped",
+				"pipelines": [],
 				"type": "ScheduleTrigger",
 				"typeProperties": {
 					"recurrence": {
@@ -98803,9 +99605,7 @@
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SCH_MTWTF_5am')]",
@@ -98933,6 +99733,146 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/xPL_Exchequer_Details_83045FIX')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_PriorWeek_CatchUp')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Weekly hrs for the week before latest Week End (Latest Sunday)",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-13T10:23:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								20
+							],
+							"weekDays": [
+								"Sunday",
+								"Tuesday",
+								"Thursday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_2Week_CatchUp')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "2 Weeks prior to most recent week end (Latest Sunday)",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-13T10:36:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								20
+							],
+							"weekDays": [
+								"Monday",
+								"Wednesday",
+								"Friday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_3Week_CatchUp')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "3 Weeks prior to most recent week end",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-13T10:37:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								8
+							],
+							"weekDays": [
+								"Monday",
+								"Friday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
 			]
 		},
 		{
@@ -100335,6 +101275,57 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Sona_Current_WeeklyHrs')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Weekly hours for most recent week end (the latest Sunday)",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"WeeksBack": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-14T15:03:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								35
+							],
+							"hours": [
+								21,
+								8
+							],
+							"weekDays": [
+								"Monday",
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday",
+								"Saturday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Full_WeeklyHrs_Data')]"
 			]
 		}
 	]

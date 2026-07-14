@@ -13,6 +13,1959 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details_Retry_PreviousYear')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "The Details (Ledger) from Exchequer for the previous financial Year, for any companies that failed in first run.",
+				"activities": [
+					{
+						"name": "Company List and Previous Year",
+						"description": "List company codes and the previous year for those that failed in the initial run, used to refresh the details data for the previous financial year BEFORE running the Current Fin Year",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "Clear stage Table Pre",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @PreviousYear AS DATE = DATEFROMPARTS(YEAR(DATEADD(YEAR,-1,@Today)), MONTH(@Today), 1)\n\nSELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription,\n    DetailsRetry.RowID AS RetryRowID\nFROM \n\tExchequer.DetailsRetry\n    \n    INNER JOIN Avery.HomeDetails\n        ON DetailsRetry.ExchCompanyCode = HomeDetails.ExchCode\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @PreviousYear\nWHERE\n\tDetailsRetry.Retried = 'FALSE'\n    AND DetailsRetry.FinancialYear = 'Previous'\n    AND HomeDetails.ExchCode IS NOT NULL\n\tAND HomeDetails.ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "Copy Exchequer Ledger",
+						"type": "Copy",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": {
+									"value": "SELECT TOP 100 \n\t[tlFolioNum]\n\t,[tlLineNo]\n\t,[tlRunNo]\n\t,[tlGLCode]\n\t,[tlNominalMode]\n\t,[tlCurrency]\n\t,[tlYear]\n\t,[tlPeriod]\n\t,[tlDepartment]\n\t,[tlCostCentre]\n\t,[tlDocType]\n\t,[tlQty]\n\t,[tlQtyMul]\n\t,[tlNetValue]\n\t,[tlDiscount]\n\t,[tlVATCode]\n\t,[tlVATAmount]\n\t,[tlPaymentCode]\n\t,[tlOldPBal]\n\t,[tlRecStatus]\n\t,[tlDiscFlag]\n\t,[tlQtyWOFF]\n\t,[tlQtyDel]\n\t,[tlCost]\n\t,[tlAcCode]\n\t,[tlLineDate]\n\t,[tlItemNo]\n\t,[tlDescription]\n\t,[tlJobCode]\n\t,[tlAnalysisCode]\n\t,[tlOurRef]\n\t,[tlPreviousBalance]\n\t,[PositionId]\nFROM \n\t@{variables('Exch_Schema')}.DETAILS",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_Exchequer",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						]
+					},
+					{
+						"name": "For Each Company",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Company List and Previous Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Company List and Previous Year').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy Data to AH2",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,'@{item().IntranetID}' AS IntranetID\n\t,'@{item().Homename}' AS Homename\n\t,L.[tlFolioNum]\n\t,L.[tlLineNo]\n\t,L.[tlRunNo]\n\t,L.[tlGLCode]\n\t,L.[tlNominalMode]\n\t,L.[tlCurrency]\n\t,L.[tlYear]\n\t,L.[tlPeriod]\n\t,L.[tlDepartment]\n\t,L.[tlCostCentre]\n\t,L.[tlDocType]\n\t,L.[tlQty]\n\t,L.[tlQtyMul]\n\t,L.[tlNetValue]\n\t,L.[tlDiscount]\n\t,L.[tlVATCode]\n\t,L.[tlVATAmount]\n\t,L.[tlPaymentCode]\n\t,L.[tlOldPBal]\n\t,L.[tlRecStatus]\n\t,L.[tlDiscFlag]\n\t,L.[tlQtyWOFF]\n\t,L.[tlQtyDel]\n\t,L.[tlCost]\n\t,L.[tlAcCode]\n\t,L.[tlLineDate]\n\t,L.[tlItemNo]\n\t,L.[tlDescription]\n\t,L.[tlJobCode]\n\t,L.[tlAnalysisCode]\n\t,L.[tlOurRef]\n\t,L.[tlPreviousBalance]\n\t,L.[PositionId] AS DetailsPositionId\n\t,H.thYourRef\n\t,H.thLongYourRefTrans\n\t,H.thOurRef\n\t,H.thPostedDate\n\t,H.thCreationDate\n\t,H.thDueDate\n\t,H.PositionId AS DocumentPositionId\n\t,H.thOriginator --Entry?\n\t,H.thOperator --Posted by?\nFROM \n\t@{item().ExchCode}.DETAILS AS L\n\n\tLEFT JOIN @{item().ExchCode}.DOCUMENT AS H\n\t\tON H.thOurRef = L.tlOurRef\nWHERE\n\tL.tlYear = '@{item().ExchequerYear}'\n\t--Exclude rows with 0 tlCurrency, but include \n\t--those with 0 tlCurrency and tlGLCode 83050\n\tAND (\n\t\tL.tlCurrency != 0\n\t\tOR\n\t\t\t(\n\t\t\tL.tlCurrency = 0\n\t\t\tAND L.tlGLCode = 83050\n\t\t\t)\n\t\tOR\n\t\t\t(\n\t\t\tL.tlCurrency = 0\n\t\t\tAND L.tlGLCode = 83045\n\t\t\t)\n\t\t)",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "HomeID",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "IntranetID",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "IntranetID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "Homename",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "Homename",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlFolioNum",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlFolioNum",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlLineNo",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlLineNo",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlRunNo",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlRunNo",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlGLCode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlGLCode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlNominalMode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlNominalMode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlCurrency",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlCurrency",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlYear",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlYear",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlPeriod",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlPeriod",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDepartment",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlDepartment",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlCostCentre",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlCostCentre",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDocType",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlDocType",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQty",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQty",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQtyMul",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQtyMul",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlNetValue",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlNetValue",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDiscount",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlDiscount",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlVATCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlVATCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlVATAmount",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlVATAmount",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlPaymentCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlPaymentCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlOldPBal",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlOldPBal",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlRecStatus",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlRecStatus",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDiscFlag",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlDiscFlag",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQtyWOFF",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQtyWOFF",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQtyDel",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQtyDel",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlCost",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlCost",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlAcCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlAcCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlLineDate",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlLineDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlItemNo",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlItemNo",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDescription",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlDescription",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlJobCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlJobCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlAnalysisCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlAnalysisCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlOurRef",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlOurRef",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thLongYourRefTrans",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thLongYourRefTrans",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlPreviousBalance",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlPreviousBalance",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "DetailsPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "DetailsPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "thYourRef",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thYourRef",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thCreationDate",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thCreationDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thPostedDate",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thPostedDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "DocumentPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "DocumentPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_Exchequer",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer",
+												"Table": "STG_Details"
+											}
+										}
+									]
+								},
+								{
+									"name": "Delete Previous Year Data",
+									"description": "Runs the Procedure DeleteDetails$CompanyAndYear to delete the companies previous year data that was collected in the previous activity",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy Data to AH2",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "NonQuery",
+												"text": {
+													"value": "EXEC Exchequer.DeleteDetails$CompanyAndYear @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = @{item().ExchCode}",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Log Retry Success",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Delete Previous Year Data",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "EXEC [Exchequer].[DetailsRetry$LogRetryAttempt] @RetryRowID = @{item().RetryRowID}, @Successful = 'True'",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Log Retry Failure",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "Copy Data to AH2",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "EXEC [Exchequer].[DetailsRetry$LogRetryAttempt] @RetryRowID = @{item().RetryRowID}, @Successful = 'FALSE'",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Insert Previous Year Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "For Each Company",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\r\n    STG_Details.[ExchCompanyCode]\r\n    ,STG_Details.[HomeID]\r\n    ,STG_Details.[IntranetID]\r\n    ,STG_Details.[Homename]\r\n    ,STG_Details.[tlOurRef]\r\n    ,STG_Details.thYourRef\r\n    ,STG_Details.thLongYourRefTrans\r\n    ,STG_Details.[tlFolioNum]\r\n    ,STG_Details.[tlLineNo]\r\n    ,STG_Details.[tlRunNo]\r\n    ,STG_Details.[tlGLCode]\r\n    ,COALESCE(GeneralLedgerCategory.GLHistroyReport, RTRIM(GeneralLedgerCategory.GL_Name)) AS GL_Name\r\n    ,STG_Details.[tlNominalMode]\r\n    ,STG_Details.[tlCurrency]\r\n    ,CompanyPeriods.PeriodReportDate\r\n    ,STG_Details.[tlYear]\r\n    ,CompanyPeriods.[PeriodYear]\r\n    ,STG_Details.[tlPeriod]\r\n    ,CompanyPeriods.CalendarMonthLongName\r\n    ,CalendarFullDescription\r\n    ,STG_Details.[thCreationDate]\r\n    ,STG_Details.[thPostedDate]\r\n    ,STG_Details.[tlLineDate]\r\n    ,STG_Details.[tlDepartment]\r\n    ,STG_Details.[tlCostCentre]\r\n    ,STG_Details.[tlDocType]\r\n    ,STG_Details.[tlQty]\r\n    ,STG_Details.[tlQtyMul]\r\n    ,STG_Details.[tlNetValue]\r\n    ,STG_Details.[tlDiscount]\r\n    ,STG_Details.[tlVATCode]\r\n    ,STG_Details.[tlVATAmount]\r\n    ,STG_Details.[tlPaymentCode]\r\n    ,STG_Details.[tlOldPBal]\r\n    ,STG_Details.[tlRecStatus]\r\n    ,STG_Details.[tlDiscFlag]\r\n    ,STG_Details.[tlQtyWOFF]\r\n    ,STG_Details.[tlQtyDel]\r\n    ,STG_Details.[tlCost]\r\n    ,STG_Details.[tlAcCode]\r\n    ,STG_Details.[tlItemNo]\r\n    ,STG_Details.[tlDescription]\r\n    ,STG_Details.[tlJobCode]\r\n    ,STG_Details.[tlAnalysisCode]\r\n    ,STG_Details.[tlPreviousBalance]\r\n    ,STG_Details.[DetailsPositionId]\r\n    ,STG_Details.[DocumentPositionId]\r\n\r\nFROM \r\n    [Exchequer].[STG_Details]\r\n\r\n    LEFT JOIN Exchequer.CompanyPeriods\r\n        ON CompanyPeriods.ExchCompanyCode = STG_Details.ExchCompanyCode\r\n        AND CompanyPeriods.ExchequerYear = STG_Details.tlYear\r\n        AND CompanyPeriods.PeriodNo = STG_Details.tlPeriod\r\n\r\n    LEFT JOIN Exchequer.GeneralLedgerCategory \r\n        ON GeneralLedgerCategory.GL_CODE = STG_Details.tlGLCode\r\nORDER BY\r\n    [STG_Details].tlYear ASC,\r\n    [STG_Details].tlPeriod ASC,\r\n    [STG_Details].ExchCompanyCode ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"parallelCopies": 2,
+							"dataIntegrationUnits": 8,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ExchCompanyCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ExchCompanyCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "IntranetID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Homename",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "Homename",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlOurRef",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlOurRef",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "thYourRef",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "thYourRef",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "thLongYourRefTrans",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "thLongYourRefTrans",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlFolioNum",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlFolioNum",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlLineNo",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlLineNo",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlRunNo",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlRunNo",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlGLCode",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlGLCode",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "GL_Name",
+											"type": "String",
+											"physicalType": "nchar"
+										},
+										"sink": {
+											"name": "GL_Name",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlNominalMode",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlNominalMode",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlCurrency",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlCurrency",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "PeriodReportDate",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "PeriodReportDate",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "tlYear",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlYear",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "PeriodYear",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "CalendarYear",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlPeriod",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlPeriod",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "CalendarMonthLongName",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CalendarMonth",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CalendarFullDescription",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CalendarFullDescription",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "thCreationDate",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "thCreationDate",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "thPostedDate",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "thPostedDate",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlLineDate",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlLineDate",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlDepartment",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlDepartment",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlCostCentre",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlCostCentre",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlDocType",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlDocType",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlQty",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlQty",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlQtyMul",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlQtyMul",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlNetValue",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlNetValue",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlDiscount",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlDiscount",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlVATCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlVATCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlVATAmount",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlVATAmount",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlPaymentCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlPaymentCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlOldPBal",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlOldPBal",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlRecStatus",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "tlRecStatus",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "tlDiscFlag",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlDiscFlag",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlQtyWOFF",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlQtyWOFF",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlQtyDel",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlQtyDel",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlCost",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlCost",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "tlAcCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlAcCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlItemNo",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlItemNo",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlDescription",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlDescription",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlJobCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlJobCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlAnalysisCode",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "tlAnalysisCode",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "tlPreviousBalance",
+											"type": "Double",
+											"physicalType": "float"
+										},
+										"sink": {
+											"name": "tlPreviousBalance",
+											"type": "Double",
+											"physicalType": "float"
+										}
+									},
+									{
+										"source": {
+											"name": "DetailsPositionId",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "DetailsPositionId",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "DocumentPositionId",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "DocumentPositionId",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Exchequer",
+									"Table": "Details"
+								}
+							}
+						]
+					},
+					{
+						"name": "Clear stage Table Pre",
+						"type": "Script",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "NonQuery",
+									"text": "EXEC Exchequer.Clear$STG_Details"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Clear stage Table Post",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Insert Previous Year Data",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "NonQuery",
+									"text": "EXEC Exchequer.Clear$STG_Details"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Exch_Schema": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Exchequer/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_NominalCodes')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Export the Nominal Codes (GL Codes) from exchequer for each Company",
+				"activities": [
+					{
+						"name": "Company List",
+						"description": "List company codes ",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\n\tHomeID, \n\tHomename, \n\tExchCode\nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Company",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Company List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Company List').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy Users to AH2",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,glCode\n\t,glName\n\t,glParent\n\t,glType\n\t,glAltCode\n\t,glClass\n\t,glNomStr\n\t,glInactive\nFROM \n\t@{item().ExchCode}.NOMINAL\nORDER BY \n\tglCode ASC",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"ExchCompanyCode",
+													"HomeID",
+													"glCode"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "HomeID",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glCode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glCode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glParent",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glParent",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glType",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glType",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glAltCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glAltCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glClass",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glClass",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glNomStr",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glNomStr",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glInactive",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glInactive",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_Exchequer",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer",
+												"Table": "NominalCodes"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Exch_Schema": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Users')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Export the Users from the Exchequer System for all companies in the Homes table",
+				"activities": [
+					{
+						"name": "Company List",
+						"description": "List company codes ",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\n\tHomeID, \n\tHomename, \n\tExchCode\nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Company",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Company List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Company List').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy Users to AH2",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,'@{item().HomeID}' AS HomeID\n\t,M.varCode1Trans1 AS UserName\n\t,M.UserName AS FullName\n\t,M.EmailAddr\nFROM \n\t@{item().ExchCode}.MLOCSTK AS M\nWHERE \n\tM.RecPfix = 'P' \n\tAND M.SubType = 'D'\nORDER BY \n\tM.varCode1Trans1 ASC",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "upsert",
+											"upsertSettings": {
+												"useTempDB": true,
+												"keys": [
+													"ExchCompanyCode",
+													"UserName"
+												]
+											},
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "UserName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "UserName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "FullName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "FullName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "EmailAddr",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "Email",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "HomeID",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_Exchequer",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer",
+												"Table": "ExchequerUsers"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Exch_Schema": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Exchequer/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Fusion_DataImportCheck')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -7618,7 +9571,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Full_WeeklyHrs_Data')]",
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_Full_WeeklyHrs_Data')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -7626,7 +9579,7 @@
 				"activities": [
 					{
 						"name": "Set EndDateTime",
-						"description": "Find the most recent Sunday and set the time to 23:59:59\n\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
+						"description": "Find the most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -7644,7 +9597,7 @@
 					},
 					{
 						"name": "Set StartDateTime",
-						"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\n\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
+						"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -7735,7 +9688,7 @@
 						}
 					},
 					{
-						"name": "Stage Data",
+						"name": "Stage Data and Remove Old Payline Records",
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
@@ -7763,7 +9716,7 @@
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Stage Data",
+								"activity": "Stage Data and Remove Old Payline Records",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -7879,6 +9832,8 @@
 					{
 						"name": "Remove Duplicate Paylines",
 						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
 								"activity": "Upsert To Final Tables",
@@ -7912,6 +9867,341 @@
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EndDateTime": {
+						"type": "String"
+					},
+					"StartDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Full_WeeklyHrs_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Gets the data for Shifts and Paylines for weekly hrs, a set number of weeks ago using parameters",
+				"activities": [
+					{
+						"name": "Set EndDateTime",
+						"description": "Find the 2nd most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.\n\nThen Subtract 7 days",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EndDateTime",
+							"value": {
+								"value": "@concat(\n    formatDateTime(\n        addDays(\n            addDays(\n                utcNow(),\n                mul(-1, dayOfWeek(utcNow()))\n            ),\n            mul(pipeline().parameters.WeeksBack, -7)\n        ),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set StartDateTime",
+						"description": "Set the start date to be 6 days before the calculated end date",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set EndDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "StartDateTime",
+							"value": {
+								"value": "@concat(\n    formatDateTime(\n        addDays(variables('EndDateTime'), -6),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get Shifts Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Set StartDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_GetFullWeekData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "shifts",
+								"MinStartDate": {
+									"value": "@variables('StartDateTime')",
+									"type": "Expression"
+								},
+								"MaxStartDate": {
+									"value": "@variables('EndDateTime')",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Get PayLines Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_GetFullWeekData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "paylines",
+								"MinStartDate": {
+									"value": "@variables('StartDateTime')",
+									"type": "Expression"
+								},
+								"MaxStartDate": {
+									"value": "@variables('EndDateTime')",
+									"type": "Expression"
+								},
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stage Data and Remove Old Payline Records",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Pre Clear Stage Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Upsert To Final Tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage Data and Remove Old Payline Records",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Pre Clear Stage Tables",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Get PayLines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clear$StageTables"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Post Clear Stage Tables",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Update AH1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clear$StageTables"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Update AH1",
+						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Remove Duplicate Paylines",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Remove Duplicate Paylines",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Upsert To Final Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Remove$DuplicatePaylines"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"WeeksBack": {
+						"type": "int"
+					},
+					"FileNameType": {
+						"type": "string"
+					}
 				},
 				"variables": {
 					"EndDateTime": {
@@ -8008,1327 +10298,6 @@
 				},
 				"folder": {
 					"name": "Sona"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_Emp_periods')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Retrieve Emp Periods, stage them and upsert to final table",
-				"activities": [
-					{
-						"name": "Get Employment Periods",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EndPoint": "emp_periods"
-							}
-						}
-					},
-					{
-						"name": "Stage Emp Periods",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Get Employment Periods",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Stage_Emp_Periods",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Upsert EmploymentPeriods",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Stage Emp Periods",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT  [active]\n      ,[EmploymentPeriods_id]\n      ,[start_date]\n      ,[idx]\n      ,[job_id]\n      ,[organisation_id]\n      ,[user_id]\n      ,[finish_date]\n      ,[organisation_user_id]\n      ,[employment_specs_id]\n      ,[employment_specs_contracted_hours_id]\n      ,[employment_specs_contracted_hours_period]\n      ,[employment_specs_contracted_hours_hours]\n      ,[employment_specs_contracted_hours_days]\n      ,[employment_specs_contracted_hours_start_date]\n      ,[employment_specs_contracted_hours_idx]\n      ,[employment_specs_contracted_hours_org_unit_id]\n      ,[employment_specs_contracted_hours_finish_date]\n      ,[employment_specs_contracted_hours_colour_coding]\n      ,[employment_specs_contracted_hours_type_of_work_id]\n      ,[employment_specs_contracted_hours_monthly_period_starts_at]\n      ,[employment_specs_contracted_hours_weekly_period_starts_at]\n      ,[employment_specs_contracted_hours_rolling_period_sequence_length_days]\n      ,[employment_specs_contracted_hours_rolling_period_sequence_start]\n      ,[employment_specs_contract_types_id]\n      ,[employment_specs_contract_types_name]\n      ,[employment_specs_contract_types_employment_type]\n      ,[employment_specs_contract_types_pay_period_start]\n      ,[employment_specs_contract_types_pay_period_type]\n      ,[employment_specs_contract_types_payroll_rule]\n      ,[employment_specs_contract_types_employment_basis]\n      ,[employment_specs_rates_of_pay_id]\n      ,[employment_specs_rates_of_pay_start_date]\n      ,[employment_specs_rates_of_pay_idx]\n      ,[employment_specs_rates_of_pay_finish_date]\n      ,TRY_CAST(REPLACE(REPLACE([employment_specs_rates_of_pay_rate], '£', ''), ',', '') AS decimal(10,2)) AS [employment_specs_rates_of_pay_rate]\n      ,[employment_specs_rates_of_pay_pay_type]\n      ,[primary_org_unit_id]\n      ,[employee_number]\n      ,[continuous_employment_start_date]\n      ,[level_id]\n      ,[job_grade_id]\n      ,[reports_to_user_id]\n      ,[reports_to_org_user_id]\n      ,[starter_declaration]\n      ,[student_loan_plan_four]\n      ,[student_loan_plan_one]\n      ,[student_loan_plan_two]\n      ,[student_loan_post_graduate]\n      ,[tupe]\n  FROM [Sona].[STG_EmploymentPeriods]\n",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"EmploymentPeriod_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "active",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "active",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "EmploymentPeriods_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EmploymentPeriod_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "start_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "start_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "idx",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "idx",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "job_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "job_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "organisation_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "organisation_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "user_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "user_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "finish_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "finish_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "organisation_user_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "organisation_user_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_period",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_period",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_hours",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_hours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_days",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_days",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 4
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_start_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_start_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_idx",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_idx",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_org_unit_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_org_unit_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_finish_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_finish_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_colour_coding",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_colour_coding",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_type_of_work_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_type_of_work_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_monthly_period_starts_at",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_monthly_period_starts_at",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 4
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_weekly_period_starts_at",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_weekly_period_starts_at",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_length_days",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_length_days",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 4
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_start",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_start",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_name",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_employment_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_type",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_pay_period_start",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_start",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_pay_period_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_type",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_payroll_rule",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_payroll_rule",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_contract_types_employment_basis",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_basis",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_rates_of_pay_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_rates_of_pay_start_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_start_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_rates_of_pay_idx",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_idx",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_rates_of_pay_finish_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_finish_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_rates_of_pay_rate",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_rate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 10
-										}
-									},
-									{
-										"source": {
-											"name": "employment_specs_rates_of_pay_pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_pay_type",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "primary_org_unit_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "primary_org_unit_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "employee_number",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "employee_number",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "continuous_employment_start_date",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "continuous_employment_start_date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "level_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "level_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "job_grade_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "job_grade_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "reports_to_user_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "reports_to_user_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "reports_to_org_user_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "reports_to_org_user_id",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "starter_declaration",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "starter_declaration",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "student_loan_plan_four",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "student_loan_plan_four",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "student_loan_plan_one",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "student_loan_plan_one",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "student_loan_plan_two",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "student_loan_plan_two",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "student_loan_post_graduate",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "student_loan_post_graduate",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "tupe",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "tupe",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "EmploymentPeriods"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_Data')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Gets the past 3 days of Shifts and Paylines",
-				"activities": [
-					{
-						"name": "Set EndDateTime",
-						"description": "Set Today as end date time at 23:59:59",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "EndDateTime",
-							"value": {
-								"value": "@concat(\n    formatDateTime(utcNow(), 'yyyy-MM-dd'),\n    'T23:59:59Z'\n)",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set StartDateTime",
-						"description": "Set Start day to be 3 days prior to today at 00:00:00",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "StartDateTime",
-							"value": {
-								"value": "@concat(\n    formatDateTime(addDays(utcNow(), -3), 'yyyy-MM-dd'),\n    'T00:00:00Z'\n)",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Get Shifts Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Set EndDateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set StartDateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EndPoint": "shifts",
-								"MinStartDate": {
-									"value": "@variables('StartDateTime')",
-									"type": "Expression"
-								},
-								"MaxStartDate": {
-									"value": "@variables('EndDateTime')",
-									"type": "Expression"
-								}
-							}
-						}
-					},
-					{
-						"name": "Get PayLines Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Get Shifts Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EndPoint": "paylines",
-								"MinStartDate": {
-									"value": "@variables('StartDateTime')",
-									"type": "Expression"
-								},
-								"MaxStartDate": {
-									"value": "@variables('EndDateTime')",
-									"type": "Expression"
-								}
-							}
-						}
-					},
-					{
-						"name": "Stage Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Pre Clear Stage Tables",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Stage_WeeklyHr_data",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update AH1",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Upsert To Final Tables",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Upsert To Final Tables",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Stage Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Pre Clear Stage Tables",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Get PayLines Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "EXEC Sona.Clear$StageTables"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
-						"name": "Post Clear Stage Tables",
-						"type": "Script",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Update AH1",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "EXEC Sona.Clear$StageTables"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"EndDateTime": {
-						"type": "String"
-					},
-					"StartDateTime": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Sona"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_CH_IP_LedgerDetails_MultiHome')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "ForEach1",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get Home List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get Home List').output.value",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Export Ledger and comments",
-									"type": "Copy",
-									"dependsOn": [
-										{
-											"activity": "Set HOME_REF",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "SELECT\t \n\t'@{variables('Home_Ref')}' AS HOME_REF,\n\tSite.SiteId AS siteid,\n\tSite.SiteName as sitename, \n\tRESIDENT.RES_CODE as resident_no,\n\tInvPosting.account_No, \n\tInvPosting.Cre_DateT AS created_date, \n\tInvPosting.Inv_Date AS transaction_date,\n\tCASE \n\t\tWHEN InvPosting.Tran_Type = 'U' THEN 'Receipt'\n\t\tWHEN InvPosting.Tran_Type = 'I' THEN 'Invoice'\n\t\tWHEN InvPosting.Tran_Type = 'C' THEN 'Credit'\n\t\tWHEN InvPosting.Tran_Type = 'J' THEN 'Adjustment'\n\t\tELSE ''\n\tEND AS transaction_type,\n\tInvPosting.Ref1 AS transaction_ref1, \n\tInvPosting.Ref2 AS transaction_ref2, \n\tInvPosting.Value AS transaction_value, \n\tInvPosting.Balance AS transaction_balance, \n\tMemo,\n\tUSERCOMM AS UserComment\nFROM\t\t \n\tInvPosting (NOLOCK) \n\t\n\tJOIN Site (NOLOCK) \n\t\tON Site.Site_Ref = InvPosting.Site_Ref\n\n\tLEFT JOIN RESIDENT (NOLOCK)\n\t\tON RESIDENT.RES_REF = INVPOSTING.RES_REF\nWHERE\t\n\tInvPosting.Site_Ref  = '@{item().SITE_REF}'",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_CH_IP",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Yardi_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Filename": {
-													"value": "@concat(variables('Home_Ref'), ' - Full Ledger Comments - ', utcNow('yyyy-MM-dd'), '.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Lookup Home",
-									"type": "Lookup",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [
-										{
-											"name": "SiteRefParam",
-											"value": "@item().SITE_REF"
-										}
-									],
-									"typeProperties": {
-										"source": {
-											"type": "AzureSqlSource",
-											"sqlReaderQuery": {
-												"value": "SELECT HOME_REF, HomeName, SITE_REF \nFROM ColdHarbourHomeID \nWHERE SITE_REF = '@{item().SITE_REF}'",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"dataset": {
-											"referenceName": "DS_AH2_YardiStage",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										},
-										"firstRowOnly": true
-									}
-								},
-								{
-									"name": "Set HOME_REF",
-									"type": "SetVariable",
-									"dependsOn": [
-										{
-											"activity": "Lookup Home",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"variableName": "Home_Ref",
-										"value": {
-											"value": "@activity('Lookup Home').output.firstRow.HOME_REF",
-											"type": "Expression"
-										}
-									}
-								}
-							]
-						}
-					},
-					{
-						"name": "Get Home List",
-						"type": "Lookup",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": {
-									"value": "SELECT SITE_REF FROM ColdHarbourHomeID WHERE \nHOME_REF IN (@{variables('Home_ref_List')})",
-									"type": "Expression"
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_YardiStage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"Home_Ref": {
-						"type": "Integer"
-					},
-					"Home_ref_List": {
-						"type": "String",
-						"defaultValue": "632,610,651,639"
-					}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Yardi_Fusion_Residents')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Resident Data",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "MySqlSource",
-								"query": {
-									"value": "SELECT * FROM fusion_avery.serviceuser\nWHERE\n\thome_ID IN (@{variables('HomeIDList')})",
-									"type": "Expression"
-								}
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "FusionMySQL",
-								"type": "DatasetReference",
-								"parameters": {
-									"TableName": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('Fusion - Residents -', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"HomeIDList": {
-						"type": "String",
-						"defaultValue": "32,34,48,50,46,35,59,61,62,64,67,63,71,74"
-					}
-				},
-				"folder": {
-					"name": "Yardi/Fusion"
 				},
 				"annotations": []
 			},
