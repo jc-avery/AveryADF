@@ -1,11 +1,11 @@
 {
-	"name": "xPL_Sona_Full_WeeklyHrs_Data",
+	"name": "PL_Sona_Full_WeeklyHrs_Data",
 	"properties": {
-		"description": "Gets the previous week data for Shifts and Paylines",
+		"description": "Gets the data for Shifts and Paylines for weekly hrs, a set number of weeks ago using parameters",
 		"activities": [
 			{
 				"name": "Set EndDateTime",
-				"description": "Find the most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
+				"description": "Find the 2nd most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.\n\nThen Subtract 7 days",
 				"type": "SetVariable",
 				"dependsOn": [],
 				"policy": {
@@ -16,16 +16,23 @@
 				"typeProperties": {
 					"variableName": "EndDateTime",
 					"value": {
-						"value": "@concat(\n    formatDateTime(\n        addDays(utcNow(), mul(-1, dayOfWeek(utcNow()))),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
+						"value": "@concat(\n    formatDateTime(\n        addDays(\n            addDays(\n                utcNow(),\n                mul(-1, dayOfWeek(utcNow()))\n            ),\n            mul(pipeline().parameters.WeeksBack, -7)\n        ),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
 						"type": "Expression"
 					}
 				}
 			},
 			{
 				"name": "Set StartDateTime",
-				"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
+				"description": "Set the start date to be 6 days before the calculated end date",
 				"type": "SetVariable",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Set EndDateTime",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"secureOutput": false,
 					"secureInput": false
@@ -34,7 +41,7 @@
 				"typeProperties": {
 					"variableName": "StartDateTime",
 					"value": {
-						"value": "@concat(\n    formatDateTime(\n        addDays(utcNow(), sub(mul(-1, dayOfWeek(utcNow())), 6)),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
+						"value": "@concat(\n    formatDateTime(\n        addDays(variables('EndDateTime'), -6),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
 						"type": "Expression"
 					}
 				}
@@ -43,12 +50,6 @@
 				"name": "Get Shifts Data",
 				"type": "ExecutePipeline",
 				"dependsOn": [
-					{
-						"activity": "Set EndDateTime",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
 					{
 						"activity": "Set StartDateTime",
 						"dependencyConditions": [
@@ -74,6 +75,10 @@
 						},
 						"MaxStartDate": {
 							"value": "@variables('EndDateTime')",
+							"type": "Expression"
+						},
+						"FileName": {
+							"value": "@pipeline().parameters.FileNameType",
 							"type": "Expression"
 						}
 					}
@@ -109,6 +114,10 @@
 						"MaxStartDate": {
 							"value": "@variables('EndDateTime')",
 							"type": "Expression"
+						},
+						"FileName": {
+							"value": "@pipeline().parameters.FileNameType",
+							"type": "Expression"
 						}
 					}
 				}
@@ -133,7 +142,13 @@
 						"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"FileName": {
+							"value": "@pipeline().parameters.FileNameType",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -288,6 +303,14 @@
 				}
 			}
 		],
+		"parameters": {
+			"WeeksBack": {
+				"type": "int"
+			},
+			"FileNameType": {
+				"type": "string"
+			}
+		},
 		"variables": {
 			"EndDateTime": {
 				"type": "String"
