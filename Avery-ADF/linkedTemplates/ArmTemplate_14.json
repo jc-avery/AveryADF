@@ -3220,63 +3220,23 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_AEMS_Export')]",
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall_Export')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
 				"activities": [
 					{
-						"name": "Execute Pipeline1",
-						"type": "ExecutePipeline",
+						"name": "Export InterCall Data",
+						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Remove CR and LF",
+								"activity": "Set vFileName",
 								"dependencyConditions": [
 									"Succeeded"
 								]
 							}
 						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AEMS_Enquiries_Export",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Execute Pipeline2",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Execute Pipeline1",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_AEMS_Export_PBData",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Remove CR and LF",
-						"type": "SqlServerStoredProcedure",
-						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
 							"retry": 0,
@@ -3286,22 +3246,180 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"storedProcedureName": "[[AEMS].[Enquiries$RemoveHiddenCharacters]"
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[InterCall].[Export$DataForSharePoint]",
+								"storedProcedureParameters": {
+									"ExportType": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.ExportType",
+											"type": "Expression"
+										}
+									},
+									"Home": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Home",
+											"type": "Expression"
+										}
+									},
+									"ReportDate": {
+										"type": "DateTime",
+										"value": {
+											"value": "@pipeline().parameters.ReportDate",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
 						},
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Directory",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(pipeline().parameters.ReportDate, 'yyyy'),'/',formatDateTime(pipeline().parameters.ReportDate, 'MM'),'/',formatDateTime(pipeline().parameters.ReportDate, 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Sharepoint Upload Loagic App",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Export InterCall Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+							"body": {
+								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{pipeline().parameters.ReportDate}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set Directory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFileName",
+							"value": {
+								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',pipeline().parameters.ReportDate,'.csv')",
+								"type": "Expression"
+							}
 						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
-				"folder": {
-					"name": "AEMS"
+				"parameters": {
+					"ExportType": {
+						"type": "string"
+					},
+					"ReportDate": {
+						"type": "string"
+					},
+					"Home": {
+						"type": "string"
+					}
 				},
-				"annotations": [],
-				"lastPublishTime": "2024-04-29T16:06:59Z"
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vFileName": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls/Child Pipelines"
+				},
+				"annotations": []
 			},
 			"dependsOn": []
 		}
