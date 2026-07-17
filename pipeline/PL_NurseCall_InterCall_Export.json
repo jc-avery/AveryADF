@@ -103,7 +103,14 @@
 			{
 				"name": "Set vDirectory",
 				"type": "SetVariable",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Set vReportDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"secureOutput": false,
 					"secureInput": false
@@ -112,7 +119,7 @@
 				"typeProperties": {
 					"variableName": "vDirectory",
 					"value": {
-						"value": "@concat(formatDateTime(pipeline().parameters.ReportDate, 'yyyy'),'/',formatDateTime(pipeline().parameters.ReportDate, 'MM'),'/',formatDateTime(pipeline().parameters.ReportDate, 'dd') )",
+						"value": "@concat(formatDateTime(variables('vReportDate'), 'yyyy'),'/',formatDateTime(variables('vReportDate'), 'MM'),'/',formatDateTime(variables('vReportDate'), 'dd') )",
 						"type": "Expression"
 					}
 				}
@@ -140,7 +147,7 @@
 					"method": "POST",
 					"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
 					"body": {
-						"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{pipeline().parameters.ReportDate}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
+						"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportDate')}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
 						"type": "Expression"
 					}
 				}
@@ -164,7 +171,105 @@
 				"typeProperties": {
 					"variableName": "vFileName",
 					"value": {
-						"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',pipeline().parameters.ReportDate,'.csv')",
+						"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vReportDate'),'.csv')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "If Condition - check if true",
+				"type": "IfCondition",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(pipeline().parameters.ExportType,'Daily')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Switch Expression",
+				"type": "Switch",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "If Condition - check if true",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.ExportType",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "Daily",
+							"activities": [
+								{
+									"name": "Set vReportDate_Daily",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vReportDate",
+										"value": {
+											"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "Weekly",
+							"activities": [
+								{
+									"name": "Set vReportDate_Weekly",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vReportDate",
+										"value": {
+											"value": "@addDays(utcNow(), -5,'yyyy-MM-dd')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Set vReportDate",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vReportDate",
+					"value": {
+						"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
 						"type": "Expression"
 					}
 				}
@@ -172,9 +277,6 @@
 		],
 		"parameters": {
 			"ExportType": {
-				"type": "string"
-			},
-			"ReportDate": {
 				"type": "string"
 			},
 			"Home": {
@@ -186,6 +288,9 @@
 				"type": "String"
 			},
 			"vFileName": {
+				"type": "String"
+			},
+			"vReportDate": {
 				"type": "String"
 			}
 		},
