@@ -1,0 +1,316 @@
+{
+	"name": "PL_ColdHarbour_Export_IP_Tables",
+	"properties": {
+		"description": "Exports CH IP tables to azure storage account",
+		"activities": [
+			{
+				"name": "Set vDirectory",
+				"description": "Todays date used for directory/storage location in storage account",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set vToday",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vDirectory",
+					"value": {
+						"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd') )",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set vToday",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vToday",
+					"value": {
+						"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Lookup Table Export List",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set vDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT SchemaName, TableName FROM ColdHarbour.TableExportList",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "For Eaxh Export Table",
+				"description": "For each table listed in ColdHarbour.TableExportList\nExport the table from CH to a CSV file, Create a Parquet file from the CSV file,\nThen Delete the csv file.",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup Table Export List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup Table Export List').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Create CSV",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"queryTimeout": "00:20:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OnPrem_CH_IP",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": {
+											"value": "@item().SchemaName",
+											"type": "Expression"
+										},
+										"Table": {
+											"value": "@item().TableName",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ColdHarbour_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Create Parquet from CSV",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Create CSV",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": false,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_ColdHarbour_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ColdHarbour_Parquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.parquet')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete CSV File",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Create Parquet from CSV",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_ColdHarbour_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": "@variables('vDirectory')",
+										"FileName": {
+											"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
+											"type": "Expression"
+										}
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"enablePartitionDiscovery": false
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"vDirectory": {
+				"type": "String"
+			},
+			"vToday": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Cold Harbour"
+		},
+		"annotations": []
+	}
+}
