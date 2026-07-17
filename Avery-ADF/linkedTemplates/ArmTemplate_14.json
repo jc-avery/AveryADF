@@ -21,6 +21,147 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Move_WebHook_Files_Step2')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Moves the merged user and result file back to YourHippo container.",
+				"activities": [
+					{
+						"name": "Copy Merged files",
+						"description": "Move merged files to AZ storage container",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Remove webhookfiles",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "yh_merged*.json",
+									"deleteFilesAfterCompletion": false
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Polestar_Storage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "yourhippo",
+									"Directory": {
+										"value": "@concat('mergedfiles', '/', formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Remove webhookfiles",
+						"type": "Delete",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureFileStorageReadSettings",
+								"recursive": true,
+								"wildcardFileName": "webhook$*.json",
+								"enablePartitionDiscovery": false
+							}
+						}
+					},
+					{
+						"name": "Remove webhookfiles_copy1",
+						"type": "Delete",
+						"dependsOn": [
+							{
+								"activity": "Copy Merged files",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_PolestarStorageAcc_Fileshare",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureFileStorageReadSettings",
+								"recursive": true,
+								"wildcardFileName": "yh_merged_*.json",
+								"enablePartitionDiscovery": false
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "YourHippo/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_YourHippo_Process_Merged_Files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3216,210 +3357,6 @@
 						"     )) ~> ClockingsTable"
 					]
 				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall_Export')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
-				"activities": [
-					{
-						"name": "Export InterCall Data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set vFileName",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderStoredProcedureName": "[[InterCall].[Export$DataForSharePoint]",
-								"storedProcedureParameters": {
-									"ExportType": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.ExportType",
-											"type": "Expression"
-										}
-									},
-									"Home": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.Home",
-											"type": "Expression"
-										}
-									},
-									"ReportDate": {
-										"type": "DateTime",
-										"value": {
-											"value": "@pipeline().parameters.ReportDate",
-											"type": "Expression"
-										}
-									}
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_NurseCall_Csv",
-								"type": "DatasetReference",
-								"parameters": {
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									},
-									"Filename": {
-										"value": "@variables('vFileName')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Directory",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(pipeline().parameters.ReportDate, 'yyyy'),'/',formatDateTime(pipeline().parameters.ReportDate, 'MM'),'/',formatDateTime(pipeline().parameters.ReportDate, 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Sharepoint Upload Loagic App",
-						"type": "WebActivity",
-						"dependsOn": [
-							{
-								"activity": "Export InterCall Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "POST",
-							"headers": {},
-							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
-							"body": {
-								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{pipeline().parameters.ReportDate}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vFileName",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set Directory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vFileName",
-							"value": {
-								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',pipeline().parameters.ReportDate,'.csv')",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"ExportType": {
-						"type": "string"
-					},
-					"ReportDate": {
-						"type": "string"
-					},
-					"Home": {
-						"type": "string"
-					}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vFileName": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Nurse Calls/Child Pipelines"
-				},
-				"annotations": []
 			},
 			"dependsOn": []
 		}

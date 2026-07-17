@@ -4793,6 +4793,315 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall_Export')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
+				"activities": [
+					{
+						"name": "Export InterCall Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vFileName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[InterCall].[Export$DataForSharePoint]",
+								"storedProcedureParameters": {
+									"ExportType": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.ExportType",
+											"type": "Expression"
+										}
+									},
+									"Home": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Home",
+											"type": "Expression"
+										}
+									},
+									"ReportDate": {
+										"type": "DateTime",
+										"value": {
+											"value": "@variables('vReportDate')",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vDirectory",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vReportDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vReportDate'), 'yyyy'),'/',formatDateTime(variables('vReportDate'), 'MM'),'/',formatDateTime(variables('vReportDate'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Sharepoint Upload Loagic App",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Export InterCall Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+							"body": {
+								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportDate')}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFileName",
+							"value": {
+								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vReportDate'),'.csv')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "If Condition - check if true",
+						"type": "IfCondition",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(pipeline().parameters.ExportType,'Daily')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Switch Expression",
+						"type": "Switch",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "If Condition - check if true",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.ExportType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "Daily",
+									"activities": [
+										{
+											"name": "Set vReportDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vReportDate",
+												"value": {
+													"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Weekly",
+									"activities": [
+										{
+											"name": "Set vReportDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vReportDate",
+												"value": {
+													"value": "@addDays(utcNow(), -5,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Set vReportDate",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vReportDate",
+							"value": {
+								"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ExportType": {
+						"type": "string"
+					},
+					"Home": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vFileName": {
+						"type": "String"
+					},
+					"vReportDate": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -9474,225 +9783,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-08-20T15:53:45Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Softworks_RateSheets')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "For Each File",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get File List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get File List').output.childItems",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Copy from file to SQL",
-									"description": "the @item().Name variable is key on the source. the .Name provides the childItem Name from the output of the Metadata task",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": true,
-												"wildcardFolderPath": "RateSheets",
-												"wildcardFileName": {
-													"value": "@item().Name",
-													"type": "Expression"
-												},
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "AzureSqlSink",
-											"writeBehavior": "insert",
-											"sqlWriterUseTableLock": false
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"mappings": [
-												{
-													"source": {
-														"name": "Employee Number",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "EmployeeID",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "Employee Name",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "EmployeeName",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "Contract Type",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "ContractType",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "Contract Start Date",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "ContractStartDate",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "Contract End Date",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "ContractEndDate",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "External Reference",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "ExternalReference",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "Is Default",
-														"type": "String",
-														"physicalType": "String"
-													},
-													"sink": {
-														"name": "IsDefault",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												}
-											],
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Softworks_RateSheets",
-											"type": "DatasetReference",
-											"parameters": {}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_AH2_TRANSFORM_DB",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "Softworks",
-												"Table": "EmployeeRates"
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Get File List",
-						"type": "GetMetadata",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_PolestarStorageAcc_Softworks_RateSheets",
-								"type": "DatasetReference",
-								"parameters": {}
-							},
-							"fieldList": [
-								"childItems"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "DelimitedTextReadSettings"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Softworks"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-07-23T14:21:03Z"
 			},
 			"dependsOn": []
 		}

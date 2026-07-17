@@ -2261,6 +2261,30 @@
 		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
 			"type": "string",
 			"defaultValue": "blob"
+		},
+		"SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
+			"type": "string",
+			"defaultValue": "Daily"
+		},
+		"SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
+			"type": "string",
+			"defaultValue": "Silvermere"
+		},
+		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
+			"type": "string",
+			"defaultValue": "Weekly"
+		},
+		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
+			"type": "string",
+			"defaultValue": "Silvermere"
+		},
+		"SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
+			"type": "string",
+			"defaultValue": "Monthly"
+		},
+		"SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
+			"type": "string",
+			"defaultValue": "Silvermere"
 		}
 	},
 	"variables": {
@@ -53445,6 +53469,318 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall_Export')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
+				"activities": [
+					{
+						"name": "Export InterCall Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vFileName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[InterCall].[Export$DataForSharePoint]",
+								"storedProcedureParameters": {
+									"ExportType": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.ExportType",
+											"type": "Expression"
+										}
+									},
+									"Home": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Home",
+											"type": "Expression"
+										}
+									},
+									"ReportDate": {
+										"type": "DateTime",
+										"value": {
+											"value": "@variables('vReportDate')",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vDirectory",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vReportDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vReportDate'), 'yyyy'),'/',formatDateTime(variables('vReportDate'), 'MM'),'/',formatDateTime(variables('vReportDate'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Sharepoint Upload Loagic App",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Export InterCall Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+							"body": {
+								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportDate')}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFileName",
+							"value": {
+								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vReportDate'),'.csv')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "If Condition - check if true",
+						"type": "IfCondition",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(pipeline().parameters.ExportType,'Daily')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Switch Expression",
+						"type": "Switch",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "If Condition - check if true",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.ExportType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "Daily",
+									"activities": [
+										{
+											"name": "Set vReportDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vReportDate",
+												"value": {
+													"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Weekly",
+									"activities": [
+										{
+											"name": "Set vReportDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vReportDate",
+												"value": {
+													"value": "@addDays(utcNow(), -5,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Set vReportDate",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vReportDate",
+							"value": {
+								"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ExportType": {
+						"type": "string"
+					},
+					"Home": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vFileName": {
+						"type": "String"
+					},
+					"vReportDate": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/datasets/DS_NurseCall_Csv')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -101329,210 +101665,133 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall_Export')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
+			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Daily')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
-				"activities": [
+				"description": "Exports data from the InterCall data on Transform for the previous day and triggers the NurseCall-SharePoint-Upload Logic app to execute, passing paramters to it to allow it to retrieve the exported file, created the directory if needed and create a copy of the file there",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
 					{
-						"name": "Export InterCall Data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set vFileName",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
+						"pipelineReference": {
+							"referenceName": "PL_NurseCall_InterCall_Export",
+							"type": "PipelineReference"
 						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderStoredProcedureName": "[[InterCall].[Export$DataForSharePoint]",
-								"storedProcedureParameters": {
-									"ExportType": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.ExportType",
-											"type": "Expression"
-										}
-									},
-									"Home": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.Home",
-											"type": "Expression"
-										}
-									},
-									"ReportDate": {
-										"type": "DateTime",
-										"value": {
-											"value": "@pipeline().parameters.ReportDate",
-											"type": "Expression"
-										}
-									}
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_NurseCall_Csv",
-								"type": "DatasetReference",
-								"parameters": {
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									},
-									"Filename": {
-										"value": "@variables('vFileName')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Set Directory",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(pipeline().parameters.ReportDate, 'yyyy'),'/',formatDateTime(pipeline().parameters.ReportDate, 'MM'),'/',formatDateTime(pipeline().parameters.ReportDate, 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Sharepoint Upload Loagic App",
-						"type": "WebActivity",
-						"dependsOn": [
-							{
-								"activity": "Export InterCall Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "POST",
-							"headers": {},
-							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
-							"body": {
-								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{pipeline().parameters.ReportDate}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vFileName",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set Directory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vFileName",
-							"value": {
-								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',pipeline().parameters.ReportDate,'.csv')",
-								"type": "Expression"
-							}
+						"parameters": {
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
+							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
 						}
 					}
 				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"ExportType": {
-						"type": "string"
-					},
-					"ReportDate": {
-						"type": "string"
-					},
-					"Home": {
-						"type": "string"
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2026-07-17T08:12:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								7
+							]
+						}
 					}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vFileName": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Nurse Calls/Child Pipelines"
-				},
-				"annotations": []
+				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
-				"[concat(variables('factoryId'), '/datasets/DS_NurseCall_Csv')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_InterCall_Export')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Weekly')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_NurseCall_InterCall_Export",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
+							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-17T08:43:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								45
+							],
+							"hours": [
+								7
+							],
+							"weekDays": [
+								"Monday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_InterCall_Export')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Monthly')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_NurseCall_InterCall_Export",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
+							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Month",
+						"interval": 1,
+						"startTime": "2026-07-17T08:44:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								8
+							],
+							"monthDays": [
+								1
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_NurseCall_InterCall_Export')]"
 			]
 		}
 	]
