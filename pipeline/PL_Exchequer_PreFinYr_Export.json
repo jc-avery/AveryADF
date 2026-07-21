@@ -1,0 +1,403 @@
+{
+	"name": "PL_Exchequer_PreFinYr_Export",
+	"properties": {
+		"activities": [
+			{
+				"name": "For Each Company",
+				"type": "ForEach",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Company List and Previous Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Company List and Previous Year').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Export Details Data to csv",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OnPrem_Exchequer",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "@{item().ExchCode}",
+										"Table": "Details"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV_Export",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().ExchCode,'_',item().Homename,'_Details_Table_',variables('vToday'),'.csv')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Export Document Data to csv",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Export Details Data to csv",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlServerSource",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_OnPrem_Exchequer",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "@{item().ExchCode}",
+										"Table": "Document"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV_Export",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().ExchCode,'_',item().Homename,'_Document_Table_',variables('vToday'),'.csv')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			},
+			{
+				"name": "Set vDirectory",
+				"description": "Todays date used for directory/storage location in storage account",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set vToday",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vDirectory",
+					"value": {
+						"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'),'/previousYear' )",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set vToday",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vToday",
+					"value": {
+						"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Company List and Previous Year",
+				"description": "List company codes and the previous year, used to refresh the details data for the previous financial year BEFORE running the Current Fin Year",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Set vDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @PreviousYear AS DATE = DATEFROMPARTS(YEAR(DATEADD(YEAR,-1,@Today)), MONTH(@Today), 1)\n\nSELECT TOP 2\n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @PreviousYear\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Get FileList",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "For Each Company",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_Polestar_Storage",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "exchequer",
+							"Directory": {
+								"value": "@variables('vDirectory')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems",
+						"itemName"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "ForEach File",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get FileList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get FileList').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Copy data1",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV_Export",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().Name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_Exchequer_Parquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vDirectory')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@replace(item().Name, '.csv', '.parquet' )",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"vToday": {
+				"type": "String"
+			},
+			"vDirectory": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Exchequer"
+		},
+		"annotations": []
+	}
+}
