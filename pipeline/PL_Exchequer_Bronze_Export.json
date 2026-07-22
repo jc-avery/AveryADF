@@ -80,7 +80,7 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"Directory": {
-											"value": "@variables('vDirectory')",
+											"value": "@concat(variables('vDirectory'),'/Details')",
 											"type": "Expression"
 										},
 										"FileName": {
@@ -153,7 +153,7 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"Directory": {
-											"value": "@variables('vDirectory')",
+											"value": "@concat(variables('vDirectory'),'/Document')",
 											"type": "Expression"
 										},
 										"FileName": {
@@ -248,7 +248,7 @@
 				}
 			},
 			{
-				"name": "Get FileList",
+				"name": "Get Details FileList",
 				"type": "GetMetadata",
 				"dependsOn": [
 					{
@@ -273,7 +273,7 @@
 						"parameters": {
 							"Container": "exchequer",
 							"Directory": {
-								"value": "@variables('vDirectory')",
+								"value": "@concat(variables('vDirectory'),'/Details')",
 								"type": "Expression"
 							}
 						}
@@ -293,11 +293,11 @@
 				}
 			},
 			{
-				"name": "ForEach File Create a Parquet File and Delete CSV",
+				"name": "ForEach Details CSV Create a Parquet File and Delete",
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "Get FileList",
+						"activity": "Get Details FileList",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -306,7 +306,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@activity('Get FileList').output.childItems",
+						"value": "@activity('Get Details FileList').output.childItems",
 						"type": "Expression"
 					},
 					"activities": [
@@ -359,7 +359,7 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"Directory": {
-											"value": "@variables('vDirectory')",
+											"value": "@concat(variables('vDirectory'),'/Details')",
 											"type": "Expression"
 										},
 										"FileName": {
@@ -375,7 +375,7 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"Directory": {
-											"value": "@variables('vDirectory')",
+											"value": "@concat(variables('vDirectory'),'/Details')",
 											"type": "Expression"
 										},
 										"FileName": {
@@ -411,7 +411,188 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"Directory": {
-											"value": "@variables('vDirectory')",
+											"value": "@concat(variables('vDirectory'),'/Details')",
+											"type": "Expression"
+										},
+										"FileName": "@item().Name"
+									}
+								},
+								"enableLogging": false,
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Get Document FileList",
+				"type": "GetMetadata",
+				"dependsOn": [
+					{
+						"activity": "For Each Company Export Detail and Document Tables",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "DS_Polestar_Storage",
+						"type": "DatasetReference",
+						"parameters": {
+							"Container": "exchequer",
+							"Directory": {
+								"value": "@concat(variables('vDirectory'),'/Document')",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"childItems",
+						"itemName"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "BinaryReadSettings"
+					}
+				}
+			},
+			{
+				"name": "ForEach Document CSV Create a Parquet File and Delete",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Document FileList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Document FileList').output.childItems",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Create Parquet File_copy1",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@concat(variables('vDirectory'),'/Document')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@item().Name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_Exchequer_Parquet",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@concat(variables('vDirectory'),'/Document')",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@replace(item().Name, '.csv', '.parquet' )",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Delete CSV file_copy1",
+							"type": "Delete",
+							"dependsOn": [
+								{
+									"activity": "Create Parquet File_copy1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataset": {
+									"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@concat(variables('vDirectory'),'/Document')",
 											"type": "Expression"
 										},
 										"FileName": "@item().Name"
