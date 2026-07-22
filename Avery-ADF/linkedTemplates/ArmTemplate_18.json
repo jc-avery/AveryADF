@@ -1938,19 +1938,19 @@
 			"type": "string",
 			"defaultValue": "Silvermere"
 		},
-		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
-			"type": "string",
-			"defaultValue": "Weekly"
-		},
-		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
-			"type": "string",
-			"defaultValue": "Silvermere"
-		},
 		"SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
 			"type": "string",
 			"defaultValue": "Monthly"
 		},
 		"SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
+			"type": "string",
+			"defaultValue": "Silvermere"
+		},
+		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
+			"type": "string",
+			"defaultValue": "Weekly"
+		},
+		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
 			"type": "string",
 			"defaultValue": "Silvermere"
 		}
@@ -1959,6 +1959,454 @@
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Pricing')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline to update Pricing tables outside GRG refresh Window",
+				"activities": [
+					{
+						"name": "Upsert Coldharbour Rooms",
+						"description": "Updates the ColdHarbour.Rooms table from the Polestar DB. Polestar DB is a replication of the GRG database (CH reporting suite/DB)",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "xPL_ColdHarbour_Rooms",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Update Occupancy",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Upsert Coldharbour Rooms",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "xPL_ColdHarbour_RoomsWithInHomeResidents",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Pricing"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-10-10T09:35:49Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_Full_WeeklyHrs_Data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Gets the previous week data for Shifts and Paylines",
+				"activities": [
+					{
+						"name": "Set EndDateTime",
+						"description": "Find the most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "EndDateTime",
+							"value": {
+								"value": "@concat(\n    formatDateTime(\n        addDays(utcNow(), mul(-1, dayOfWeek(utcNow()))),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set StartDateTime",
+						"description": "Find the Monday six days before the most recent Sunday and set the time to 00:00:00.\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week.\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSubtract another 6 days (this gives the Monday before that Sunday).\nSet the time to 00:00:00 UTC",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "StartDateTime",
+							"value": {
+								"value": "@concat(\n    formatDateTime(\n        addDays(utcNow(), sub(mul(-1, dayOfWeek(utcNow())), 6)),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get Shifts Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Set EndDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set StartDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_GetFullWeekData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "shifts",
+								"MinStartDate": {
+									"value": "@variables('StartDateTime')",
+									"type": "Expression"
+								},
+								"MaxStartDate": {
+									"value": "@variables('EndDateTime')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Get PayLines Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_GetFullWeekData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "paylines",
+								"MinStartDate": {
+									"value": "@variables('StartDateTime')",
+									"type": "Expression"
+								},
+								"MaxStartDate": {
+									"value": "@variables('EndDateTime')",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Stage Data and Remove Old Payline Records",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Pre Clear Stage Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Upsert To Final Tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage Data and Remove Old Payline Records",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Pre Clear Stage Tables",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Get PayLines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clear$StageTables"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Post Clear Stage Tables",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Update AH1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clear$StageTables"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Update AH1",
+						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Remove Duplicate Paylines",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Remove Duplicate Paylines",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Upsert To Final Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Remove$DuplicatePaylines"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"EndDateTime": {
+						"type": "String"
+					},
+					"StartDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobFileShare')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AveryblobFileShare",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureFileStorageLocation"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion_Archive')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('archive/', formatDateTime(utcNow(), 'yyyy'), '/', formatDateTime(utcNow(), 'MM'), '/', formatDateTime(utcNow(), 'dd'), '/')\n",
+							"type": "Expression"
+						},
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/DS_Averyblob_Tribepad')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
@@ -2074,6 +2522,130 @@
 							],
 							"hours": [
 								1
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Daily')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Exports data from the InterCall data on Transform for the previous day and triggers the NurseCall-SharePoint-Upload Logic app to execute, passing paramters to it to allow it to retrieve the exported file, created the directory if needed and create a copy of the file there",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_NurseCall_InterCall_Export",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
+							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2026-07-17T08:12:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								7
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Monthly')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_NurseCall_InterCall_Export",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
+							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Month",
+						"interval": 1,
+						"startTime": "2026-07-17T08:44:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								8
+							],
+							"monthDays": [
+								1
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Weekly')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_NurseCall_InterCall_Export",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
+							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-17T08:43:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								45
+							],
+							"hours": [
+								7
+							],
+							"weekDays": [
+								"Monday"
 							]
 						}
 					}
@@ -2324,23 +2896,19 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Daily')]",
+			"name": "[concat(parameters('factoryName'), '/SCH_Florence_Accurall_Import')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Exports data from the InterCall data on Transform for the previous day and triggers the NurseCall-SharePoint-Upload Logic app to execute, passing paramters to it to allow it to retrieve the exported file, created the directory if needed and create a copy of the file there",
 				"annotations": [],
 				"runtimeState": "Started",
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_NurseCall_InterCall_Export",
+							"referenceName": "PL_Florence_AccuralReport",
 							"type": "PipelineReference"
 						},
-						"parameters": {
-							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
-							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
-						}
+						"parameters": {}
 					}
 				],
 				"type": "ScheduleTrigger",
@@ -2348,424 +2916,21 @@
 					"recurrence": {
 						"frequency": "Day",
 						"interval": 1,
-						"startTime": "2026-07-17T08:12:00",
+						"startTime": "2026-07-22T07:59:00",
 						"timeZone": "GMT Standard Time",
 						"schedule": {
 							"minutes": [
 								30
 							],
 							"hours": [
-								7
+								9,
+								12,
+								15,
+								20
 							]
 						}
 					}
 				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Weekly')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_NurseCall_InterCall_Export",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
-							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-07-17T08:43:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								45
-							],
-							"hours": [
-								7
-							],
-							"weekDays": [
-								"Monday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_NurseCall_InterCall_Export_Monthly')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_NurseCall_InterCall_Export",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
-							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Month",
-						"interval": 1,
-						"startTime": "2026-07-17T08:44:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								8
-							],
-							"monthDays": [
-								1
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Export_IP_Tables')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Exports CH IP tables to azure storage account",
-				"activities": [
-					{
-						"name": "Set vDirectory",
-						"description": "Todays date used for directory/storage location in storage account",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vToday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vToday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vToday",
-							"value": {
-								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Lookup Table Export List",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT SchemaName, TableName FROM ColdHarbour.TableExportList",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "For Eaxh Export Table",
-						"description": "For each table listed in ColdHarbour.TableExportList\nExport the table from CH to a CSV file, Create a Parquet file from the CSV file,\nThen Delete the csv file.",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Lookup Table Export List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Lookup Table Export List').output.value",
-								"type": "Expression"
-							},
-							"isSequential": true,
-							"activities": [
-								{
-									"name": "Create CSV",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"queryTimeout": "00:20:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_CH_IP",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": {
-													"value": "@item().SchemaName",
-													"type": "Expression"
-												},
-												"Table": {
-													"value": "@item().TableName",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_ColdHarbour_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Create Parquet from CSV",
-									"type": "Copy",
-									"dependsOn": [
-										{
-											"activity": "Create CSV",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "ParquetSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "ParquetWriteSettings"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_ColdHarbour_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_ColdHarbour_Parquet",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.parquet')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Delete CSV File",
-									"type": "Delete",
-									"dependsOn": [
-										{
-											"activity": "Create Parquet from CSV",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataset": {
-											"referenceName": "DS_ColdHarbour_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": "@variables('vDirectory')",
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										},
-										"enableLogging": false,
-										"storeSettings": {
-											"type": "AzureBlobStorageReadSettings",
-											"recursive": false,
-											"enablePartitionDiscovery": false
-										}
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vToday": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Cold Harbour"
-				},
-				"annotations": []
 			},
 			"dependsOn": []
 		},
@@ -2849,768 +3014,6 @@
 					"name": "Cold Harbour"
 				},
 				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Runs the child pipelines to import the previous financial year and the current financial year. Both clearing the data in Exchequer.Details for the year and company the table before inserting the new data",
-				"activities": [
-					{
-						"name": "Previous Fin Year",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Log Pipeline Start",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Details_PreviousYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Current FIN Year",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 60s",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Details_CurrentYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 60s",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Previous Fin Year",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 60
-						}
-					},
-					{
-						"name": "Prev Yr Email Notification",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Previous Fin Year",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "The PL_Exchequer_Details Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Previous Fin Year"
-							}
-						}
-					},
-					{
-						"name": "Current Yr Email Notification",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Current FIN Year",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "The PL_Exchequer_Details Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Current Fin Year"
-							}
-						}
-					},
-					{
-						"name": "Log Pipeline Start",
-						"type": "Script",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "EXEC Exchequer.DetailsPipelineLog$Start"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
-						"name": "Log Pipeline Failure",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Prev Yr Email Notification",
-								"dependencyConditions": [
-									"Completed"
-								]
-							},
-							{
-								"activity": "Current Yr Email Notification",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "Exchequer.DetailsPipelineLog$Failure"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
-						"name": "Log Pipeline Completed",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Current FIN Year",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "Exchequer.DetailsPipelineLog$Complete"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details_Retry')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Retries those companies that failed and were logged for a retry from the PL_Exchequer_Details Pipeline",
-				"activities": [
-					{
-						"name": "Retry Previous Fin Year",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Details_Retry_PreviousYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Retry Current FIN Year",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 60s",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Details_Retry_CurrentYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 60s",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Retry Previous Fin Year",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 60
-						}
-					},
-					{
-						"name": "Prev Yr Email Notification",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Retry Previous Fin Year",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Retry Previous Fin Year"
-							}
-						}
-					},
-					{
-						"name": "Current Yr Email Notification",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Retry Current FIN Year",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Retry Current Fin Year"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Fusion_Move_Files_To_VM')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Moves files loaded to the Fusion Container in the averyblob storage account, to the averyblobfileshare. So they can be copied off the file share to a location on the VM",
-				"activities": [
-					{
-						"name": "Copy container files to Fileshare",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "*.zip",
-									"deleteFilesAfterCompletion": false
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureFileStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "Averyblob_Fusion",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "AveryblobFileShare",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Archive files",
-						"description": "Moves the files to archive folder in the container",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Copy container files to Fileshare",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": "*.zip",
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "Averyblob_Fusion",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "Averyblob_Fusion_Archive",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Fusion"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_GRG_Refresh_TRANSFORM')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Refresh Residents",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_GRG_RESIDENT",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Refresh Rooms",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Populate Daily Occupancy",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_GRG_ROOMS",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Refresh Movement",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Refresh Rooms",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_GRG_ADMIN_DISCHARGE",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Populate Daily Occupancy",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Refresh Accounts",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_GRG_DailyOccupancySnapshot",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Refresh Diary Entries",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Refresh Residents",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_GRG_CHIP_Resident_Diary",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Refresh Accounts",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Refresh Diary Entries",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_GRG_ACCOUNT",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "GRG"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Softworks')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Employees",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_SoftWorks_API_Employee",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Clockings",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Employees",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_SoftWorks_API_Clockings",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Load data to TRANSFORM_DB",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Clockings",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Softworks_JSON_SQL",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Softworks"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-04-05T14:58:56Z"
 			},
 			"dependsOn": []
 		}
