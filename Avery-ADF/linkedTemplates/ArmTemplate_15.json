@@ -21,6 +21,42 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_CH_IP')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "OnPrem_CHIP_Avery_DC",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Schema": {
+						"type": "string"
+					},
+					"Table": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "OnPrem"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_Exchequer')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -1004,7 +1040,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_Broadshield_Download_Data')]",
@@ -1666,7 +1704,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_AnalysisCodes')]",
@@ -1783,7 +1823,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_Billing_Profiles')]",
@@ -1959,7 +2001,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_DirectDebitData')]",
@@ -2297,7 +2341,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_PostedTransactions')]",
@@ -2930,7 +2976,9 @@
 				},
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_CH_IP')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_Residents')]",
@@ -3266,164 +3314,6 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-09-26T11:05:27Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Download')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Download bak files from FTP",
-						"description": "Download the zipped bak files from FTP",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CareBlox-bak-Files",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Copy Bak files to Fileshare",
-						"description": "Copy today's downloaded bak files",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 15",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CareBlox-Fileshare",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 15",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Download bak files from FTP",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 15
-						}
-					},
-					{
-						"name": "Copy Bak files to Fileshare Failure",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy Bak files to Fileshare",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": {
-									"value": "Red",
-									"type": "Expression"
-								},
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Copy Bak files to Fileshare"
-							}
-						}
-					},
-					{
-						"name": "Download bak files from FTP Failure",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Download bak files from FTP",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "Pipeline failed",
-								"Colour": {
-									"value": "Red",
-									"type": "Expression"
-								},
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Download bak files from FTP",
-								"Subject": "Pipeline Failure"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Careblox"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-01T10:23:31Z"
 			},
 			"dependsOn": []
 		}
