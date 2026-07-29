@@ -13,6 +13,184 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_GRG_CHIP_Resident_Diary')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies the resident diary entries from CH to AH2 Transform",
+				"activities": [
+					{
+						"name": "Copy Resident Diary",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlServerSource",
+								"sqlReaderQuery": "SELECT \n\tResident_Dy.RES_DY_REF,\n\tResident_Dy.RES_REF,\n\tR.RES_CODE,\n    ChSysDec.Description AS EntryType,\n    CAST(Resident_Dy.Entry_Date AS DATE) AS EntryDate,\n\tCAST(Resident_Dy.Review_Date AS DATE) AS ReviewDate,\n    replace(cast(Resident_Dy.Entry_Text as varchar(MAX)), char(13) + char(10), ' ') AS DiaryEntry,\n    isnull(User_Hd.Name, '') AS EnteredBy\nFROM \n    Resident_Dy (NOLOCK)\n    \n    LEFT JOIN Chsysdec (NOLOCK)\n        ON Chsysdec.Decode_Ref = Resident_Dy.Entry_Type\n        \n    LEFT JOIN User_Hd (NOLOCK)\n        ON User_Hd.User_Ref = Resident_Dy.User_Ref\n\n\tLEFT JOIN RESIDENT AS R (NOLOCK)\n\t\tON R.RES_REF = Resident_Dy.RES_REF",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"RES_DY_REF"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "RES_DY_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "RES_DY_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "RES_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "RES_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "EntryType",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "EntryType",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "EntryDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "EntryDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "ReviewDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "ReviewDate",
+											"type": "DateTime",
+											"physicalType": "date"
+										}
+									},
+									{
+										"source": {
+											"name": "DiaryEntry",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "DiaryEntry",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "EnteredBy",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "EnteredBy",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_OnPrem_CH_IP",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "GRG",
+									"Table": "ResidentDiary"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "GRG/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_GRG_HOME')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -9986,86 +10164,6 @@
 				},
 				"folder": {
 					"name": "Yardi/Exchequer"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/XPL_CH_Bill_Profile_With_Calendar')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export billing profiles and Calendars used",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlServerSource",
-								"sqlReaderQuery": "SELECT DISTINCT\n\tP.PRO_CODE AS profile_code,\n\tP.PRODESC AS profile_description,\n\tCALENDAR.CAL_REF AS Cal_Ref,\n\tCALENDAR.CAL_CODE AS calendar_code,\n\tCALENDAR.CAL_DESC AS calendar_description\t\nFROM \n\tFUNDSRC_HD AS ACC\n\n\tLEFT JOIN PROFILES AS P\n\t\tON P.PRO_REF = ACC.PRO_REF\n\n\tLEFT JOIN CONTACT_HD AS CONTACT\n\t\tON CONTACT.CONTACT_REF = ACC.CNTA_DET_REF\n\n\tLEFT JOIN CALENDAR_HD AS CALENDAR\n\t\tON CALENDAR.CAL_REF = ACC.CAL_REF\nWHERE\n\tP.FSTYPE = 401",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "DelimitedTextSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "DelimitedTextWriteSettings",
-									"quoteAllText": true,
-									"fileExtension": ".txt"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_OnPrem_CH_IP",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Yardi_CSV",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": {
-										"value": "@concat('LA Billing Profile Calendar Usage - ', utcNow('yyyy-MM-dd'), '.csv')",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Yardi/CHIP"
 				},
 				"annotations": []
 			},

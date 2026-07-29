@@ -22,20 +22,48 @@
 		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "WeeklyHrs_2WeekPrior"
-		},
-		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack": {
-			"type": "int",
-			"defaultValue": 3
-		},
-		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType": {
-			"type": "string",
-			"defaultValue": "WeeklyHrs_3WeekPrior"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_10pm')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_YourHippo_Move_WebHook_Files_Step1",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2025-04-04T09:19:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								22
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_AfterMidnight')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
@@ -371,7 +399,7 @@
 						}
 					},
 					{
-						"name": "Import Current Year Data",
+						"name": "Import Current Year Data To SQL",
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
@@ -405,6 +433,47 @@
 						"dependsOn": [
 							{
 								"activity": "Export Current Year Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					},
+					{
+						"name": "Delete and Then Insert New Data",
+						"description": "Deletes the current year data and imports the newly exported and imported data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s Again",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Delete_Insert_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 20s Again",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Import Current Year Data To SQL",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -1592,50 +1661,6 @@
 							"weekDays": [
 								"Monday",
 								"Wednesday",
-								"Friday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_3Week_CatchUp')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "3 Weeks prior to most recent week end",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_Full_WeeklyHrs_Data",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_Full_WeeklyHrs_Data_parameters_FileNameType')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-07-13T10:37:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								6
-							],
-							"weekDays": [
-								"Monday",
 								"Friday"
 							]
 						}
