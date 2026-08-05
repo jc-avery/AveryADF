@@ -103,6 +103,8 @@
 			{
 				"name": "Set vDirectory",
 				"type": "SetVariable",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Set vReportDate",
@@ -127,6 +129,8 @@
 			{
 				"name": "Sharepoint Upload Loagic App",
 				"type": "WebActivity",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Export InterCall Data",
@@ -161,6 +165,12 @@
 						"dependencyConditions": [
 							"Succeeded"
 						]
+					},
+					{
+						"activity": "Switch Set vDirectory And vFileNameDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
 					}
 				],
 				"policy": {
@@ -171,7 +181,7 @@
 				"typeProperties": {
 					"variableName": "vFileName",
 					"value": {
-						"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vReportDate'),'.csv')",
+						"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vFileNameDate'),'_v2.csv')",
 						"type": "Expression"
 					}
 				}
@@ -269,9 +279,122 @@
 				"typeProperties": {
 					"variableName": "vReportDate",
 					"value": {
-						"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+						"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
 						"type": "Expression"
 					}
+				}
+			},
+			{
+				"name": "Switch Set vDirectory And vFileNameDate",
+				"type": "Switch",
+				"dependsOn": [
+					{
+						"activity": "Set vReportDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"on": {
+						"value": "@pipeline().parameters.ExportType",
+						"type": "Expression"
+					},
+					"cases": [
+						{
+							"value": "Daily",
+							"activities": [
+								{
+									"name": "Set vDirectory_Daily",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set vDirectoryDate_Daily",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vDirectory",
+										"value": {
+											"value": "@concat(formatDateTime(variables('vDirectoryDate'), 'yyyy'),'/',formatDateTime(variables('vDirectoryDate'), 'MM'),'/',formatDateTime(variables('vDirectoryDate'), 'dd') )",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "Set vDirectoryDate_Daily",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vDirectoryDate",
+										"value": {
+											"value": "@addDays(variables('vReportDate'), -1,'yyyy-MM-dd')",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "Set vFileNameDate",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set vDirectoryDate_Daily",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vFileNameDate",
+										"value": {
+											"value": "@variables('vDirectoryDate')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"value": "Weekly",
+							"activities": [
+								{
+									"name": "Set vReportDate_Weekly_copy1",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vReportDate",
+										"value": {
+											"value": "@addDays(utcNow(), -5,'yyyy-MM-dd')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
 				}
 			}
 		],
@@ -291,6 +414,12 @@
 				"type": "String"
 			},
 			"vReportDate": {
+				"type": "String"
+			},
+			"vDirectoryDate": {
+				"type": "String"
+			},
+			"vFileNameDate": {
 				"type": "String"
 			}
 		},
