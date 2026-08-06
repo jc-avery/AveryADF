@@ -34524,6 +34524,7 @@
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Used to update table used in the GL Hist Report",
 				"activities": [
 					{
 						"name": "For Each Company Delete Current Year Data",
@@ -36926,7 +36927,7 @@
 								{
 									"type": "Query",
 									"text": {
-										"value": "TRUNCATE TABLE Exchequer_Bronze.@{pipeline().parameters.Exchequer_Table}",
+										"value": "TRUNCATE TABLE Exchequer_Bronze.@{concat(pipeline().parameters.Exchequer_Table,'_CurrentYear')}",
 										"type": "Expression"
 									}
 								}
@@ -59488,10 +59489,10 @@
 											"type": "Expression"
 										}
 									},
-									"ReportDate": {
+									"ReportEndDate": {
 										"type": "DateTime",
 										"value": {
-											"value": "@variables('vReportDate')",
+											"value": "@variables('vReportEndDate')",
 											"type": "Expression"
 										}
 									}
@@ -59536,7 +59537,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"Directory": {
-										"value": "@variables('vDirectory')",
+										"value": "@variables('vBlobDirectory')",
 										"type": "Expression"
 									},
 									"Filename": {
@@ -59548,11 +59549,11 @@
 						]
 					},
 					{
-						"name": "Set vDirectory",
+						"name": "Set vBlobDirectory",
 						"type": "SetVariable",
 						"dependsOn": [
 							{
-								"activity": "Set vReportDate",
+								"activity": "Set vReportEndDate",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -59564,9 +59565,9 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"variableName": "vDirectory",
+							"variableName": "vBlobDirectory",
 							"value": {
-								"value": "@concat(formatDateTime(variables('vReportDate'), 'yyyy'),'/',formatDateTime(variables('vReportDate'), 'MM'),'/',formatDateTime(variables('vReportDate'), 'dd') )",
+								"value": "@concat(formatDateTime(variables('vReportEndDate'), 'yyyy'),'/',formatDateTime(variables('vReportEndDate'), 'MM'),'/',formatDateTime(variables('vReportEndDate'), 'dd') )",
 								"type": "Expression"
 							}
 						}
@@ -59595,7 +59596,7 @@
 							"headers": {},
 							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
 							"body": {
-								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportDate')}\",\n    \"blobDirectory\": \"@{variables('vDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
+								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportEndDate')}\",\n    \"blobDirectory\": \"@{variables('vBlobDirectory')}\",\n    \"sharePointDirectory\": \"@{variables('vSharePointDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
 								"type": "Expression"
 							}
 						}
@@ -59605,7 +59606,13 @@
 						"type": "SetVariable",
 						"dependsOn": [
 							{
-								"activity": "Set vDirectory",
+								"activity": "Set vBlobDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Switch Set vSharePointDirectory And vFileNameDate",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -59619,7 +59626,7 @@
 						"typeProperties": {
 							"variableName": "vFileName",
 							"value": {
-								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vReportDate'),'.csv')",
+								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vFileNameDate'),'.csv')",
 								"type": "Expression"
 							}
 						}
@@ -59671,7 +59678,7 @@
 											},
 											"userProperties": [],
 											"typeProperties": {
-												"variableName": "vReportDate",
+												"variableName": "vReportEndDate",
 												"value": {
 													"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
 													"type": "Expression"
@@ -59693,7 +59700,7 @@
 											},
 											"userProperties": [],
 											"typeProperties": {
-												"variableName": "vReportDate",
+												"variableName": "vReportEndDate",
 												"value": {
 													"value": "@addDays(utcNow(), -5,'yyyy-MM-dd')",
 													"type": "Expression"
@@ -59706,7 +59713,7 @@
 						}
 					},
 					{
-						"name": "Set vReportDate",
+						"name": "Set vReportEndDate",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -59715,11 +59722,170 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"variableName": "vReportDate",
+							"variableName": "vReportEndDate",
 							"value": {
-								"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+								"value": "2026-07-20",
 								"type": "Expression"
 							}
+						}
+					},
+					{
+						"name": "Switch Set vSharePointDirectory And vFileNameDate",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "Set vReportEndDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.ExportType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "Daily",
+									"activities": [
+										{
+											"name": "Set vDirectoryDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set vFileNameDate_Daily",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vSharePointDirectory",
+												"value": {
+													"value": "@concat(formatDateTime(variables('vFileNameDate'), 'yyyy'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'MM'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'dd') )",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "Set vFileNameDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vFileNameDate",
+												"value": {
+													"value": "@formatDateTime(addDays(variables('vReportEndDate'), -1 ), 'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Weekly",
+									"activities": [
+										{
+											"name": "Set vFileNameDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vFileNameDate",
+												"value": {
+													"value": "@addDays(variables('vReportEndDate'), -7,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "Set vDirectoryDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set vFileNameDate_Weekly",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vSharePointDirectory",
+												"value": {
+													"value": "@concat(formatDateTime(variables('vFileNameDate'), 'yyyy'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'MM'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'dd') )",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Monthly",
+									"activities": [
+										{
+											"name": "Set vFileNameDate_Monthly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vFileNameDate",
+												"value": {
+													"value": "@formatdatetime(addToTime(variables('vReportEndDate'), -1, 'Month'), 'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "Set vSharePointDirectory_Monthly",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set vFileNameDate_Monthly",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vSharePointDirectory",
+												"value": {
+													"value": "@concat(formatDateTime(variables('vFileNameDate'), 'yyyy'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'MM'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'dd') )",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
 						}
 					}
 				],
@@ -59735,13 +59901,19 @@
 					}
 				},
 				"variables": {
-					"vDirectory": {
+					"vBlobDirectory": {
 						"type": "String"
 					},
 					"vFileName": {
 						"type": "String"
 					},
-					"vReportDate": {
+					"vReportEndDate": {
+						"type": "String"
+					},
+					"vSharePointDirectory": {
+						"type": "String"
+					},
+					"vFileNameDate": {
 						"type": "String"
 					}
 				},
