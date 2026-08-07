@@ -1,0 +1,186 @@
+{
+	"name": "PL_NurseCall_HomeManagerDetails_SharePoint_Export",
+	"properties": {
+		"activities": [
+			{
+				"name": "Set vBlobDirectory",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set vSharePointDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vBlobDirectory",
+					"value": {
+						"value": "@concat('')\n",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set vFileName",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set vBlobDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vFileName",
+					"value": "Home Manager Details.csv"
+				}
+			},
+			{
+				"name": "Export Home Manager Details",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set vFileName",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT \n    HomeID, \n    Homename, \n    HomeManager, \n    ManagerEmail \nFROM \n    Avery.HomeDetails \nWHERE \n    (HomeTypeName != 'Non Op Company' \n    AND HomeTypeName != 'Test Home')\n    OR HomeTypeName IS NULL",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_NurseCall_Csv",
+						"type": "DatasetReference",
+						"parameters": {
+							"Directory": {
+								"value": "@variables('vBlobDirectory')",
+								"type": "Expression"
+							},
+							"Filename": {
+								"value": "@variables('vFileName')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Sharepoint Upload Loagic App",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Export Home Manager Details",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+					"body": {
+						"value": "{\n    \"extractType\": \"\",\n    \"reportDate\": \"\",\n    \"blobDirectory\": \"@{variables('vBlobDirectory')}\",\n    \"sharePointDirectory\": \"@{variables('vSharePointDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"\"\n}",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set vSharePointDirectory",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vSharePointDirectory",
+					"value": {
+						"value": "@concat('')",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"variables": {
+			"vBlobDirectory": {
+				"type": "String"
+			},
+			"vFileName": {
+				"type": "String"
+			},
+			"vSharePointDirectory": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Nurse Calls"
+		},
+		"annotations": []
+	}
+}
