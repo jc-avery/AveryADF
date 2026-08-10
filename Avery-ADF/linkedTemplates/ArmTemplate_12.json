@@ -13,6 +13,309 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureFileStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": "intercall_download_*.csv",
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_polestar_storage_fileshare_binary",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Polestar_Storage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "nursecalls",
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vDirectory",
+						"description": "Sets directory save location in azure storage account used in sink of copy",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vYesterday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vYesterday",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vYesterday",
+							"value": {
+								"value": "@addDays(utcNow(), -1)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vYesterday": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_StageData_InterCall')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Stage Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set vFilename",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "DelimitedTextSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "DelimitedTextReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFilename')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "InterCall",
+									"Table": "STG_InterCall"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vDirectory",
+						"description": "Sets directory save location in azure storage account used in sink of copy",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vYesterday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vYesterday'), 'yyyy'),'/',formatDateTime(variables('vYesterday'), 'MM'),'/',formatDateTime(variables('vYesterday'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vYesterday",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vYesterday",
+							"value": {
+								"value": "@addDays(utcNow(), -1)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFilename",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vYesterday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFilename",
+							"value": {
+								"value": "@concat('intercall_download_',formatDateTime(variables('vYesterday'), 'yyyyMMdd'),'.csv')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vYesterday": {
+						"type": "String"
+					},
+					"vFilename": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Polestar_Occupancy')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -6542,295 +6845,6 @@
 								"parameters": {
 									"Schema": "Sona",
 									"Table": "STG_EmploymentPeriods_TypesOfWork"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_Jobs')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Jobs",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"Jobs_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "Jobs_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['upload_id']"
-										},
-										"sink": {
-											"name": "upload_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['archived_at']"
-										},
-										"sink": {
-											"name": "archived_at",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "jobs v2.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_Jobs"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_OrgUnits')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "OrgUnits",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"OrgUnits_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "OrgUnits_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['timezone']"
-										},
-										"sink": {
-											"name": "timezone",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['is_base_entity']"
-										},
-										"sink": {
-											"name": "is_base_entity",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['org_unit_type']['id']"
-										},
-										"sink": {
-											"name": "org_unit_type_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['org_unit_type']['name']"
-										},
-										"sink": {
-											"name": "org_unit_type_name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['accounting_cost_code']"
-										},
-										"sink": {
-											"name": "accounting_cost_code",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['average_hourly_rate']"
-										},
-										"sink": {
-											"name": "average_hourly_rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['paycaptain_company_id']"
-										},
-										"sink": {
-											"name": "paycaptain_company_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['parent_org_unit']['id']"
-										},
-										"sink": {
-											"name": "parent_org_unit_id",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": ""
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona All Org_Units 2026-06-24.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_OrgUnits"
 								}
 							}
 						]
