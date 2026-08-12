@@ -67971,20 +67971,21 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetFullWeekData",
+								"referenceName": "PL_Sona_Get_FullWeeklyHrs_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"EndPoint": "shifts",
-								"MinStartDate": {
+								"StartDateTime": {
 									"value": "@variables('StartDateTime')",
 									"type": "Expression"
 								},
-								"MaxStartDate": {
+								"EndDateTime": {
 									"value": "@variables('EndDateTime')",
 									"type": "Expression"
 								},
+								"EndPoint": "shifts",
+								"PageSize": "500",
 								"FileName": {
 									"value": "@pipeline().parameters.FileNameType",
 									"type": "Expression"
@@ -67997,7 +67998,7 @@
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Get Shifts Data",
+								"activity": "Wait 1 Min",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -68009,20 +68010,21 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetFullWeekData",
+								"referenceName": "PL_Sona_Get_FullWeeklyHrs_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"EndPoint": "paylines",
-								"MinStartDate": {
+								"StartDateTime": {
 									"value": "@variables('StartDateTime')",
 									"type": "Expression"
 								},
-								"MaxStartDate": {
+								"EndDateTime": {
 									"value": "@variables('EndDateTime')",
 									"type": "Expression"
 								},
+								"EndPoint": "pay_lines",
+								"PageSize": "500",
 								"FileName": {
 									"value": "@pipeline().parameters.FileNameType",
 									"type": "Expression"
@@ -68047,7 +68049,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
+								"referenceName": "PL_Sona_Stage_FullWeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68076,7 +68078,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+								"referenceName": "PL_Sona_Upsert_FullWeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68170,7 +68172,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+								"referenceName": "xPL_Sona_WeeklyHrs_ViewTransfer",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68211,6 +68213,22 @@
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
 						}
+					},
+					{
+						"name": "Wait 1 Min",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Get Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 60
+						}
 					}
 				],
 				"policy": {
@@ -68238,11 +68256,11 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetFullWeekData')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Full_WeeklyHr_data')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHr_data')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Get_FullWeeklyHrs_ADFv')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_FullWeeklyHrs')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_FullWeeklyHrs')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_ViewTransfer')]"
+				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_WeeklyHrs_ViewTransfer')]"
 			]
 		},
 		{
@@ -68439,227 +68457,6 @@
 						"type": "string"
 					},
 					"MaxStartDate": {
-						"type": "string"
-					}
-				},
-				"variables": {
-					"APIToken": {
-						"type": "String"
-					},
-					"AzFuncCode": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Sona/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_Sona_Data_Extract')]",
-				"[concat(variables('factoryId'), '/datasets/DS_Sona_API_Response')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_GetFullWeekData')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Extract Data Func",
-						"description": "Call the azure function to make the api call",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set FunctionCode",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set APIToken",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.15:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 60,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "RestSource",
-								"httpRequestTimeout": "00:10:00",
-								"requestInterval": "00.00:00:00.010",
-								"requestMethod": "GET",
-								"additionalHeaders": {
-									"X-API-Key": {
-										"value": "@variables('APIToken')",
-										"type": "Expression"
-									}
-								},
-								"paginationRules": {
-									"supportRFC5988": "true"
-								}
-							},
-							"sink": {
-								"type": "JsonSink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								},
-								"formatSettings": {
-									"type": "JsonWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Data_Extract",
-								"type": "DatasetReference",
-								"parameters": {
-									"FunctionCode": {
-										"value": "@variables('AzFuncCode')",
-										"type": "Expression"
-									},
-									"end_point": "@pipeline().parameters.EndPoint",
-									"min_start_date": {
-										"value": "@pipeline().parameters.MinStartDate",
-										"type": "Expression"
-									},
-									"max_start_date": {
-										"value": "@pipeline().parameters.MaxStartDate",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_Sona_API_Response",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@concat(pipeline().parameters.FileName, '-', pipeline().parameters.EndPoint)",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Get AZ Func Code",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": true,
-							"secureInput": true
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPICallAzFunc/1c971f76435e4e6ab021f17345a1fdb5?api-version=7.3",
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://vault.azure.net"
-							}
-						}
-					},
-					{
-						"name": "Get Sona API Token",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": true,
-							"secureInput": true
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPIToken/559963575ce3414abe3d756da8dd179f?api-version=7.3",
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://vault.azure.net"
-							}
-						}
-					},
-					{
-						"name": "Set FunctionCode",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get AZ Func Code",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "AzFuncCode",
-							"value": {
-								"value": "@activity('Get AZ Func Code').output.value",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set APIToken",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get Sona API Token",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "APIToken",
-							"value": {
-								"value": "@activity('Get Sona API Token').output.value",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"EndPoint": {
-						"type": "string"
-					},
-					"MinStartDate": {
-						"type": "string"
-					},
-					"MaxStartDate": {
-						"type": "string"
-					},
-					"FileName": {
 						"type": "string"
 					}
 				},
@@ -69514,6 +69311,213 @@
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Emp_Periods')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_FullWeeklyHrs_ADFv')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Call Sona API",
+						"description": "Call the Sona API with provided Endpoint and Start End date times. Copy Activity handles pagination, cycling through each page (RANGE1::1 start:end:offset) until entries is empty (EndCondition:$.entries = Empty)",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set API Parameter Names",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.15:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.500",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"QueryParameters.{page}": "RANGE:1::1",
+									"EndCondition:$.entries": "Empty",
+									"MaxRequestNumber": "120"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_API",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": {
+										"value": "@concat('/api/v1/',pipeline().parameters.EndPoint,'?page={page}&page_size=',pipeline().parameters.PageSize,'&',variables('vStartDateTime'),'=',pipeline().parameters.StartDateTime,'&',variables('vEndDateTime'),'=',pipeline().parameters.EndDateTime)",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Sona_API_Response",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-',pipeline().parameters.EndPoint)",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set API Parameter Names",
+						"type": "Switch",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.EndPoint",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "pay_lines",
+									"activities": [
+										{
+											"name": "Set StartDateTime_pay_lines",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vStartDateTime",
+												"value": "start_datetime"
+											}
+										},
+										{
+											"name": "Set EndDateTime_pay_lines",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set StartDateTime_pay_lines",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vEndDateTime",
+												"value": "end_datetime"
+											}
+										}
+									]
+								},
+								{
+									"value": "shifts",
+									"activities": [
+										{
+											"name": "Set StartDateTime_shifts",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vStartDateTime",
+												"value": "min_start_datetime"
+											}
+										},
+										{
+											"name": "Set EndDateTime_shifts",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set StartDateTime_shifts",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vEndDateTime",
+												"value": "max_start_datetime"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"StartDateTime": {
+						"type": "string"
+					},
+					"EndDateTime": {
+						"type": "string"
+					},
+					"EndPoint": {
+						"type": "string"
+					},
+					"PageSize": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vStartDateTime": {
+						"type": "String"
+					},
+					"vEndDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines/Weekly Hours"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_API')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_API_Response')]"
 			]
 		},
 		{
@@ -74249,7 +74253,7 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/All Users"
 				},
 				"annotations": []
 			},
@@ -74822,7 +74826,7 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Emp Periods"
 				},
 				"annotations": []
 			},
@@ -74832,11 +74836,10 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_Full_WeeklyHr_data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_FullWeeklyHrs')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Inserts the shifts and payroll data to stage tables for the previous week, with WE being Sunday",
 				"activities": [
 					{
 						"name": "Stage Paylines Data",
@@ -74871,16 +74874,7 @@
 							},
 							"sink": {
 								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"shift_id",
-										"user_id",
-										"start_datetime",
-										"duration_in_minutes"
-									]
-								},
+								"writeBehavior": "insert",
 								"sqlWriterUseTableLock": false,
 								"disableMetricsCollection": false
 							},
@@ -74944,15 +74938,6 @@
 									},
 									{
 										"source": {
-											"path": "[['end_datetime']"
-										},
-										"sink": {
-											"name": "end_datetime",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
 											"path": "[['start_datetime']"
 										},
 										"sink": {
@@ -74962,10 +74947,10 @@
 									},
 									{
 										"source": {
-											"path": "[['shift_id']"
+											"path": "[['end_datetime']"
 										},
 										"sink": {
-											"name": "shift_id",
+											"name": "end_datetime",
 											"type": "String"
 										}
 									},
@@ -74980,10 +74965,37 @@
 									},
 									{
 										"source": {
+											"path": "[['shift_id']"
+										},
+										"sink": {
+											"name": "shift_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_type_id']"
+										},
+										"sink": {
+											"name": "shift_type_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
 											"path": "[['pay_type']"
 										},
 										"sink": {
 											"name": "pay_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_type_name']"
+										},
+										"sink": {
+											"name": "shift_type_name",
 											"type": "String"
 										}
 									},
@@ -75001,7 +75013,7 @@
 											"path": "[['rate_of_pay']['rate']"
 										},
 										"sink": {
-											"name": "rate",
+											"name": "rate_of_pay_rate",
 											"type": "String"
 										}
 									},
@@ -75024,7 +75036,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"FileName": {
-										"value": "@concat(pipeline().parameters.FileName,'-paylines$')",
+										"value": "@concat(pipeline().parameters.FileName,'-pay_lines$')",
 										"type": "Expression"
 									},
 									"DateString": {
@@ -75064,6 +75076,46 @@
 						}
 					},
 					{
+						"name": "Removed edited Paylines",
+						"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Stage Paylines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Stage Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
 						"name": "Stage Shifts Data",
 						"type": "Copy",
 						"dependsOn": [
@@ -75096,13 +75148,7 @@
 							},
 							"sink": {
 								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"shift_id"
-									]
-								},
+								"writeBehavior": "insert",
 								"sqlWriterUseTableLock": false,
 								"disableMetricsCollection": false
 							},
@@ -75193,19 +75239,19 @@
 									},
 									{
 										"source": {
-											"path": "[['internal_id']"
+											"path": "[['user_working_shift']['id']"
 										},
 										"sink": {
-											"name": "internal_id",
+											"name": "user_working_shift_id",
 											"type": "String"
 										}
 									},
 									{
 										"source": {
-											"path": "[['user_working_shift']['id']"
+											"path": "[['internal_id']"
 										},
 										"sink": {
-											"name": "user_working_shift_id",
+											"name": "internal_id",
 											"type": "String"
 										}
 									}
@@ -75239,152 +75285,6 @@
 								}
 							}
 						]
-					},
-					{
-						"name": "Stage Shifts_shift_breaks Data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Stage Shifts Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"shift_id",
-										"break_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "shift_id"
-										}
-									},
-									{
-										"source": {
-											"path": "[['shift_breaks'][0]['break']['id']"
-										},
-										"sink": {
-											"name": "break_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['shift_breaks'][0]['break']['duration']"
-										},
-										"sink": {
-											"name": "duration",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['entries']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Json_WeeklyHrs",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@concat(pipeline().parameters.FileName,'-shifts$')",
-										"type": "Expression"
-									},
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_Shifts_Shift_Breaks"
-								}
-							}
-						]
-					},
-					{
-						"name": "Removed edited Paylines",
-						"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Stage Paylines Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Stage Shifts_shift_breaks Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
 					}
 				],
 				"policy": {
@@ -75401,7 +75301,7 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Weekly Hours"
 				},
 				"annotations": []
 			},
@@ -75412,7 +75312,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_WeeklyHr_data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_WeeklyHrs_3Days')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -78237,7 +78137,7 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/All Users"
 				},
 				"annotations": []
 			},
@@ -78247,7 +78147,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_WeeklyHr_data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_FullWeeklyHrs')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -78784,7 +78684,7 @@
 					"elapsedTimeMetric": {}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Weekly Hours"
 				},
 				"annotations": []
 			},
@@ -78794,7 +78694,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_Data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_3Days')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -78927,7 +78827,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Stage_WeeklyHr_data",
+								"referenceName": "PL_Sona_Stage_WeeklyHrs_3Days",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -78953,7 +78853,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+								"referenceName": "xPL_Sona_WeeklyHrs_ViewTransfer",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -78977,7 +78877,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+								"referenceName": "PL_Sona_Upsert_FullWeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -79071,495 +78971,10 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_WeeklyHr_data')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_ViewTransfer')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHr_data')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_WeeklyHrs_3Days')]",
+				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_WeeklyHrs_ViewTransfer')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_FullWeeklyHrs')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_ViewTransfer')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies the view/data from AH2 to AH1",
-				"activities": [
-					{
-						"name": "vPayLinesDetailSummary",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE dbo.AH2_Sona_vPayLinesDetailSummary",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										},
-										"sink": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										}
-									},
-									{
-										"source": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										},
-										"sink": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										}
-									},
-									{
-										"source": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 38
-										},
-										"sink": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 38
-										}
-									},
-									{
-										"source": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "vPayLinesDetailSummary"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH1_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "AH2_Sona_vPayLinesDetailSummary"
-								}
-							}
-						]
-					},
-					{
-						"name": "vPayLinesDetail",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE dbo.AH2_Sona_vPayLinesDetail",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "start_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "start_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "end_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "end_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 26
-										},
-										"sink": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 26
-										}
-									},
-									{
-										"source": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										},
-										"sink": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										}
-									},
-									{
-										"source": {
-											"name": "RateType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "RateType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										},
-										"sink": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										}
-									},
-									{
-										"source": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "vPayLinesDetail"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH1_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "AH2_Sona_vPayLinesDetail"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]"
 			]
 		},
 		{
@@ -93456,7 +92871,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetFullWeekData",
+								"referenceName": "xPL_Sona_GetFullWeekData",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -93490,7 +92905,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetFullWeekData",
+								"referenceName": "xPL_Sona_GetFullWeekData",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -93524,7 +92939,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Stage_Full_WeeklyHr_data",
+								"referenceName": "xPL_Sona_Stage_Full_WeeklyHr_data",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -93548,7 +92963,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_WeeklyHr_data",
+								"referenceName": "PL_Sona_Upsert_FullWeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -93642,7 +93057,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_WeeklyHrs_ViewTransfer",
+								"referenceName": "xPL_Sona_WeeklyHrs_ViewTransfer",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -93697,16 +93112,1302 @@
 					}
 				},
 				"folder": {
-					"name": "Sona"
+					"name": "Sona/Child Pipelines/Old"
 				},
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetFullWeekData')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Full_WeeklyHr_data')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHr_data')]",
+				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_GetFullWeekData')]",
+				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_Stage_Full_WeeklyHr_data')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_FullWeeklyHrs')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_ViewTransfer')]"
+				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_WeeklyHrs_ViewTransfer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_GetFullWeekData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Extract Data Func",
+						"description": "Call the azure function to make the api call",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set FunctionCode",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set APIToken",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.15:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:10:00",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"additionalHeaders": {
+									"X-API-Key": {
+										"value": "@variables('APIToken')",
+										"type": "Expression"
+									}
+								},
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Data_Extract",
+								"type": "DatasetReference",
+								"parameters": {
+									"FunctionCode": {
+										"value": "@variables('AzFuncCode')",
+										"type": "Expression"
+									},
+									"end_point": "@pipeline().parameters.EndPoint",
+									"min_start_date": {
+										"value": "@pipeline().parameters.MinStartDate",
+										"type": "Expression"
+									},
+									"max_start_date": {
+										"value": "@pipeline().parameters.MaxStartDate",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Sona_API_Response",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName, '-', pipeline().parameters.EndPoint)",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Get AZ Func Code",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPICallAzFunc/1c971f76435e4e6ab021f17345a1fdb5?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Get Sona API Token",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPIToken/559963575ce3414abe3d756da8dd179f?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set FunctionCode",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get AZ Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "AzFuncCode",
+							"value": {
+								"value": "@activity('Get AZ Func Code').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set APIToken",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get Sona API Token",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "APIToken",
+							"value": {
+								"value": "@activity('Get Sona API Token').output.value",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"EndPoint": {
+						"type": "string"
+					},
+					"MinStartDate": {
+						"type": "string"
+					},
+					"MaxStartDate": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"APIToken": {
+						"type": "String"
+					},
+					"AzFuncCode": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines/Old"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Data_Extract')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_API_Response')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_Stage_Full_WeeklyHr_data')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Inserts the shifts and payroll data to stage tables for the previous week, with WE being Sunday",
+				"activities": [
+					{
+						"name": "Stage Paylines Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set DateString",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"shift_id",
+										"user_id",
+										"start_datetime",
+										"duration_in_minutes"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "PayLines_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['comment']"
+										},
+										"sink": {
+											"name": "comment",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['entry_type']"
+										},
+										"sink": {
+											"name": "entry_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['variant']"
+										},
+										"sink": {
+											"name": "variant",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_id']"
+										},
+										"sink": {
+											"name": "user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['duration_in_minutes']"
+										},
+										"sink": {
+											"name": "duration_in_minutes",
+											"type": "Int64"
+										}
+									},
+									{
+										"source": {
+											"path": "[['end_datetime']"
+										},
+										"sink": {
+											"name": "end_datetime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['start_datetime']"
+										},
+										"sink": {
+											"name": "start_datetime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_id']"
+										},
+										"sink": {
+											"name": "shift_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['is_sleep']"
+										},
+										"sink": {
+											"name": "is_sleep",
+											"type": "Boolean"
+										}
+									},
+									{
+										"source": {
+											"path": "[['pay_type']"
+										},
+										"sink": {
+											"name": "pay_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['rate_of_pay']['id']"
+										},
+										"sink": {
+											"name": "rate_of_pay_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['rate_of_pay']['rate']"
+										},
+										"sink": {
+											"name": "rate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['rate_of_pay']['pay_type']"
+										},
+										"sink": {
+											"name": "rate_of_pay_pay_type",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Json_WeeklyHrs",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-paylines$')",
+										"type": "Expression"
+									},
+									"DateString": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_PayLines"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set DateString",
+						"description": "Sets the date string used for Dataset property",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Stage Shifts Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set DateString",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"shift_id"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "shift_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['description']"
+										},
+										"sink": {
+											"name": "description",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['category']"
+										},
+										"sink": {
+											"name": "category",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['org_unit']['id']"
+										},
+										"sink": {
+											"name": "shifts_org_unit_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['start_datetime']"
+										},
+										"sink": {
+											"name": "start_datetime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['agency']['id']"
+										},
+										"sink": {
+											"name": "agency_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_type']['id']"
+										},
+										"sink": {
+											"name": "shifts_shift_type_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_type']['name']"
+										},
+										"sink": {
+											"name": "shifts_shift_type_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['finish_datetime']"
+										},
+										"sink": {
+											"name": "finish_datetime",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['internal_id']"
+										},
+										"sink": {
+											"name": "internal_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_working_shift']['id']"
+										},
+										"sink": {
+											"name": "user_working_shift_id",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Json_WeeklyHrs",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-shifts$')",
+										"type": "Expression"
+									},
+									"DateString": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Shifts"
+								}
+							}
+						]
+					},
+					{
+						"name": "Stage Shifts_shift_breaks Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Stage Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"shift_id",
+										"break_id"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "shift_id"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_breaks'][0]['break']['id']"
+										},
+										"sink": {
+											"name": "break_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_breaks'][0]['break']['duration']"
+										},
+										"sink": {
+											"name": "duration",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Json_WeeklyHrs",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'-shifts$')",
+										"type": "Expression"
+									},
+									"DateString": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Shifts_Shift_Breaks"
+								}
+							}
+						]
+					},
+					{
+						"name": "Removed edited Paylines",
+						"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Stage Paylines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Stage Shifts_shift_breaks Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines/Old"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Json_WeeklyHrs')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_WeeklyHrs_ViewTransfer')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Copies the view/data from AH2 to AH1",
+				"activities": [
+					{
+						"name": "vPayLinesDetailSummary",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE dbo.AH2_Sona_vPayLinesDetailSummary",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "first_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "first_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "last_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "last_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "external_id",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "external_id",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Job",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "Job",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "variant",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "variant",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "comment",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "comment",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Pay_type",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "Pay_type",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HourlyRate",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 13,
+											"precision": 24
+										},
+										"sink": {
+											"name": "HourlyRate",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 13,
+											"precision": 24
+										}
+									},
+									{
+										"source": {
+											"name": "ContractType",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ContractType",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ContractedHours",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 6
+										},
+										"sink": {
+											"name": "ContractedHours",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 6
+										}
+									},
+									{
+										"source": {
+											"name": "HoursWorked",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 6,
+											"precision": 38
+										},
+										"sink": {
+											"name": "HoursWorked",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 6,
+											"precision": 38
+										}
+									},
+									{
+										"source": {
+											"name": "WE_Date",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "WE_Date",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "vPayLinesDetailSummary"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "AH2_Sona_vPayLinesDetailSummary"
+								}
+							}
+						]
+					},
+					{
+						"name": "vPayLinesDetail",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE dbo.AH2_Sona_vPayLinesDetail",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "first_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "first_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "last_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "last_name",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "external_id",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "external_id",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "Job",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "Job",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "start_datetime",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "start_datetime",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "end_datetime",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "end_datetime",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HoursWorked",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 6,
+											"precision": 26
+										},
+										"sink": {
+											"name": "HoursWorked",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 6,
+											"precision": 26
+										}
+									},
+									{
+										"source": {
+											"name": "variant",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "variant",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "comment",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "comment",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "pay_type",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "pay_type",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HourlyRate",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 13,
+											"precision": 24
+										},
+										"sink": {
+											"name": "HourlyRate",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 13,
+											"precision": 24
+										}
+									},
+									{
+										"source": {
+											"name": "RateType",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "RateType",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ContractType",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ContractType",
+											"type": "String",
+											"physicalType": "nvarchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ContractedHours",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 6
+										},
+										"sink": {
+											"name": "ContractedHours",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 6
+										}
+									},
+									{
+										"source": {
+											"name": "WE_Date",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "WE_Date",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "vPayLinesDetail"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH1_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "AH2_Sona_vPayLinesDetail"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines/Old"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH1_Avery')]"
 			]
 		},
 		{
@@ -107014,7 +107715,7 @@
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Sona_WeeklyHrs_Data",
+							"referenceName": "PL_Sona_WeeklyHrs_3Days",
 							"type": "PipelineReference"
 						},
 						"parameters": {}
@@ -107039,7 +107740,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_Data')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_3Days')]"
 			]
 		},
 		{
@@ -107957,7 +108658,7 @@
 					},
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Sona_WeeklyHrs_Data",
+							"referenceName": "PL_Sona_WeeklyHrs_3Days",
 							"type": "PipelineReference"
 						},
 						"parameters": {}
@@ -107990,7 +108691,7 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_YourHippo_Process_Merged_Files')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_Data')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_3Days')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_MaintenanceApp_Refresh')]"
 			]
 		},

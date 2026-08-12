@@ -3660,7 +3660,7 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/All Users"
 				},
 				"annotations": []
 			},
@@ -4230,18 +4230,17 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Emp Periods"
 				},
 				"annotations": []
 			},
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_Full_WeeklyHr_data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_FullWeeklyHrs')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Inserts the shifts and payroll data to stage tables for the previous week, with WE being Sunday",
 				"activities": [
 					{
 						"name": "Stage Paylines Data",
@@ -4276,16 +4275,7 @@
 							},
 							"sink": {
 								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"shift_id",
-										"user_id",
-										"start_datetime",
-										"duration_in_minutes"
-									]
-								},
+								"writeBehavior": "insert",
 								"sqlWriterUseTableLock": false,
 								"disableMetricsCollection": false
 							},
@@ -4349,15 +4339,6 @@
 									},
 									{
 										"source": {
-											"path": "[['end_datetime']"
-										},
-										"sink": {
-											"name": "end_datetime",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
 											"path": "[['start_datetime']"
 										},
 										"sink": {
@@ -4367,10 +4348,10 @@
 									},
 									{
 										"source": {
-											"path": "[['shift_id']"
+											"path": "[['end_datetime']"
 										},
 										"sink": {
-											"name": "shift_id",
+											"name": "end_datetime",
 											"type": "String"
 										}
 									},
@@ -4385,10 +4366,37 @@
 									},
 									{
 										"source": {
+											"path": "[['shift_id']"
+										},
+										"sink": {
+											"name": "shift_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_type_id']"
+										},
+										"sink": {
+											"name": "shift_type_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
 											"path": "[['pay_type']"
 										},
 										"sink": {
 											"name": "pay_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['shift_type_name']"
+										},
+										"sink": {
+											"name": "shift_type_name",
 											"type": "String"
 										}
 									},
@@ -4406,7 +4414,7 @@
 											"path": "[['rate_of_pay']['rate']"
 										},
 										"sink": {
-											"name": "rate",
+											"name": "rate_of_pay_rate",
 											"type": "String"
 										}
 									},
@@ -4429,7 +4437,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"FileName": {
-										"value": "@concat(pipeline().parameters.FileName,'-paylines$')",
+										"value": "@concat(pipeline().parameters.FileName,'-pay_lines$')",
 										"type": "Expression"
 									},
 									"DateString": {
@@ -4469,6 +4477,46 @@
 						}
 					},
 					{
+						"name": "Removed edited Paylines",
+						"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Stage Paylines Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Stage Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
 						"name": "Stage Shifts Data",
 						"type": "Copy",
 						"dependsOn": [
@@ -4501,13 +4549,7 @@
 							},
 							"sink": {
 								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"shift_id"
-									]
-								},
+								"writeBehavior": "insert",
 								"sqlWriterUseTableLock": false,
 								"disableMetricsCollection": false
 							},
@@ -4598,19 +4640,19 @@
 									},
 									{
 										"source": {
-											"path": "[['internal_id']"
+											"path": "[['user_working_shift']['id']"
 										},
 										"sink": {
-											"name": "internal_id",
+											"name": "user_working_shift_id",
 											"type": "String"
 										}
 									},
 									{
 										"source": {
-											"path": "[['user_working_shift']['id']"
+											"path": "[['internal_id']"
 										},
 										"sink": {
-											"name": "user_working_shift_id",
+											"name": "internal_id",
 											"type": "String"
 										}
 									}
@@ -4644,152 +4686,6 @@
 								}
 							}
 						]
-					},
-					{
-						"name": "Stage Shifts_shift_breaks Data",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Stage Shifts Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"shift_id",
-										"break_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "shift_id"
-										}
-									},
-									{
-										"source": {
-											"path": "[['shift_breaks'][0]['break']['id']"
-										},
-										"sink": {
-											"name": "break_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['shift_breaks'][0]['break']['duration']"
-										},
-										"sink": {
-											"name": "duration",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['entries']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Json_WeeklyHrs",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": {
-										"value": "@concat(pipeline().parameters.FileName,'-shifts$')",
-										"type": "Expression"
-									},
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_Shifts_Shift_Breaks"
-								}
-							}
-						]
-					},
-					{
-						"name": "Removed edited Paylines",
-						"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Stage Paylines Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Stage Shifts_shift_breaks Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
 					}
 				],
 				"policy": {
@@ -4806,14 +4702,14 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Weekly Hours"
 				},
 				"annotations": []
 			},
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_WeeklyHr_data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_WeeklyHrs_3Days')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -7632,14 +7528,14 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/All Users"
 				},
 				"annotations": []
 			},
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_WeeklyHr_data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_FullWeeklyHrs')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -8176,489 +8072,7 @@
 					"elapsedTimeMetric": {}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_ViewTransfer')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Copies the view/data from AH2 to AH1",
-				"activities": [
-					{
-						"name": "vPayLinesDetailSummary",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE dbo.AH2_Sona_vPayLinesDetailSummary",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										},
-										"sink": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										}
-									},
-									{
-										"source": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										},
-										"sink": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										}
-									},
-									{
-										"source": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 38
-										},
-										"sink": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 38
-										}
-									},
-									{
-										"source": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "vPayLinesDetailSummary"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH1_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "AH2_Sona_vPayLinesDetailSummary"
-								}
-							}
-						]
-					},
-					{
-						"name": "vPayLinesDetail",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE dbo.AH2_Sona_vPayLinesDetail",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "first_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "last_name",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "external_id",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Job",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "start_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "start_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "end_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "end_datetime",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 26
-										},
-										"sink": {
-											"name": "HoursWorked",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 6,
-											"precision": 26
-										}
-									},
-									{
-										"source": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "variant",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "pay_type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										},
-										"sink": {
-											"name": "HourlyRate",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 13,
-											"precision": 24
-										}
-									},
-									{
-										"source": {
-											"name": "RateType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "RateType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "ContractType",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										},
-										"sink": {
-											"name": "ContractedHours",
-											"type": "Decimal",
-											"physicalType": "decimal",
-											"scale": 2,
-											"precision": 6
-										}
-									},
-									{
-										"source": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										},
-										"sink": {
-											"name": "WE_Date",
-											"type": "Date",
-											"physicalType": "date"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "vPayLinesDetail"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH1_Avery",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "dbo",
-									"Table": "AH2_Sona_vPayLinesDetail"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Weekly Hours"
 				},
 				"annotations": []
 			},
@@ -9367,6 +8781,274 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-10-10T08:27:28Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Yardi_AEMS')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Look up Values",
+						"type": "Lookup",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT HOME_REF, HomeName, IntranetID FROM ColdHarbourHomeID WHERE HOME_REF = '@{variables('Home_Ref')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_YardiStage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						}
+					},
+					{
+						"name": "AEMS Enquiry",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set HomeName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set IntranetID",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT\n    ID\n    ,AEMS_ID\n    ,aems_version\n    ,homeID\n    ,uploadedBy\n    ,managerEmailed\n    ,enquiryStatus\n    ,enquiryID\n    ,initialEnquiry\n    ,enquirerSalutation\n    ,enquirerLastName AS enquirerFirstName\n    ,enquirerFirstName AS enquirerLastName \n    ,enquirerSalutationTwo\n    ,enquirerLastNameTwo \n    ,enquirerFirstNameTwo \n    ,enquiryDate\n    ,enquirerRelationshipToResident\n    ,en_areacode\n    ,enquirerTelephone \n    ,enquiry_mobile \n    ,enquirerEmail \n    ,enquirerAddress  AS nokAddress\n    ,enquirerAddressOne AS nokAddressOne\n    ,enquirerAddressTwo  AS nokAddressTwo\n    ,enquirerAddressThree  AS nokAddressThree \n    ,enquiry_postcode \n    ,enquiry_postcode_two \n    ,residentSalutation\n    ,residentFirstName \n    ,residentLastName \n    ,residentDOB \n    ,residentSalutationTwo\n    ,residentFirstNameTwo\n    ,residentLastNameTwo\n    ,residentDOBTwo\n    ,residentNOK\n    ,residentAddress \n    ,residentAddressOne \n    ,residentAddressTwo \n    ,residentAddressThree \n    ,residentPostcode \n    ,residentTelephone \n    ,residentCareCategory\n    ,residentFundingCategory\n    ,residentCareCategoryTwo\n    ,funding_total\n    ,residentFunding\n    ,residentFundingTwo\n    --,enquiryDetails \n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiryDetails), '\"', '') AS enquiryDetails\n    ,enquiryType\n    ,responseTime\n    ,responseCurrentStatus\n    ,responseNeeded\n    ,responseAmountTried\n    ,followUpDate\n    ,followUpReason\n    ,uploadToCH\n    ,admissionDate\n    ,enquiryClosed\n    ,managerContacted\n    ,homeVisit\n    ,assessmentBooked\n    ,assesmentComplete\n    ,admission\n    ,homeVisitBooked\n    ,admissionBooked\n    ,video_booked\n    ,video_complete\n    ,homeVisitRequested\n    ,assesmentRequested\n    ,newEnquiry\n    ,cameFrom\n    ,enquirer_address \n    ,enquirer_postcode \n    ,lng\n    ,lat\n    ,enquirer_area\n    ,enquirer_county\n    ,nok_name\n    ,nok_surname\n    ,nok_county\n    ,nok_relation\n    ,nok_telephone\n    ,nok_mobile\n    ,nok_address\n    ,resident_county\n    ,nok_Salutation\n    ,newsletter_receive\n    ,newsletter_email\n    ,enquiry_urgent\n    ,optOut\n    ,type_news\n    ,type_mag\n    ,type_other\n    ,gp_name\n    ,gp_address\n    ,gp_telephone\n    ,gp_requested\n    ,gp_received\n    ,website\n    ,brochure\n    ,brochure_requestID\n    ,entryMethod\n    ,current_action_id\n    ,column_hash\n    ,receiveMarketing\n    ,willTopUp\n    ,enquiry_entered_from\n    ,enquiry_closed_reason\n    ,enquiry_deleted\n    ,enquiry_weight\nFROM \n    AEMS.AEMS_Enquiries AS E\nWHERE \n    E.homeID IN (@{variables('IntranetID')})",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('AEMS Enquiry - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set HomeName",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "HomeName",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.HomeName",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set IntranetID",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Look up Values",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "IntranetID",
+							"value": {
+								"value": "@activity('Look up Values').output.firstRow.IntranetID",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "AEMS Enquiry Actions",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "AEMS Enquiry",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT \n    A.ID\n    ,A.AEMS_ID\n    ,enquiry_setBy\n    ,enquiry_id\n    ,enquiry_dateRequired\n    ,enquiry_reason\n    ,enquiry_contact\n    ,enquiry_actionComplete\n    ,enquiry_actionInserted\n    ,enquiry_actionCompleteDate\n    ,enquiry_actionCompleteBy\n    ,enquiry_homeID\n    ,enquiry_missed\n    ,enquiry_missedEmail\n    ,enquiry_missedEmailDate\n    ,enquiry_initialContact\n    ,enquiry_flag\n    ,enquiry_critical\n    --,REPLACE(enquiry_details, '\"', '')\n    ,REPLACE(CONVERT(VARCHAR(MAX), enquiry_details), '\"', '') AS enquiry_details\n    ,enquiry_picked_up\n    ,enquiry_assigned_to\n    ,enquiry_assigned_when\n    ,enquiry_action_call_handler\n    ,enquiry_new\nFROM \n    AEMS.AEMS_Enquiries_Actions AS A\n\n    INNER JOIN AEMS.AEMS_Enquiries AS E\n        ON E.AEMS_ID = A.enquiry_id\n        AND E.homeID = A.enquiry_homeID\n    WHERE\n        A.enquiry_homeID IN (@{variables('IntranetID')})\n        ",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Yardi_CSV",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": {
+										"value": "@concat('AEMS Enquiry Actions - ', utcNow('yyyy-MM-dd'), '.csv')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Home_Ref": {
+						"type": "String",
+						"defaultValue": "611"
+					},
+					"HomeName": {
+						"type": "String"
+					},
+					"IntranetID": {
+						"type": "String",
+						"defaultValue": "7581,83,7596,7598"
+					}
+				},
+				"folder": {
+					"name": "Yardi/AEMS"
+				},
+				"annotations": []
 			},
 			"dependsOn": []
 		}

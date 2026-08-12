@@ -5603,24 +5603,18 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_GetFullWeekData')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_FullWeeklyHrs_ADFv')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"activities": [
 					{
-						"name": "Extract Data Func",
-						"description": "Call the azure function to make the api call",
+						"name": "Call Sona API",
+						"description": "Call the Sona API with provided Endpoint and Start End date times. Copy Activity handles pagination, cycling through each page (RANGE1::1 start:end:offset) until entries is empty (EndCondition:$.entries = Empty)",
 						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Set FunctionCode",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set APIToken",
+								"activity": "Set API Parameter Names",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -5637,17 +5631,13 @@
 						"typeProperties": {
 							"source": {
 								"type": "RestSource",
-								"httpRequestTimeout": "00:10:00",
-								"requestInterval": "00.00:00:00.010",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.500",
 								"requestMethod": "GET",
-								"additionalHeaders": {
-									"X-API-Key": {
-										"value": "@variables('APIToken')",
-										"type": "Expression"
-									}
-								},
 								"paginationRules": {
-									"supportRFC5988": "true"
+									"QueryParameters.{page}": "RANGE:1::1",
+									"EndCondition:$.entries": "Empty",
+									"MaxRequestNumber": "120"
 								}
 							},
 							"sink": {
@@ -5663,20 +5653,11 @@
 						},
 						"inputs": [
 							{
-								"referenceName": "DS_Sona_Data_Extract",
+								"referenceName": "DS_Sona_API",
 								"type": "DatasetReference",
 								"parameters": {
-									"FunctionCode": {
-										"value": "@variables('AzFuncCode')",
-										"type": "Expression"
-									},
-									"end_point": "@pipeline().parameters.EndPoint",
-									"min_start_date": {
-										"value": "@pipeline().parameters.MinStartDate",
-										"type": "Expression"
-									},
-									"max_start_date": {
-										"value": "@pipeline().parameters.MaxStartDate",
+									"EndPoint": {
+										"value": "@concat('/api/v1/',pipeline().parameters.EndPoint,'?page={page}&page_size=',pipeline().parameters.PageSize,'&',variables('vStartDateTime'),'=',pipeline().parameters.StartDateTime,'&',variables('vEndDateTime'),'=',pipeline().parameters.EndDateTime)",
 										"type": "Expression"
 									}
 								}
@@ -5688,7 +5669,7 @@
 								"type": "DatasetReference",
 								"parameters": {
 									"FileName": {
-										"value": "@concat(pipeline().parameters.FileName, '-', pipeline().parameters.EndPoint)",
+										"value": "@concat(pipeline().parameters.FileName,'-',pipeline().parameters.EndPoint)",
 										"type": "Expression"
 									}
 								}
@@ -5696,95 +5677,97 @@
 						]
 					},
 					{
-						"name": "Get AZ Func Code",
-						"type": "WebActivity",
+						"name": "Set API Parameter Names",
+						"type": "Switch",
 						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": true,
-							"secureInput": true
-						},
 						"userProperties": [],
 						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPICallAzFunc/1c971f76435e4e6ab021f17345a1fdb5?api-version=7.3",
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://vault.azure.net"
-							}
-						}
-					},
-					{
-						"name": "Get Sona API Token",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": true,
-							"secureInput": true
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPIToken/559963575ce3414abe3d756da8dd179f?api-version=7.3",
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://vault.azure.net"
-							}
-						}
-					},
-					{
-						"name": "Set FunctionCode",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get AZ Func Code",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "AzFuncCode",
-							"value": {
-								"value": "@activity('Get AZ Func Code').output.value",
+							"on": {
+								"value": "@pipeline().parameters.EndPoint",
 								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set APIToken",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Get Sona API Token",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "APIToken",
-							"value": {
-								"value": "@activity('Get Sona API Token').output.value",
-								"type": "Expression"
-							}
+							},
+							"cases": [
+								{
+									"value": "pay_lines",
+									"activities": [
+										{
+											"name": "Set StartDateTime_pay_lines",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vStartDateTime",
+												"value": "start_datetime"
+											}
+										},
+										{
+											"name": "Set EndDateTime_pay_lines",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set StartDateTime_pay_lines",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vEndDateTime",
+												"value": "end_datetime"
+											}
+										}
+									]
+								},
+								{
+									"value": "shifts",
+									"activities": [
+										{
+											"name": "Set StartDateTime_shifts",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vStartDateTime",
+												"value": "min_start_datetime"
+											}
+										},
+										{
+											"name": "Set EndDateTime_shifts",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set StartDateTime_shifts",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vEndDateTime",
+												"value": "max_start_datetime"
+											}
+										}
+									]
+								}
+							]
 						}
 					}
 				],
@@ -5792,13 +5775,16 @@
 					"elapsedTimeMetric": {}
 				},
 				"parameters": {
+					"StartDateTime": {
+						"type": "string"
+					},
+					"EndDateTime": {
+						"type": "string"
+					},
 					"EndPoint": {
 						"type": "string"
 					},
-					"MinStartDate": {
-						"type": "string"
-					},
-					"MaxStartDate": {
+					"PageSize": {
 						"type": "string"
 					},
 					"FileName": {
@@ -5806,15 +5792,15 @@
 					}
 				},
 				"variables": {
-					"APIToken": {
+					"vStartDateTime": {
 						"type": "String"
 					},
-					"AzFuncCode": {
+					"vEndDateTime": {
 						"type": "String"
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Weekly Hours"
 				},
 				"annotations": []
 			},
