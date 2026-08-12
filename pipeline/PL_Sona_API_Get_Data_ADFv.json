@@ -1,0 +1,91 @@
+{
+	"name": "PL_Sona_API_Get_Data_ADFv",
+	"properties": {
+		"activities": [
+			{
+				"name": "Call Sona API",
+				"description": "Call the Sona API with provided Endpoint. Copy Activity handles pagination, cycling through each page (RANGE1::1 start:end:offset) until entries is empty (EndCondition:$.entries = Empty)",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.15:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "RestSource",
+						"httpRequestTimeout": "00:01:40",
+						"requestInterval": "00.00:00:00.500",
+						"requestMethod": "GET",
+						"paginationRules": {
+							"QueryParameters.{page}": "RANGE:1::1",
+							"EndCondition:$.entries": "Empty",
+							"MaxRequestNumber": "120"
+						}
+					},
+					"sink": {
+						"type": "JsonSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "JsonWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Sona_API",
+						"type": "DatasetReference",
+						"parameters": {
+							"EndPoint": {
+								"value": "@concat('/api/v1/',pipeline().parameters.EndPoint,'?page={page}&page_size=',pipeline().parameters.PageSize)",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Sona_API_Response",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": {
+								"value": "@concat(pipeline().parameters.FileName,'_',pipeline().parameters.EndPoint)",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"EndPoint": {
+				"type": "string"
+			},
+			"PageSize": {
+				"type": "string"
+			},
+			"FileName": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"vStartDateTime": {
+				"type": "String"
+			},
+			"vEndDateTime": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Sona/Child Pipelines"
+		},
+		"annotations": []
+	}
+}
