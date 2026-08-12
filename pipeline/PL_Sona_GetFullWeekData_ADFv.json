@@ -1,0 +1,193 @@
+{
+	"name": "PL_Sona_GetFullWeekData_ADFv",
+	"properties": {
+		"activities": [
+			{
+				"name": "Extract Data Func",
+				"description": "Call the azure function to make the api call",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set FunctionCode",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set APIToken",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.15:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 60,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "RestSource",
+						"httpRequestTimeout": "00:01:40",
+						"requestInterval": "00.00:00:00.500",
+						"requestMethod": "GET",
+						"paginationRules": {
+							"QueryParameters.{page}": "RANGE:1::1",
+							"EndCondition:$.entries": "Empty",
+							"MaxRequestNumber": "55"
+						}
+					},
+					"sink": {
+						"type": "JsonSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "JsonWriteSettings"
+						}
+					},
+					"enableStaging": false
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Sona_API",
+						"type": "DatasetReference",
+						"parameters": {
+							"EndPoint": "/api/v1/pay_lines?page={page}&page_size=100&start_datetime=2026-08-10T00%3A00%3A00Z&end_datetime=2026-08-10T10%3A00%3A00Z"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_Sona_API_Response",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": {
+								"value": "@concat(pipeline().parameters.FileName, '- Test - ' )",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Get AZ Func Code",
+				"type": "WebActivity",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPICallAzFunc/1c971f76435e4e6ab021f17345a1fdb5?api-version=7.3",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Get Sona API Token",
+				"type": "WebActivity",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": true,
+					"secureInput": true
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPIToken/559963575ce3414abe3d756da8dd179f?api-version=7.3",
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://vault.azure.net"
+					}
+				}
+			},
+			{
+				"name": "Set FunctionCode",
+				"type": "SetVariable",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Get AZ Func Code",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "AzFuncCode",
+					"value": {
+						"value": "@activity('Get AZ Func Code').output.value",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set APIToken",
+				"type": "SetVariable",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Get Sona API Token",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "APIToken",
+					"value": {
+						"value": "@activity('Get Sona API Token').output.value",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"FileName": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"APIToken": {
+				"type": "String"
+			},
+			"AzFuncCode": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Sona/Child Pipelines"
+		},
+		"annotations": []
+	}
+}
