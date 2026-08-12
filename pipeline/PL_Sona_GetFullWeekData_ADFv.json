@@ -3,18 +3,12 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "Extract Data Func",
-				"description": "Call the azure function to make the api call",
+				"name": "Call Sona API",
+				"description": "Call the Sona API with provided Endpoint and Start End date times. Copy Activity handles pagination, cycling through each page (RANGE1::1 start:end:offset) until entries is empty (EndCondition:$.entries = Empty)",
 				"type": "Copy",
 				"dependsOn": [
 					{
-						"activity": "Set FunctionCode",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "Set APIToken",
+						"activity": "Set API Parameter Names",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -37,7 +31,7 @@
 						"paginationRules": {
 							"QueryParameters.{page}": "RANGE:1::1",
 							"EndCondition:$.entries": "Empty",
-							"MaxRequestNumber": "55"
+							"MaxRequestNumber": "120"
 						}
 					},
 					"sink": {
@@ -56,7 +50,10 @@
 						"referenceName": "DS_Sona_API",
 						"type": "DatasetReference",
 						"parameters": {
-							"EndPoint": "/api/v1/pay_lines?page={page}&page_size=100&start_datetime=2026-08-10T00%3A00%3A00Z&end_datetime=2026-08-10T10%3A00%3A00Z"
+							"EndPoint": {
+								"value": "@concat('/api/v1/',pipeline().parameters.EndPoint,'?page={page}&page_size=',pipeline().parameters.PageSize,'&',variables('vStartDateTime'),'=',pipeline().parameters.StartDateTime,'&',variables('vEndDateTime'),'=',pipeline().parameters.EndDateTime)",
+								"type": "Expression"
+							}
 						}
 					}
 				],
@@ -66,7 +63,7 @@
 						"type": "DatasetReference",
 						"parameters": {
 							"FileName": {
-								"value": "@concat(pipeline().parameters.FileName, '- Test - ' )",
+								"value": "@concat(pipeline().parameters.FileName,'-',pipeline().parameters.EndPoint)",
 								"type": "Expression"
 							}
 						}
@@ -74,114 +71,122 @@
 				]
 			},
 			{
-				"name": "Get AZ Func Code",
-				"type": "WebActivity",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
+				"name": "Set API Parameter Names",
+				"type": "Switch",
 				"dependsOn": [],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": true,
-					"secureInput": true
-				},
 				"userProperties": [],
 				"typeProperties": {
-					"method": "GET",
-					"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPICallAzFunc/1c971f76435e4e6ab021f17345a1fdb5?api-version=7.3",
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://vault.azure.net"
-					}
-				}
-			},
-			{
-				"name": "Get Sona API Token",
-				"type": "WebActivity",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
-				"dependsOn": [],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": true,
-					"secureInput": true
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"method": "GET",
-					"url": "https://avery-adf-keyvault.vault.azure.net/secrets/SonaAPIToken/559963575ce3414abe3d756da8dd179f?api-version=7.3",
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://vault.azure.net"
-					}
-				}
-			},
-			{
-				"name": "Set FunctionCode",
-				"type": "SetVariable",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
-				"dependsOn": [
-					{
-						"activity": "Get AZ Func Code",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "AzFuncCode",
-					"value": {
-						"value": "@activity('Get AZ Func Code').output.value",
+					"on": {
+						"value": "@pipeline().parameters.EndPoint",
 						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "Set APIToken",
-				"type": "SetVariable",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
-				"dependsOn": [
-					{
-						"activity": "Get Sona API Token",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "APIToken",
-					"value": {
-						"value": "@activity('Get Sona API Token').output.value",
-						"type": "Expression"
-					}
+					},
+					"cases": [
+						{
+							"value": "pay_lines",
+							"activities": [
+								{
+									"name": "Set StartDateTime_pay_lines",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vStartDateTime",
+										"value": "start_datetime"
+									}
+								},
+								{
+									"name": "Set EndDateTime_pay_lines",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set StartDateTime_pay_lines",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vEndDateTime",
+										"value": "end_datetime"
+									}
+								}
+							]
+						},
+						{
+							"value": "shifts",
+							"activities": [
+								{
+									"name": "Set StartDateTime_shifts",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vStartDateTime",
+										"value": "min_start_datetime"
+									}
+								},
+								{
+									"name": "Set EndDateTime_shifts",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set StartDateTime_shifts",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vEndDateTime",
+										"value": "max_start_datetime"
+									}
+								}
+							]
+						}
+					]
 				}
 			}
 		],
 		"parameters": {
+			"StartDateTime": {
+				"type": "string"
+			},
+			"EndDateTime": {
+				"type": "string"
+			},
+			"EndPoint": {
+				"type": "string"
+			},
+			"PageSize": {
+				"type": "string"
+			},
 			"FileName": {
 				"type": "string"
 			}
 		},
 		"variables": {
-			"APIToken": {
+			"vStartDateTime": {
 				"type": "String"
 			},
-			"AzFuncCode": {
+			"vEndDateTime": {
 				"type": "String"
 			}
 		},

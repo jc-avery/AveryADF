@@ -1,0 +1,468 @@
+{
+	"name": "PL_Sona_Stage_WeeklyHrs",
+	"properties": {
+		"activities": [
+			{
+				"name": "Stage Paylines Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set DateString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"path": "['id']"
+								},
+								"sink": {
+									"name": "PayLines_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['comment']"
+								},
+								"sink": {
+									"name": "comment",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['entry_type']"
+								},
+								"sink": {
+									"name": "entry_type",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['variant']"
+								},
+								"sink": {
+									"name": "variant",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['user_id']"
+								},
+								"sink": {
+									"name": "user_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['duration_in_minutes']"
+								},
+								"sink": {
+									"name": "duration_in_minutes",
+									"type": "Int64"
+								}
+							},
+							{
+								"source": {
+									"path": "['start_datetime']"
+								},
+								"sink": {
+									"name": "start_datetime",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['end_datetime']"
+								},
+								"sink": {
+									"name": "end_datetime",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['is_sleep']"
+								},
+								"sink": {
+									"name": "is_sleep",
+									"type": "Boolean"
+								}
+							},
+							{
+								"source": {
+									"path": "['shift_id']"
+								},
+								"sink": {
+									"name": "shift_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['shift_type_id']"
+								},
+								"sink": {
+									"name": "shift_type_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['pay_type']"
+								},
+								"sink": {
+									"name": "pay_type",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['shift_type_name']"
+								},
+								"sink": {
+									"name": "shift_type_name",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['rate_of_pay']['id']"
+								},
+								"sink": {
+									"name": "rate_of_pay_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['rate_of_pay']['rate']"
+								},
+								"sink": {
+									"name": "rate_of_pay_rate",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['rate_of_pay']['pay_type']"
+								},
+								"sink": {
+									"name": "rate_of_pay_pay_type",
+									"type": "String"
+								}
+							}
+						],
+						"collectionReference": "$['entries']"
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Sona_Json_WeeklyHrs",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": {
+								"value": "@concat(pipeline().parameters.FileName,'-pay_lines$')",
+								"type": "Expression"
+							},
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Sona",
+							"Table": "STG_PayLines"
+						}
+					}
+				]
+			},
+			{
+				"name": "Set DateString",
+				"description": "Sets the date string used for Dataset property",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DateString",
+					"value": {
+						"value": "@utcNow('yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Removed edited Paylines",
+				"description": "Deletes the payline records that are not present in the newly staged data. Limit delete records to the shifts we just staged, and delete those paylines that aren't present in the new paylines staged data",
+				"type": "Script",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [
+					{
+						"activity": "Stage Paylines Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Stage Shifts Data",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "AH2_TRANSFORM_DB",
+					"type": "LinkedServiceReference"
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": "DELETE\nFROM Sona.PayLines\nWHERE \n\nEXISTS --Limit to the shifts we have exported data for (weekly data)\n(\n    SELECT 1\n    FROM Sona.STG_Shifts AS ss\n    WHERE ss.shift_id = PayLines.shift_id\n)\nAND NOT EXISTS --Exclude paylines that match paylines and shifts just exported and staged\n(\n    SELECT 1\n    FROM Sona.STG_PayLines AS sp\n    WHERE sp.shift_id = PayLines.shift_id\n      AND sp.PayLines_id = PayLines.PayLine_id\n)"
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Stage Shifts Data",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set DateString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"path": "['id']"
+								},
+								"sink": {
+									"name": "shift_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['description']"
+								},
+								"sink": {
+									"name": "description",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['category']"
+								},
+								"sink": {
+									"name": "category",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['org_unit']['id']"
+								},
+								"sink": {
+									"name": "shifts_org_unit_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['start_datetime']"
+								},
+								"sink": {
+									"name": "start_datetime",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['agency']['id']"
+								},
+								"sink": {
+									"name": "agency_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['shift_type']['id']"
+								},
+								"sink": {
+									"name": "shifts_shift_type_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['shift_type']['name']"
+								},
+								"sink": {
+									"name": "shifts_shift_type_name",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['finish_datetime']"
+								},
+								"sink": {
+									"name": "finish_datetime",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['user_working_shift']['id']"
+								},
+								"sink": {
+									"name": "user_working_shift_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['internal_id']"
+								},
+								"sink": {
+									"name": "internal_id",
+									"type": "String"
+								}
+							}
+						],
+						"collectionReference": "$['entries']"
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Sona_Json_WeeklyHrs",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": {
+								"value": "@concat(pipeline().parameters.FileName,'$')",
+								"type": "Expression"
+							},
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Sona",
+							"Table": "STG_Shifts"
+						}
+					}
+				]
+			}
+		],
+		"parameters": {
+			"FileName": {
+				"type": "string"
+			}
+		},
+		"variables": {
+			"DateString": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Sona/Child Pipelines"
+		},
+		"annotations": []
+	}
+}
