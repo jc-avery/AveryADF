@@ -2238,35 +2238,35 @@
 			"type": "string",
 			"defaultValue": "Silvermere"
 		},
-		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack": {
+		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
 			"type": "int",
 			"defaultValue": 0
 		},
-		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType": {
+		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "FullWeekData"
 		},
-		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack": {
+		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
 			"type": "int",
 			"defaultValue": 2
 		},
-		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType": {
+		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "WeeklyHrs_2WeekPrior"
 		},
-		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack": {
+		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
 			"type": "int",
 			"defaultValue": 3
 		},
-		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType": {
+		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "WeeklyHrs_3WeekPrior"
 		},
-		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack": {
+		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
 			"type": "int",
 			"defaultValue": 1
 		},
-		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType": {
+		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "WeeklyHrs_PrevWeek"
 		},
@@ -67422,6 +67422,106 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_API_Get_Data_ADFv')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Call Sona API",
+						"description": "Call the Sona API with provided Endpoint. Copy Activity handles pagination, cycling through each page (RANGE1::1 start:end:offset) until entries is empty (EndCondition:$.entries = Empty)",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.15:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 60,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.500",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"QueryParameters.{page}": "RANGE:1::1",
+									"EndCondition:$.entries": "Empty",
+									"MaxRequestNumber": "120"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_API",
+								"type": "DatasetReference",
+								"parameters": {
+									"EndPoint": {
+										"value": "@concat('/api/v1/',pipeline().parameters.EndPoint,'?page={page}&page_size=',pipeline().parameters.PageSize)",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_Sona_API_Response",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": {
+										"value": "@concat(pipeline().parameters.FileName,'_',pipeline().parameters.EndPoint)",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"EndPoint": {
+						"type": "string"
+					},
+					"PageSize": {
+						"type": "string"
+					},
+					"FileName": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vStartDateTime": {
+						"type": "String"
+					},
+					"vEndDateTime": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_API')]",
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_API_Response')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Sona_AbsenceSubTypes')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -67905,7 +68005,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_FullWeeklyHrs_Data')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_FullWeek')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -67971,7 +68071,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Get_FullWeeklyHrs_ADFv",
+								"referenceName": "PL_Sona_Get_WeeklyHrs_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68010,7 +68110,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Get_FullWeeklyHrs_ADFv",
+								"referenceName": "PL_Sona_Get_WeeklyHrs_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68049,7 +68149,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Stage_FullWeeklyHrs",
+								"referenceName": "PL_Sona_Stage_WeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68078,7 +68178,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_FullWeeklyHrs",
+								"referenceName": "PL_Sona_Upsert_WeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68256,15 +68356,15 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Get_FullWeeklyHrs_ADFv')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_FullWeeklyHrs')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_FullWeeklyHrs')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Get_WeeklyHrs_ADFv')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_WeeklyHrs')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHrs')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]",
 				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_WeeklyHrs_ViewTransfer')]"
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_GetData')]",
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_GetData_AZFunc')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -68469,7 +68569,7 @@
 					}
 				},
 				"folder": {
-					"name": "Sona/Child Pipelines"
+					"name": "Sona/Child Pipelines/Old"
 				},
 				"annotations": []
 			},
@@ -68519,7 +68619,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
+								"referenceName": "xPL_Sona_GetData_AZFunc",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -68563,7 +68663,7 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_All_Users')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]",
+				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_GetData_AZFunc')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_All_Users')]"
 			]
 		},
@@ -68584,12 +68684,14 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
+								"referenceName": "PL_Sona_API_Get_Data_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"EndPoint": "emp_periods"
+								"EndPoint": "employment_periods",
+								"PageSize": "500",
+								"FileName": "Regular"
 							}
 						}
 					},
@@ -68639,7 +68741,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT  [active]\n      ,[EmploymentPeriods_id]\n      ,[start_date]\n      ,[idx]\n      ,[job_id]\n      ,[organisation_id]\n      ,[user_id]\n      ,[finish_date]\n      ,[organisation_user_id]\n      ,[employment_specs_id]\n      ,[employment_specs_contracted_hours_id]\n      ,[employment_specs_contracted_hours_period]\n      ,[employment_specs_contracted_hours_hours]\n      ,[employment_specs_contracted_hours_days]\n      ,[employment_specs_contracted_hours_start_date]\n      ,[employment_specs_contracted_hours_idx]\n      ,[employment_specs_contracted_hours_org_unit_id]\n      ,[employment_specs_contracted_hours_finish_date]\n      ,[employment_specs_contracted_hours_colour_coding]\n      ,[employment_specs_contracted_hours_type_of_work_id]\n      ,[employment_specs_contracted_hours_monthly_period_starts_at]\n      ,[employment_specs_contracted_hours_weekly_period_starts_at]\n      ,[employment_specs_contracted_hours_rolling_period_sequence_length_days]\n      ,[employment_specs_contracted_hours_rolling_period_sequence_start]\n      ,[employment_specs_contract_types_id]\n      ,[employment_specs_contract_types_name]\n      ,[employment_specs_contract_types_employment_type]\n      ,[employment_specs_contract_types_pay_period_start]\n      ,[employment_specs_contract_types_pay_period_type]\n      ,[employment_specs_contract_types_payroll_rule]\n      ,[employment_specs_contract_types_employment_basis]\n      ,[employment_specs_rates_of_pay_id]\n      ,[employment_specs_rates_of_pay_start_date]\n      ,[employment_specs_rates_of_pay_idx]\n      ,[employment_specs_rates_of_pay_finish_date]\n      ,TRY_CAST(REPLACE(REPLACE([employment_specs_rates_of_pay_rate], '£', ''), ',', '') AS decimal(10,2)) AS [employment_specs_rates_of_pay_rate]\n      ,[employment_specs_rates_of_pay_pay_type]\n      ,[primary_org_unit_id]\n      ,[employee_number]\n      ,[continuous_employment_start_date]\n      ,[level_id]\n      ,[job_grade_id]\n      ,[reports_to_user_id]\n      ,[reports_to_org_user_id]\n      ,[starter_declaration]\n      ,[student_loan_plan_four]\n      ,[student_loan_plan_one]\n      ,[student_loan_plan_two]\n      ,[student_loan_post_graduate]\n      ,[tupe]\n  FROM [Sona].[STG_EmploymentPeriods]\n",
+								"sqlReaderQuery": "SELECT  [active]\n      ,[EmploymentPeriods_id]\n      ,[start_date]\n      ,[idx]\n      ,[job_id]\n      ,[organisation_id]\n      ,[user_id]\n      ,[finish_date]\n      ,[organisation_user_id]\n      ,[employment_specs_id]\n      ,[employment_specs_contracted_hours_id]\n      ,[employment_specs_contracted_hours_period]\n      ,[employment_specs_contracted_hours_hours]\n      ,[employment_specs_contracted_hours_days]\n      ,[employment_specs_contracted_hours_start_date]\n      ,[employment_specs_contracted_hours_idx]\n      ,[employment_specs_contracted_hours_org_unit_id]\n      ,[employment_specs_contracted_hours_finish_date]\n      ,[employment_specs_contracted_hours_colour_coding]\n      ,[employment_specs_contracted_hours_type_of_work_id]\n      ,[employment_specs_contracted_hours_monthly_period_starts_at]\n      ,[employment_specs_contracted_hours_weekly_period_starts_at]\n      ,[employment_specs_contracted_hours_rolling_period_sequence_length_days]\n      ,[employment_specs_contracted_hours_rolling_period_sequence_start]\n      ,[employment_specs_contract_types_id]\n      ,[employment_specs_contract_types_name]\n      ,[employment_specs_contract_types_employment_type]\n      ,[employment_specs_contract_types_pay_period_start]\n      ,[employment_specs_contract_types_pay_period_type]\n      ,[employment_specs_contract_types_payroll_rule]\n      ,[employment_specs_contract_types_employment_basis]\n      ,[employment_specs_rates_of_pay_id]\n      ,[employment_specs_rates_of_pay_start_date]\n      ,[employment_specs_rates_of_pay_idx]\n      ,[employment_specs_rates_of_pay_finish_date]\n      ,TRY_CAST(REPLACE(REPLACE([employment_specs_rates_of_pay_rate], '£', ''), ',', '') AS decimal(10,2)) AS [employment_specs_rates_of_pay_rate]\n      ,[employment_specs_rates_of_pay_pay_type]\n      ,[primary_org_unit_id]\n      ,[employee_number]\n      ,[continuous_employment_start_date]\n      ,[level_id]\n      ,[job_grade_id]\n      ,[reports_to_user_id]\n      ,[reports_to_org_user_id]\n      ,[starter_declaration]\n      ,[student_loan_plan_four]\n      ,[student_loan_plan_one]\n      ,[student_loan_plan_two]\n      ,[student_loan_post_graduate]\n      ,[tupe]\n      ,termination_reason\n      ,TRY_CONVERT( DATETIME, updated_at_utc) AS updated_at_utc\n  FROM [Sona].[STG_EmploymentPeriods]\n",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
@@ -69090,8 +69192,10 @@
 									{
 										"source": {
 											"name": "employment_specs_rates_of_pay_rate",
-											"type": "String",
-											"physicalType": "nvarchar"
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 10
 										},
 										"sink": {
 											"name": "employment_specs_rates_of_pay_rate",
@@ -69268,6 +69372,30 @@
 											"type": "String",
 											"physicalType": "varchar"
 										}
+									},
+									{
+										"source": {
+											"name": "termination_reason",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "termination_reason",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "updated_at_utc",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "updated_at_utc",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
 									}
 								],
 								"typeConversion": true,
@@ -69308,13 +69436,13 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_API_Get_Data_ADFv')]",
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Emp_Periods')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_FullWeeklyHrs_ADFv')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_WeeklyHrs_ADFv')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -74263,580 +74391,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_Emp_Periods')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Inserts the Emp_Periods data to stage tables",
-				"activities": [
-					{
-						"name": "Stage Emp Periods",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set DateString",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"preCopyScript": "TRUNCATE TABLE Sona.STG_EmploymentPeriods",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['active']"
-										},
-										"sink": {
-											"name": "active",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "EmploymentPeriods_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['start_date']"
-										},
-										"sink": {
-											"name": "start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['idx']"
-										},
-										"sink": {
-											"name": "idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['user_id']"
-										},
-										"sink": {
-											"name": "user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['job_id']"
-										},
-										"sink": {
-											"name": "job_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['organisation_id']"
-										},
-										"sink": {
-											"name": "organisation_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['finish_date']"
-										},
-										"sink": {
-											"name": "finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['organisation_user_id']"
-										},
-										"sink": {
-											"name": "organisation_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employee_number']"
-										},
-										"sink": {
-											"name": "employee_number",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['primary_org_unit_id']"
-										},
-										"sink": {
-											"name": "primary_org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['continuous_employment_start_date']"
-										},
-										"sink": {
-											"name": "continuous_employment_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['level_id']"
-										},
-										"sink": {
-											"name": "level_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['job_grade_id']"
-										},
-										"sink": {
-											"name": "job_grade_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['reports_to_user_id']"
-										},
-										"sink": {
-											"name": "reports_to_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['reports_to_org_user_id']"
-										},
-										"sink": {
-											"name": "reports_to_org_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['starter_declaration']"
-										},
-										"sink": {
-											"name": "starter_declaration",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['student_loan_plan_four']"
-										},
-										"sink": {
-											"name": "student_loan_plan_four",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['student_loan_plan_one']"
-										},
-										"sink": {
-											"name": "student_loan_plan_one",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['student_loan_plan_two']"
-										},
-										"sink": {
-											"name": "student_loan_plan_two",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['student_loan_post_graduate']"
-										},
-										"sink": {
-											"name": "student_loan_post_graduate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['tupe']"
-										},
-										"sink": {
-											"name": "tupe",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['updated_at_utc']"
-										},
-										"sink": {
-											"name": "employment_specs_updated_at_utc",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['period']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_period",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['hours']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_hours",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['days']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_days",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['start_date']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['idx']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['org_unit_id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['finish_date']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['colour_coding']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_colour_coding",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['type_of_work_id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_type_of_work_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['weekly_period_starts_at']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_weekly_period_starts_at",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['monthly_period_starts_at']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_monthly_period_starts_at",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_length_days']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_length_days",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_start']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_start",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contract_types'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contract_types'][0]['name']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contract_types'][0]['employment_type']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contract_types'][0]['pay_period_type']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contract_types'][0]['payroll_rule']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_payroll_rule",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['contract_types'][0]['employment_basis']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_basis",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['rates_of_pay'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['rates_of_pay'][0]['start_date']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['rates_of_pay'][0]['idx']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['rates_of_pay'][0]['rate']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['rates_of_pay'][0]['finish_date']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['employment_specs'][0]['rates_of_pay'][0]['pay_type']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_pay_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs[0].termination_reason.name']"
-										},
-										"sink": {
-											"name": "employment_specs_termination_reason",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['entries']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Json_WeeklyHrs",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "emp_periods$",
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_EmploymentPeriods"
-								}
-							}
-						]
-					},
-					{
-						"name": "Set DateString",
-						"description": "Sets the date string used for Dataset property",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "DateString",
-							"value": {
-								"value": "@utcNow('yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"DateString": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Sona/Child Pipelines/Emp Periods"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_Sona_Json_WeeklyHrs')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_FullWeeklyHrs')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_WeeklyHrs')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -74865,7 +74420,7 @@
 								"type": "JsonSource",
 								"storeSettings": {
 									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
+									"recursive": false,
 									"enablePartitionDiscovery": false
 								},
 								"formatSettings": {
@@ -75139,7 +74694,7 @@
 								"type": "JsonSource",
 								"storeSettings": {
 									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
+									"recursive": false,
 									"enablePartitionDiscovery": false
 								},
 								"formatSettings": {
@@ -75312,7 +74867,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_WeeklyHrs_3Days')]",
+			"name": "[concat(parameters('factoryName'), '/xPL_Sona_Stage_WeeklyHrs_3Days')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -78147,7 +77702,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_FullWeeklyHrs')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_WeeklyHrs')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -78759,20 +78314,22 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
+								"referenceName": "PL_Sona_Get_WeeklyHrs_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"EndPoint": "shifts",
-								"MinStartDate": {
+								"StartDateTime": {
 									"value": "@variables('StartDateTime')",
 									"type": "Expression"
 								},
-								"MaxStartDate": {
+								"EndDateTime": {
 									"value": "@variables('EndDateTime')",
 									"type": "Expression"
-								}
+								},
+								"EndPoint": "shifts",
+								"PageSize": "500",
+								"FileName": "3Day"
 							}
 						}
 					},
@@ -78793,20 +78350,22 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_GetData",
+								"referenceName": "PL_Sona_Get_WeeklyHrs_ADFv",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"EndPoint": "paylines",
-								"MinStartDate": {
+								"StartDateTime": {
 									"value": "@variables('StartDateTime')",
 									"type": "Expression"
 								},
-								"MaxStartDate": {
+								"EndDateTime": {
 									"value": "@variables('EndDateTime')",
 									"type": "Expression"
-								}
+								},
+								"EndPoint": "pay_lines",
+								"PageSize": "500",
+								"FileName": "3Day"
 							}
 						}
 					},
@@ -78827,11 +78386,13 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Stage_WeeklyHrs_3Days",
+								"referenceName": "PL_Sona_Stage_WeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
-							"parameters": {}
+							"parameters": {
+								"FileName": "3Day"
+							}
 						}
 					},
 					{
@@ -78877,7 +78438,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_FullWeeklyHrs",
+								"referenceName": "PL_Sona_Upsert_WeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -78970,10 +78531,10 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_GetData')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_WeeklyHrs_3Days')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Get_WeeklyHrs_ADFv')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_WeeklyHrs')]",
 				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_WeeklyHrs_ViewTransfer')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_FullWeeklyHrs')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHrs')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
 			]
 		},
@@ -92963,7 +92524,7 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_FullWeeklyHrs",
+								"referenceName": "PL_Sona_Upsert_WeeklyHrs",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
@@ -93119,7 +92680,7 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_GetFullWeekData')]",
 				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_Stage_Full_WeeklyHr_data')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_FullWeeklyHrs')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_WeeklyHrs')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]",
 				"[concat(variables('factoryId'), '/pipelines/xPL_Sona_WeeklyHrs_ViewTransfer')]"
 			]
@@ -108343,12 +107904,12 @@
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Sona_FullWeeklyHrs_Data",
+							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType')]"
+							"WeeksBack": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
 						}
 					}
 				],
@@ -108380,7 +107941,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_FullWeeklyHrs_Data')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_FullWeek')]"
 			]
 		},
 		{
@@ -108394,12 +107955,12 @@
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Sona_FullWeeklyHrs_Data",
+							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType')]"
+							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
 						}
 					}
 				],
@@ -108427,7 +107988,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_FullWeeklyHrs_Data')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_FullWeek')]"
 			]
 		},
 		{
@@ -108441,12 +108002,12 @@
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Sona_FullWeeklyHrs_Data",
+							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType')]"
+							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
 						}
 					}
 				],
@@ -108473,7 +108034,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_FullWeeklyHrs_Data')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_FullWeek')]"
 			]
 		},
 		{
@@ -108487,12 +108048,12 @@
 				"pipelines": [
 					{
 						"pipelineReference": {
-							"referenceName": "PL_Sona_FullWeeklyHrs_Data",
+							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_FullWeeklyHrs_Data_parameters_FileNameType')]"
+							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
 						}
 					}
 				],
@@ -108520,7 +108081,7 @@
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_FullWeeklyHrs_Data')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_WeeklyHrs_FullWeek')]"
 			]
 		},
 		{
@@ -109905,6 +109466,588 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_Emp_Periods')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Inserts the Emp_Periods data to stage tables",
+				"activities": [
+					{
+						"name": "Stage Emp Periods",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set DateString",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE Sona.STG_EmploymentPeriods",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['active']"
+										},
+										"sink": {
+											"name": "active",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "EmploymentPeriods_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['start_date']"
+										},
+										"sink": {
+											"name": "start_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['idx']"
+										},
+										"sink": {
+											"name": "idx",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_id']"
+										},
+										"sink": {
+											"name": "user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['job_id']"
+										},
+										"sink": {
+											"name": "job_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['organisation_id']"
+										},
+										"sink": {
+											"name": "organisation_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['finish_date']"
+										},
+										"sink": {
+											"name": "finish_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['organisation_user_id']"
+										},
+										"sink": {
+											"name": "organisation_user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employee_number']"
+										},
+										"sink": {
+											"name": "employee_number",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['primary_org_unit_id']"
+										},
+										"sink": {
+											"name": "primary_org_unit_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['continuous_employment_start_date']"
+										},
+										"sink": {
+											"name": "continuous_employment_start_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['level_id']"
+										},
+										"sink": {
+											"name": "level_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['job_grade_id']"
+										},
+										"sink": {
+											"name": "job_grade_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['reports_to_user_id']"
+										},
+										"sink": {
+											"name": "reports_to_user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['reports_to_org_user_id']"
+										},
+										"sink": {
+											"name": "reports_to_org_user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['starter_declaration']"
+										},
+										"sink": {
+											"name": "starter_declaration",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['student_loan_plan_four']"
+										},
+										"sink": {
+											"name": "student_loan_plan_four",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['student_loan_plan_one']"
+										},
+										"sink": {
+											"name": "student_loan_plan_one",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['student_loan_plan_two']"
+										},
+										"sink": {
+											"name": "student_loan_plan_two",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['student_loan_post_graduate']"
+										},
+										"sink": {
+											"name": "student_loan_post_graduate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['termination_reason']['name']"
+										},
+										"sink": {
+											"name": "termination_reason",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['tupe']"
+										},
+										"sink": {
+											"name": "tupe",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['updated_at_utc']"
+										},
+										"sink": {
+											"name": "updated_at_utc",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['id']"
+										},
+										"sink": {
+											"name": "employment_specs_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['id']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['period']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_period",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['hours']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_hours",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['days']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_days",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['start_date']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_start_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['idx']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_idx",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['org_unit_id']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_org_unit_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['finish_date']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_finish_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['colour_coding']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_colour_coding",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['type_of_work_id']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_type_of_work_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['weekly_period_starts_at']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_weekly_period_starts_at",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['monthly_period_starts_at']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_monthly_period_starts_at",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_length_days']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_rolling_period_sequence_length_days",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_start']"
+										},
+										"sink": {
+											"name": "employment_specs_contracted_hours_rolling_period_sequence_start",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['id']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['name']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['employment_type']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_employment_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['pay_period_type']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_pay_period_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['payroll_rule']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_payroll_rule",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['pay_period_start']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_pay_period_start",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['contract_types'][0]['employment_basis']"
+										},
+										"sink": {
+											"name": "employment_specs_contract_types_employment_basis",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['rates_of_pay'][0]['id']"
+										},
+										"sink": {
+											"name": "employment_specs_rates_of_pay_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['rates_of_pay'][0]['start_date']"
+										},
+										"sink": {
+											"name": "employment_specs_rates_of_pay_start_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['rates_of_pay'][0]['idx']"
+										},
+										"sink": {
+											"name": "employment_specs_rates_of_pay_idx",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['rates_of_pay'][0]['rate']"
+										},
+										"sink": {
+											"name": "employment_specs_rates_of_pay_rate",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['rates_of_pay'][0]['finish_date']"
+										},
+										"sink": {
+											"name": "employment_specs_rates_of_pay_finish_date",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['employment_specs'][0]['rates_of_pay'][0]['pay_type']"
+										},
+										"sink": {
+											"name": "employment_specs_rates_of_pay_pay_type",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Json_WeeklyHrs",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "Regular_employment_periods$",
+									"DateString": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_EmploymentPeriods"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set DateString",
+						"description": "Sets the date string used for Dataset property",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines/Emp Periods"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_Sona_Json_WeeklyHrs')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
 			]
 		}
 	]
