@@ -12,15 +12,37 @@
 					"name": "SonaAbscenses"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference"
+					},
+					"name": "InsertAbsenceDays"
+				},
+				{
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference"
+					},
+					"name": "InsertAbsenceLinkedShifts"
+				}
+			],
 			"transformations": [
+				{
+					"name": "FlattenEntries",
+					"description": "Unrolling arrays from entries to columns 'id, days, linked_shifts'"
+				},
+				{
+					"name": "FlattenLinkedShifts"
+				},
 				{
 					"name": "FlattenDays"
 				}
 			],
 			"scriptLines": [
 				"source(output(",
-				"          entries as (absence_subtype_id as string, absence_type_id as string, current_employee_number as string, days as (date as date, status as string)[], documents as string[], ends_at as timestamp, id as string, idx as string, is_open_ended as boolean, is_paid as string, linked_shifts as (end_datetime as timestamp, id as string, is_shift_run as boolean, is_travel_gap as boolean, shift_break as string, shift_run_id as string, start_datetime as timestamp)[], payroll_type as string, starts_at as timestamp, user_id as string, user_internal_id as string)[],",
+				"          entries as (absence_subtype_id as string, absence_type_id as string, current_employee_number as string, days as (date as date, status as string)[], documents as string[], ends_at as timestamp, id as string, idx as string, is_open_ended as boolean, is_paid as string, linked_shifts as (end_datetime as string, id as string, is_shift_run as boolean, is_travel_gap as boolean, shift_break as string, shift_run_id as string, start_datetime as string)[], payroll_type as string, starts_at as timestamp, user_id as string, user_internal_id as string)[],",
 				"          page_number as short,",
 				"          page_size as short,",
 				"          total_entries as integer,",
@@ -32,12 +54,52 @@
 				"     documentForm: 'documentPerLine') ~> SonaAbscenses",
 				"SonaAbscenses foldDown(unroll(entries),",
 				"     mapColumn(",
-				"          id = entries.id,",
+				"          absence_id = entries.id,",
 				"          days = entries.days,",
 				"          linked_shifts = entries.linked_shifts",
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
-				"     skipDuplicateMapOutputs: false) ~> FlattenDays"
+				"     skipDuplicateMapOutputs: false) ~> FlattenEntries",
+				"FlattenEntries foldDown(unroll(linked_shifts),",
+				"     mapColumn(",
+				"          absence_id,",
+				"          linked_shift_id = linked_shifts.id,",
+				"          linked_shift_start_datetime = linked_shifts.start_datetime,",
+				"          linked_shift_is_shift_run = linked_shifts.is_shift_run,",
+				"          linked_shift_shift_run_id = linked_shifts.shift_run_id,",
+				"          linked_shift_is_travel_gap = linked_shifts.is_travel_gap,",
+				"          linked_shift_end_datetime = linked_shifts.end_datetime",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> FlattenLinkedShifts",
+				"FlattenEntries foldDown(unroll(days),",
+				"     mapColumn(",
+				"          absence_id,",
+				"          days_status = days.status,",
+				"          days_date = days.date",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> FlattenDays",
+				"FlattenDays sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> InsertAbsenceDays",
+				"FlattenLinkedShifts sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError') ~> InsertAbsenceLinkedShifts"
 			]
 		}
 	}
