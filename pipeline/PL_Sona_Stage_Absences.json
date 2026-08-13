@@ -5,7 +5,14 @@
 			{
 				"name": "Stage Absences",
 				"type": "Copy",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Set DateString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -28,13 +35,8 @@
 					},
 					"sink": {
 						"type": "AzureSqlSink",
-						"writeBehavior": "upsert",
-						"upsertSettings": {
-							"useTempDB": true,
-							"keys": [
-								"Absence_ID"
-							]
-						},
+						"preCopyScript": "TRUNCATE TABLE Sona.STG_Absences",
+						"writeBehavior": "insert",
 						"sqlWriterUseTableLock": false,
 						"disableMetricsCollection": false
 					},
@@ -47,7 +49,8 @@
 									"path": "['id']"
 								},
 								"sink": {
-									"name": "Absence_ID"
+									"name": "Absence_ID",
+									"type": "String"
 								}
 							},
 							{
@@ -55,7 +58,7 @@
 									"path": "['user_id']"
 								},
 								"sink": {
-									"name": "User_ID",
+									"name": "user_id",
 									"type": "String"
 								}
 							},
@@ -64,16 +67,7 @@
 									"path": "['starts_at']"
 								},
 								"sink": {
-									"name": "Starts_at",
-									"type": "DateTime"
-								}
-							},
-							{
-								"source": {
-									"path": "['ends_at']"
-								},
-								"sink": {
-									"name": "Ends_at",
+									"name": "starts_at",
 									"type": "DateTime"
 								}
 							},
@@ -97,10 +91,37 @@
 							},
 							{
 								"source": {
-									"path": "['user_internal_id']"
+									"path": "['ends_at']"
 								},
 								"sink": {
-									"name": "user_internal_id",
+									"name": "ends_at",
+									"type": "DateTime"
+								}
+							},
+							{
+								"source": {
+									"path": "['is_open_ended']"
+								},
+								"sink": {
+									"name": "is_open_ended",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['payroll_type']"
+								},
+								"sink": {
+									"name": "payroll_type",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['is_paid']"
+								},
+								"sink": {
+									"name": "is_paid",
 									"type": "String"
 								}
 							},
@@ -115,10 +136,10 @@
 							},
 							{
 								"source": {
-									"path": "['is_paid']"
+									"path": "['user_internal_id']"
 								},
 								"sink": {
-									"name": "is_paid",
+									"name": "user_internal_id",
 									"type": "String"
 								}
 							}
@@ -128,10 +149,14 @@
 				},
 				"inputs": [
 					{
-						"referenceName": "DS_Sona_API_Response",
+						"referenceName": "DS_Sona_Json_WeeklyHrs",
 						"type": "DatasetReference",
 						"parameters": {
-							"FileName": "Sona Absences"
+							"FileName": "All_absences$",
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
 						}
 					}
 				],
@@ -149,14 +174,9 @@
 			{
 				"name": "Stage Absences Missed Shifts",
 				"type": "Copy",
-				"dependsOn": [
-					{
-						"activity": "Stage Absences",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -262,8 +282,211 @@
 						}
 					}
 				]
+			},
+			{
+				"name": "Set DateString",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DateString",
+					"value": {
+						"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Stage Absences_Days",
+				"type": "Copy",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"preCopyScript": "TRUNCATE TABLE Sona.STG_Absences_Days",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"path": "['id']"
+								}
+							},
+							{
+								"source": {
+									"path": "['user_id']"
+								}
+							},
+							{
+								"source": {
+									"path": "['starts_at']"
+								}
+							},
+							{
+								"source": {
+									"path": "['absence_type_id']"
+								}
+							},
+							{
+								"source": {
+									"path": "['absence_subtype_id']"
+								}
+							},
+							{
+								"source": {
+									"path": "['ends_at']"
+								}
+							},
+							{
+								"source": {
+									"path": "['is_open_ended']"
+								}
+							},
+							{
+								"source": {
+									"path": "['payroll_type']"
+								}
+							},
+							{
+								"source": {
+									"path": "['is_paid']"
+								}
+							},
+							{
+								"source": {
+									"path": "['current_employee_number']"
+								}
+							},
+							{
+								"source": {
+									"path": "['user_internal_id']"
+								}
+							},
+							{
+								"source": {
+									"path": "['days'][0]['status']"
+								}
+							},
+							{
+								"source": {
+									"path": "['days'][0]['date']"
+								}
+							},
+							{
+								"source": {
+									"path": "['linked_shifts'][0]"
+								}
+							},
+							{
+								"source": {
+									"path": "['documents'][0]"
+								}
+							}
+						],
+						"collectionReference": "$['entries']"
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Sona_Json_WeeklyHrs",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": "All_absences$",
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Sona",
+							"Table": "STG_Absences_Days"
+						}
+					}
+				]
+			},
+			{
+				"name": "Flatten Days",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [
+					{
+						"activity": "Stage Absences",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "DF_Sona_Absences_Flatten",
+						"type": "DataFlowReference",
+						"parameters": {
+							"pDateString": {
+								"value": "'@{variables('DateString')}'",
+								"type": "Expression"
+							},
+							"pFileName": {
+								"value": "'@{All_absences$}'",
+								"type": "Expression"
+							}
+						}
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
 			}
 		],
+		"variables": {
+			"DateString": {
+				"type": "String"
+			}
+		},
 		"folder": {
 			"name": "Sona/Child Pipelines/Absences"
 		},
