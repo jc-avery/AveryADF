@@ -4944,7 +4944,10 @@
 								"paginationRules": {
 									"QueryParameters.{page}": "RANGE:1::1",
 									"EndCondition:$.entries": "Empty",
-									"MaxRequestNumber": "120"
+									"MaxRequestNumber": {
+										"value": "@pipeline().parameters.MaxRequestLimit",
+										"type": "Expression"
+									}
 								}
 							},
 							"sink": {
@@ -4996,6 +4999,10 @@
 					},
 					"FileName": {
 						"type": "string"
+					},
+					"MaxRequestLimit": {
+						"type": "string",
+						"defaultValue": "100"
 					}
 				},
 				"variables": {
@@ -5210,284 +5217,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Absences')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Stage Absences",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"Absence_ID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "Absence_ID"
-										}
-									},
-									{
-										"source": {
-											"path": "[['user_id']"
-										},
-										"sink": {
-											"name": "User_ID",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['starts_at']"
-										},
-										"sink": {
-											"name": "Starts_at",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['ends_at']"
-										},
-										"sink": {
-											"name": "Ends_at",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "[['absence_type_id']"
-										},
-										"sink": {
-											"name": "absence_type_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['absence_subtype_id']"
-										},
-										"sink": {
-											"name": "absence_subtype_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['user_internal_id']"
-										},
-										"sink": {
-											"name": "user_internal_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['current_employee_number']"
-										},
-										"sink": {
-											"name": "current_employee_number",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['is_paid']"
-										},
-										"sink": {
-											"name": "is_paid",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['entries']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_API_Response",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "Sona Absences"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_Absences"
-								}
-							}
-						]
-					},
-					{
-						"name": "Stage Absences Missed Shifts",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Stage Absences",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"Absence_ID",
-										"Linked_Shift_ID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['absence_id']"
-										},
-										"sink": {
-											"name": "Absence_ID",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['user_id']"
-										},
-										"sink": {
-											"name": "User_ID",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['linked_shift_id']"
-										},
-										"sink": {
-											"name": "Linked_Shift_ID",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['shift_start_datetime']"
-										},
-										"sink": {
-											"name": "start_datetime",
-											"type": "DateTime"
-										}
-									},
-									{
-										"source": {
-											"path": "$['shift_end_datetime']"
-										},
-										"sink": {
-											"name": "end_datetime",
-											"type": "DateTime"
-										}
-									}
-								],
-								"collectionReference": ""
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_API_Response",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "flattened_linked_shifts"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_Absences_Missied_Shifts"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_WeeklyHrs_ADFv')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -5522,7 +5251,10 @@
 								"paginationRules": {
 									"QueryParameters.{page}": "RANGE:1::1",
 									"EndCondition:$.entries": "Empty",
-									"MaxRequestNumber": "120"
+									"MaxRequestNumber": {
+										"value": "@pipeline().parameters.MaxRequestLimit",
+										"type": "Expression"
+									}
 								}
 							},
 							"sink": {
@@ -5674,6 +5406,10 @@
 					},
 					"FileName": {
 						"type": "string"
+					},
+					"MaxRequestLimit": {
+						"type": "string",
+						"defaultValue": "120"
 					}
 				},
 				"variables": {
@@ -6716,6 +6452,124 @@
 								"parameters": {
 									"Schema": "Sona",
 									"Table": "STG_EmploymentPeriods_TypesOfWork"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Initial API Files"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_Jobs')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Jobs",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"Jobs_id"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['id']"
+										},
+										"sink": {
+											"name": "Jobs_id"
+										}
+									},
+									{
+										"source": {
+											"path": "$['name']"
+										},
+										"sink": {
+											"name": "name",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['upload_id']"
+										},
+										"sink": {
+											"name": "upload_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "$['archived_at']"
+										},
+										"sink": {
+											"name": "archived_at",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "",
+								"mapComplexValuesToString": false
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Initial_File",
+								"type": "DatasetReference",
+								"parameters": {
+									"Filename": "jobs v2.json"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Jobs"
 								}
 							}
 						]

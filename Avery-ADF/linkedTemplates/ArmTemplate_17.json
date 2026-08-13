@@ -7915,7 +7915,7 @@
 						}
 					},
 					{
-						"name": "Update HomeID table",
+						"name": "Update Transform AveryDetails",
 						"description": "Updates Avery.HomeDetails table in the TRANSFORM_DB with latest data ",
 						"type": "ExecutePipeline",
 						"dependsOn": [
@@ -7946,7 +7946,7 @@
 						"onInactiveMarkAs": "Succeeded",
 						"dependsOn": [
 							{
-								"activity": "Update HomeID table",
+								"activity": "Update Transform AveryDetails",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -9571,7 +9571,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_All_Users')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_All_Users')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -9618,7 +9618,8 @@
 							"parameters": {
 								"EndPoint": "users",
 								"PageSize": "500",
-								"FileName": "All"
+								"FileName": "All",
+								"MaxRequestLimit": "120"
 							}
 						}
 					},
@@ -9658,7 +9659,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Get_Emp_periods')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Emp_periods')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -9681,7 +9682,8 @@
 							"parameters": {
 								"EndPoint": "employment_periods",
 								"PageSize": "500",
-								"FileName": "Regular"
+								"FileName": "Regular",
+								"MaxRequestLimit": "120"
 							}
 						}
 					},
@@ -10428,208 +10430,17 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_3Days')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Stage_Absences')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Gets the past 3 days of Shifts and Paylines",
 				"activities": [
 					{
-						"name": "Set EndDateTime",
-						"description": "Set Today as end date time at 23:59:59",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "EndDateTime",
-							"value": {
-								"value": "@concat(\n    formatDateTime(utcNow(), 'yyyy-MM-dd'),\n    'T23:59:59Z'\n)",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set StartDateTime",
-						"description": "Set Start day to be 3 days prior to today at 00:00:00",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "StartDateTime",
-							"value": {
-								"value": "@concat(\n    formatDateTime(addDays(utcNow(), -3), 'yyyy-MM-dd'),\n    'T00:00:00Z'\n)",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Get Shifts Data",
-						"type": "ExecutePipeline",
+						"name": "Stage Absences",
+						"type": "Copy",
 						"dependsOn": [
 							{
-								"activity": "Set EndDateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set StartDateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Get_WeeklyHrs_ADFv",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"StartDateTime": {
-									"value": "@variables('StartDateTime')",
-									"type": "Expression"
-								},
-								"EndDateTime": {
-									"value": "@variables('EndDateTime')",
-									"type": "Expression"
-								},
-								"EndPoint": "shifts",
-								"PageSize": "500",
-								"FileName": "3Day"
-							}
-						}
-					},
-					{
-						"name": "Get PayLines Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Get Shifts Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Get_WeeklyHrs_ADFv",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"StartDateTime": {
-									"value": "@variables('StartDateTime')",
-									"type": "Expression"
-								},
-								"EndDateTime": {
-									"value": "@variables('EndDateTime')",
-									"type": "Expression"
-								},
-								"EndPoint": "pay_lines",
-								"PageSize": "500",
-								"FileName": "3Day"
-							}
-						}
-					},
-					{
-						"name": "Stage Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Pre Clear Stage Tables",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Stage_WeeklyHrs",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"FileName": "3Day"
-							}
-						}
-					},
-					{
-						"name": "Update AH1",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Upsert To Final Tables",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "xPL_Sona_WeeklyHrs_ViewTransfer",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Upsert To Final Tables",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Stage Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_WeeklyHrs",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Pre Clear Stage Tables",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Get PayLines Data",
+								"activity": "Clear Stage Tables",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -10643,28 +10454,227 @@
 							"secureInput": false
 						},
 						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "AH2_TRANSFORM_DB",
-							"type": "LinkedServiceReference"
-						},
 						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": "EXEC Sona.Clear$StageTables"
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
 								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['id']"
+										},
+										"sink": {
+											"name": "absence_id"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_id']"
+										},
+										"sink": {
+											"name": "user_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['starts_at']"
+										},
+										"sink": {
+											"name": "starts_at",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['absence_type_id']"
+										},
+										"sink": {
+											"name": "absence_type_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['absence_subtype_id']"
+										},
+										"sink": {
+											"name": "absence_subtype_id",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['ends_at']"
+										},
+										"sink": {
+											"name": "ends_at",
+											"type": "DateTime"
+										}
+									},
+									{
+										"source": {
+											"path": "[['is_open_ended']"
+										},
+										"sink": {
+											"name": "is_open_ended",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['payroll_type']"
+										},
+										"sink": {
+											"name": "payroll_type",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['is_paid']"
+										},
+										"sink": {
+											"name": "is_paid",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['current_employee_number']"
+										},
+										"sink": {
+											"name": "current_employee_number",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['user_internal_id']"
+										},
+										"sink": {
+											"name": "user_internal_id",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['entries']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_Sona_Json_WeeklyHrs",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "All_absences$",
+									"DateString": {
+										"value": "@variables('DateString')",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Absences"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set DateString",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": {
+								"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd')",
+								"type": "Expression"
+							}
 						}
 					},
 					{
-						"name": "Post Clear Stage Tables",
-						"type": "Script",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
+						"name": "Flatten Days",
+						"type": "ExecuteDataFlow",
 						"dependsOn": [
 							{
-								"activity": "Update AH1",
+								"activity": "Stage Absences",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Sona_Absences_Flatten",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"SonaAbscenses": {
+										"FileName": "All_absences$",
+										"DateString": {
+											"value": "@variables('DateString')",
+											"type": "Expression"
+										}
+									},
+									"InsertAbsenceDays": {
+										"Schema": "Sona",
+										"Table": "STG_Absences_Days"
+									},
+									"InsertAbsenceLinkedShifts": {
+										"Schema": "Sona",
+										"Table": "STG_Absences_Linked_Shifts"
+									}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "Clear Stage Tables",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Set DateString",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -10686,7 +10696,7 @@
 							"scripts": [
 								{
 									"type": "Query",
-									"text": "EXEC Sona.Clear$StageTables"
+									"text": "TRUNCATE TABLE Sona.STG_Absences\nTRUNCATE TABLE Sona.STG_Absences_Days\nTRUNCATE TABLE Sona.STG_Absences_Linked_Shifts"
 								}
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
@@ -10697,15 +10707,12 @@
 					"elapsedTimeMetric": {}
 				},
 				"variables": {
-					"EndDateTime": {
-						"type": "String"
-					},
-					"StartDateTime": {
+					"DateString": {
 						"type": "String"
 					}
 				},
 				"folder": {
-					"name": "Sona"
+					"name": "Sona/Child Pipelines/Absences"
 				},
 				"annotations": []
 			},
