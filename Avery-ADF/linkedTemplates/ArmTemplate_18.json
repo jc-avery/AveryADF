@@ -1936,15 +1936,15 @@
 	},
 	"resources": [
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_3Days')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_WeeklyHrs_FullWeek')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Gets the past 3 days of Shifts and Paylines",
+				"description": "Gets the data for Shifts and Paylines for weekly hrs, a set number of weeks ago using parameters",
 				"activities": [
 					{
 						"name": "Set EndDateTime",
-						"description": "Set Today as end date time at 23:59:59",
+						"description": "Find the 2nd most recent Sunday and set the time to 23:59:59\nLogic Below:\nGet today's UTC date.\nCalculate the day of the week (Sunday = 0, Monday = 1, ..., Saturday = 6).\nMake that number negative.\nSubtract that many days from today (this gives the most recent Sunday).\nSet the time to 23:59:59 UTC.\n\nThen Subtract 7 days",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -1955,16 +1955,23 @@
 						"typeProperties": {
 							"variableName": "EndDateTime",
 							"value": {
-								"value": "@concat(\n    formatDateTime(utcNow(), 'yyyy-MM-dd'),\n    'T23:59:59Z'\n)",
+								"value": "@concat(\n    formatDateTime(\n        addDays(\n            addDays(\n                utcNow(),\n                mul(-1, dayOfWeek(utcNow()))\n            ),\n            mul(pipeline().parameters.WeeksBack, -7)\n        ),\n        'yyyy-MM-dd'\n    ),\n    'T23:59:59Z'\n)",
 								"type": "Expression"
 							}
 						}
 					},
 					{
 						"name": "Set StartDateTime",
-						"description": "Set Start day to be 3 days prior to today at 00:00:00",
+						"description": "Set the start date to be 6 days before the calculated end date",
 						"type": "SetVariable",
-						"dependsOn": [],
+						"dependsOn": [
+							{
+								"activity": "Set EndDateTime",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
 						"policy": {
 							"secureOutput": false,
 							"secureInput": false
@@ -1973,7 +1980,7 @@
 						"typeProperties": {
 							"variableName": "StartDateTime",
 							"value": {
-								"value": "@concat(\n    formatDateTime(addDays(utcNow(), -3), 'yyyy-MM-dd'),\n    'T00:00:00Z'\n)",
+								"value": "@concat(\n    formatDateTime(\n        addDays(variables('EndDateTime'), -6),\n        'yyyy-MM-dd'\n    ),\n    'T00:00:00Z'\n)",
 								"type": "Expression"
 							}
 						}
@@ -1982,12 +1989,6 @@
 						"name": "Get Shifts Data",
 						"type": "ExecutePipeline",
 						"dependsOn": [
-							{
-								"activity": "Set EndDateTime",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
 							{
 								"activity": "Set StartDateTime",
 								"dependencyConditions": [
@@ -2016,7 +2017,10 @@
 								},
 								"EndPoint": "shifts",
 								"PageSize": "500",
-								"FileName": "3Day"
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
 							}
 						}
 					},
@@ -2025,7 +2029,7 @@
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Get Shifts Data",
+								"activity": "Wait 1 Min",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -2052,12 +2056,15 @@
 								},
 								"EndPoint": "pay_lines",
 								"PageSize": "500",
-								"FileName": "3Day"
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
 							}
 						}
 					},
 					{
-						"name": "Stage Data",
+						"name": "Stage Data and Remove Old Payline Records",
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
@@ -2078,34 +2085,11 @@
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"FileName": "3Day"
+								"FileName": {
+									"value": "@pipeline().parameters.FileNameType",
+									"type": "Expression"
+								}
 							}
-						}
-					},
-					{
-						"name": "Update AH1",
-						"type": "ExecutePipeline",
-						"state": "Inactive",
-						"onInactiveMarkAs": "Succeeded",
-						"dependsOn": [
-							{
-								"activity": "Upsert To Final Tables",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "xPL_Sona_WeeklyHrs_ViewTransfer",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
 						}
 					},
 					{
@@ -2113,7 +2097,7 @@
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Stage Data",
+								"activity": "Stage Data and Remove Old Payline Records",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -2199,10 +2183,95 @@
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
 						}
+					},
+					{
+						"name": "Update AH1",
+						"type": "ExecutePipeline",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Remove Duplicate Paylines",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "xPL_Sona_WeeklyHrs_ViewTransfer",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Remove Duplicate Paylines",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Upsert To Final Tables",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Remove$DuplicatePaylines"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Wait 1 Min",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Get Shifts Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 60
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"WeeksBack": {
+						"type": "int"
+					},
+					"FileNameType": {
+						"type": "string"
+					}
 				},
 				"variables": {
 					"EndDateTime": {
