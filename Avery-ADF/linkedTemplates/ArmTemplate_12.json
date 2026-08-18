@@ -13,6 +13,679 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_HomeManagerDetails_SharePoint_Export')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Set vBlobDirectory",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vSharePointDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vBlobDirectory",
+							"value": {
+								"value": "@concat('ManagerDetails')\n",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vBlobDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFileName",
+							"value": "Home Manager Details.csv"
+						}
+					},
+					{
+						"name": "Export Home Manager Details",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vFileName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT \n    HomeID, \n    Homename, \n    HomeManager, \n    ManagerEmail \nFROM \n    Avery.HomeDetails \nWHERE \n    (HomeTypeName != 'Non Op Company' \n    AND HomeTypeName != 'Test Home')\n    OR HomeTypeName IS NULL",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vBlobDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Sharepoint Upload Loagic App",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Export Home Manager Details",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+							"body": {
+								"value": "{\n    \"extractType\": \"Managers\",\n    \"reportDate\": \"\",\n    \"blobDirectory\": \"@{variables('vBlobDirectory')}\",\n    \"sharePointDirectory\": \"@{variables('vSharePointDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vSharePointDirectory",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vSharePointDirectory",
+							"value": {
+								"value": "@concat('')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vBlobDirectory": {
+						"type": "String"
+					},
+					"vFileName": {
+						"type": "String"
+					},
+					"vSharePointDirectory": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_InterCall_Export')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
+				"activities": [
+					{
+						"name": "Export InterCall Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set vFileName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[InterCall].[Export$DataForSharePoint]",
+								"storedProcedureParameters": {
+									"ExportType": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.ExportType",
+											"type": "Expression"
+										}
+									},
+									"Home": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.Home",
+											"type": "Expression"
+										}
+									},
+									"ReportEndDate": {
+										"type": "DateTime",
+										"value": {
+											"value": "@variables('vReportEndDate')",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "DelimitedTextSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "DelimitedTextWriteSettings",
+									"quoteAllText": true,
+									"fileExtension": ".txt"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_NurseCall_Csv",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@variables('vBlobDirectory')",
+										"type": "Expression"
+									},
+									"Filename": {
+										"value": "@variables('vFileName')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set vBlobDirectory",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vReportEndDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vBlobDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vReportEndDate'), 'yyyy'),'/',formatDateTime(variables('vReportEndDate'), 'MM'),'/',formatDateTime(variables('vReportEndDate'), 'dd') )",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Sharepoint Upload Loagic App",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Export InterCall Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+							"body": {
+								"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportEndDate')}\",\n    \"blobDirectory\": \"@{variables('vBlobDirectory')}\",\n    \"sharePointDirectory\": \"@{variables('vSharePointDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vFileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vBlobDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Switch Set vSharePointDirectory And vFileNameDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vFileName",
+							"value": {
+								"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vFileNameDate'),'.csv')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "If Condition - check if true",
+						"type": "IfCondition",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(pipeline().parameters.ExportType,'Daily')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Switch Expression",
+						"type": "Switch",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "If Condition - check if true",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.ExportType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "Daily",
+									"activities": [
+										{
+											"name": "Set vReportDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vReportEndDate",
+												"value": {
+													"value": "@addDays(utcNow(), -1,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Weekly",
+									"activities": [
+										{
+											"name": "Set vReportDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vReportEndDate",
+												"value": {
+													"value": "@addDays(utcNow(), -5,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Set vReportEndDate",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vReportEndDate",
+							"value": {
+								"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Switch Set vSharePointDirectory And vFileNameDate",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "Set vReportEndDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.ExportType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "Daily",
+									"activities": [
+										{
+											"name": "Set vDirectoryDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set vFileNameDate_Daily",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vSharePointDirectory",
+												"value": {
+													"value": "@concat(formatDateTime(variables('vFileNameDate'), 'yyyy'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'MM'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'dd') )",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "Set vFileNameDate_Daily",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vFileNameDate",
+												"value": {
+													"value": "@formatDateTime(addDays(variables('vReportEndDate'), -1 ), 'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Weekly",
+									"activities": [
+										{
+											"name": "Set vFileNameDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vFileNameDate",
+												"value": {
+													"value": "@addDays(variables('vReportEndDate'), -7,'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "Set vDirectoryDate_Weekly",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set vFileNameDate_Weekly",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vSharePointDirectory",
+												"value": {
+													"value": "@concat(formatDateTime(variables('vFileNameDate'), 'yyyy'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'MM'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'dd') )",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"value": "Monthly",
+									"activities": [
+										{
+											"name": "Set vFileNameDate_Monthly",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vFileNameDate",
+												"value": {
+													"value": "@formatdatetime(addToTime(variables('vReportEndDate'), -1, 'Month'), 'yyyy-MM-dd')",
+													"type": "Expression"
+												}
+											}
+										},
+										{
+											"name": "Set vSharePointDirectory_Monthly",
+											"type": "SetVariable",
+											"dependsOn": [
+												{
+													"activity": "Set vFileNameDate_Monthly",
+													"dependencyConditions": [
+														"Succeeded"
+													]
+												}
+											],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vSharePointDirectory",
+												"value": {
+													"value": "@concat(formatDateTime(variables('vFileNameDate'), 'yyyy'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'MM'),\n\t'/',formatDateTime(variables('vFileNameDate'), 'dd') )",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ExportType": {
+						"type": "string"
+					},
+					"Home": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vBlobDirectory": {
+						"type": "String"
+					},
+					"vFileName": {
+						"type": "String"
+					},
+					"vReportEndDate": {
+						"type": "String"
+					},
+					"vSharePointDirectory": {
+						"type": "String"
+					},
+					"vFileNameDate": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Nurse Calls"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_NurseCall_Intercall_CopyFile')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -5832,744 +6505,6 @@
 								"parameters": {
 									"Schema": "Sona",
 									"Table": "STG_ContractedHours"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_EmploymentPeriods')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "EmploymentPeriods",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['active']"
-										},
-										"sink": {
-											"name": "active",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "EmploymentPeriods_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['start_date']"
-										},
-										"sink": {
-											"name": "start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['idx']"
-										},
-										"sink": {
-											"name": "idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['job_id']"
-										},
-										"sink": {
-											"name": "job_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['organisation_id']"
-										},
-										"sink": {
-											"name": "organisation_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['user_id']"
-										},
-										"sink": {
-											"name": "user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['finish_date']"
-										},
-										"sink": {
-											"name": "finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['organisation_user_id']"
-										},
-										"sink": {
-											"name": "organisation_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['period']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_period",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['hours']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_hours",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['days']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_days",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['start_date']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['idx']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['org_unit_id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['finish_date']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['colour_coding']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_colour_coding",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['type_of_work_id']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_type_of_work_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['monthly_period_starts_at']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_monthly_period_starts_at",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['weekly_period_starts_at']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_weekly_period_starts_at",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_length_days']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_length_days",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contracted_hours'][0]['rolling_period_sequence_start']"
-										},
-										"sink": {
-											"name": "employment_specs_contracted_hours_rolling_period_sequence_start",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['name']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['employment_type']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['pay_period_start']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_start",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['pay_period_type']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_pay_period_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['payroll_rule']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_payroll_rule",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['contract_types'][0]['employment_basis']"
-										},
-										"sink": {
-											"name": "employment_specs_contract_types_employment_basis",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['id']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['start_date']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['idx']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_idx",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['finish_date']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_finish_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['rate']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_rate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employment_specs'][0]['rates_of_pay'][0]['pay_type']"
-										},
-										"sink": {
-											"name": "employment_specs_rates_of_pay_pay_type",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['primary_org_unit_id']"
-										},
-										"sink": {
-											"name": "primary_org_unit_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['employee_number']"
-										},
-										"sink": {
-											"name": "employee_number",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['continuous_employment_start_date']"
-										},
-										"sink": {
-											"name": "continuous_employment_start_date",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['level_id']"
-										},
-										"sink": {
-											"name": "level_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['job_grade_id']"
-										},
-										"sink": {
-											"name": "job_grade_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['reports_to_user_id']"
-										},
-										"sink": {
-											"name": "reports_to_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['reports_to_org_user_id']"
-										},
-										"sink": {
-											"name": "reports_to_org_user_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['starter_declaration']"
-										},
-										"sink": {
-											"name": "starter_declaration",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_plan_four']"
-										},
-										"sink": {
-											"name": "student_loan_plan_four",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_plan_one']"
-										},
-										"sink": {
-											"name": "student_loan_plan_one",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_plan_two']"
-										},
-										"sink": {
-											"name": "student_loan_plan_two",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['student_loan_post_graduate']"
-										},
-										"sink": {
-											"name": "student_loan_post_graduate",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['tupe']"
-										},
-										"sink": {
-											"name": "tupe",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona All Employment Periods 2026-04-14.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_EmploymentPeriods"
-								}
-							}
-						]
-					},
-					{
-						"name": "EmploymentPeriods_TypesOfWork",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "EmploymentPeriods",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "employment_period_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "type_of_work_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['name']"
-										},
-										"sink": {
-											"name": "type_of_work_name",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['types_of_work']",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona All Employment Periods 2026-04-14.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_EmploymentPeriods_TypesOfWork"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Initial_Jobs')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Jobs",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"Jobs_id"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "$['id']"
-										},
-										"sink": {
-											"name": "Jobs_id"
-										}
-									},
-									{
-										"source": {
-											"path": "$['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['upload_id']"
-										},
-										"sink": {
-											"name": "upload_id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "$['archived_at']"
-										},
-										"sink": {
-											"name": "archived_at",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "",
-								"mapComplexValuesToString": false
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "jobs v2.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "STG_Jobs"
 								}
 							}
 						]
