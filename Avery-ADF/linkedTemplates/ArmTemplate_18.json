@@ -13,6 +13,94 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_All_Users')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Stage All Users",
+						"description": "Insert into stage tables and upsert tables",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get All Sona Users",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Stage_All_Users",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Get All Sona Users",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_API_Get_Data_ADFv",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "users",
+								"PageSize": "500",
+								"FileName": "All",
+								"MaxRequestLimit": "120"
+							}
+						}
+					},
+					{
+						"name": "Upsert From Stage",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage All Users",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_All_Users",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Sona_Emp_periods')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1051,6 +1139,72 @@
 								{
 									"type": "Query",
 									"text": "TRUNCATE TABLE Sona.STG_Absences\nTRUNCATE TABLE Sona.STG_Absences_Days\nTRUNCATE TABLE Sona.STG_Absences_Linked_Shifts"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Clean Duplicate Absence Records",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Flatten Days",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clean$AbsenceStageReords"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Remove Delete Absences",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Clean Duplicate Absence Records",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM \n    Sona.Absences\nWHERE\n    NOT EXISTS --Employment Period Doesn't exist in the export EmpPeriods Data\n    (\n        SELECT 1\n        FROM\n            Sona.STG_Absences AS SA\n        WHERE\n            SA.absence_id = Absences.absence_id\n    )"
 								}
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
@@ -7058,35 +7212,6 @@
 						"container": "fusion"
 					}
 				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_Averyblob_Tribepad')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "AveryblobStorageAccount",
-					"type": "LinkedServiceReference"
-				},
-				"folder": {
-					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
-				},
-				"annotations": [],
-				"type": "DelimitedText",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"fileName": "Test File.txt",
-						"container": "tribepad"
-					},
-					"columnDelimiter": ",",
-					"escapeChar": "\\",
-					"firstRowAsHeader": true,
-					"quoteChar": "\""
-				},
-				"schema": []
 			},
 			"dependsOn": []
 		}

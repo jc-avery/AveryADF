@@ -60584,30 +60584,6 @@
 						]
 					},
 					{
-						"name": "Set vBlobDirectory",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vReportEndDate",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vBlobDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vReportEndDate'), 'yyyy'),'/',formatDateTime(variables('vReportEndDate'), 'MM'),'/',formatDateTime(variables('vReportEndDate'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
 						"name": "Sharepoint Upload Loagic App",
 						"type": "WebActivity",
 						"dependsOn": [
@@ -60641,13 +60617,13 @@
 						"type": "SetVariable",
 						"dependsOn": [
 							{
-								"activity": "Set vBlobDirectory",
+								"activity": "Switch Set vSharePointDirectory And vFileNameDate",
 								"dependencyConditions": [
 									"Succeeded"
 								]
 							},
 							{
-								"activity": "Switch Set vSharePointDirectory And vFileNameDate",
+								"activity": "Switch Set Blob Directory",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -60919,6 +60895,65 @@
 											}
 										}
 									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Switch Set Blob Directory",
+						"type": "Switch",
+						"dependsOn": [
+							{
+								"activity": "Set vReportEndDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"on": {
+								"value": "@pipeline().parameters.ExportType",
+								"type": "Expression"
+							},
+							"cases": [
+								{
+									"value": "Daily",
+									"activities": [
+										{
+											"name": "Set vBlobDirectory_Daily",
+											"type": "SetVariable",
+											"dependsOn": [],
+											"policy": {
+												"secureOutput": false,
+												"secureInput": false
+											},
+											"userProperties": [],
+											"typeProperties": {
+												"variableName": "vBlobDirectory",
+												"value": {
+													"value": "@formatDateTime(addDays(variables('vReportEndDate'), -1), 'yyyy/MM/dd')",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							],
+							"defaultActivities": [
+								{
+									"name": "Set vBlobDirectory",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "vBlobDirectory",
+										"value": "@concat(formatDateTime(variables('vReportEndDate'), 'yyyy'),'/',formatDateTime(variables('vReportEndDate'), 'MM'),'/',formatDateTime(variables('vReportEndDate'), 'dd') )"
+									}
 								}
 							]
 						}
@@ -67788,7 +67823,7 @@
 							"parameters": {
 								"EndPoint": "absences",
 								"PageSize": "1000",
-								"FileName": "All_test",
+								"FileName": "All",
 								"MaxRequestLimit": "150",
 								"AdditionalAPIParams": "&order_by=starts_at_asc"
 							}
@@ -67817,6 +67852,30 @@
 							"waitOnCompletion": true,
 							"parameters": {}
 						}
+					},
+					{
+						"name": "Upsert Absence Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage Absence Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_Absences",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
 					}
 				],
 				"policy": {
@@ -67829,7 +67888,8 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/pipelines/PL_Sona_API_Get_Data_ADFv')]",
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Absences')]"
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Stage_Absences')]",
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Upsert_Absences')]"
 			]
 		},
 		{
@@ -72914,6 +72974,72 @@
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
 						}
+					},
+					{
+						"name": "Clean Duplicate Absence Records",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Flatten Days",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Sona.Clean$AbsenceStageReords"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Remove Delete Absences",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Clean Duplicate Absence Records",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM \n    Sona.Absences\nWHERE\n    NOT EXISTS --Employment Period Doesn't exist in the export EmpPeriods Data\n    (\n        SELECT 1\n        FROM\n            Sona.STG_Absences AS SA\n        WHERE\n            SA.absence_id = Absences.absence_id\n    )"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
 					}
 				],
 				"policy": {
@@ -74519,6 +74645,39 @@
 								"type": "Expression"
 							}
 						}
+					},
+					{
+						"name": "Clear Deleted EmpPeriods",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Stage Emp Periods",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "DELETE\nFROM \n    Sona.EmploymentPeriods\nWHERE\n    NOT EXISTS --Employment Period Doesn't exist in the export EmpPeriods Data\n    (\n        SELECT 1\n        FROM\n            Sona.STG_EmploymentPeriods AS SE\n        WHERE\n            SE.EmploymentPeriods_id = EmploymentPeriods.EmploymentPeriod_id\n    )"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
 					}
 				],
 				"policy": {
@@ -74536,7 +74695,8 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_Sona_Json_WeeklyHrs')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
@@ -76961,6 +77121,385 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Upsert_Absences')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Absences",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"absence_id"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "absence_id",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "absence_id",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "user_id",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "user_id",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "starts_at",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "starts_at",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "ends_at",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ends_at",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "absence_type_id",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "absence_type_id",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "absence_subtype_id",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "absence_subtype_id",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "is_open_ended",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "is_open_ended",
+											"type": "Boolean",
+											"physicalType": "bit"
+										}
+									},
+									{
+										"source": {
+											"name": "payroll_type",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "payroll_type",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "is_paid",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "is_paid",
+											"type": "Boolean",
+											"physicalType": "bit"
+										}
+									},
+									{
+										"source": {
+											"name": "user_internal_id",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "user_internal_id",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "current_employee_number",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "current_employee_number",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Absences"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "Absences"
+								}
+							}
+						]
+					},
+					{
+						"name": "Absences Days",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Absences",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE Sona.Absences_Days",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "absence_id",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "absence_id",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "days_status",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "days_status",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "days_date",
+											"type": "Date",
+											"physicalType": "date"
+										},
+										"sink": {
+											"name": "days_date",
+											"type": "Date",
+											"physicalType": "date"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "STG_Absences_Days"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "Absences_Days"
+								}
+							}
+						]
+					},
+					{
+						"name": "Absence Linked Shifts",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Absences Days",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT  \n    [absence_id]\n    ,[linked_shift_id]\n    ,TRY_CONVERT(DATETIME, [linked_shift_start_datetime]) AS [linked_shift_start_datetime]\n    ,[linked_shift_is_shift_run]\n    ,[linked_shift_shift_run_id]\n    ,[linked_shift_is_travel_gap]\n    ,TRY_CONVERT(DATETIME, [linked_shift_end_datetime]) AS [linked_shift_end_datetime]\nFROM \n    [Sona].[STG_Absences_Linked_Shifts]",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE Sona.Absences_Linked_Shifts",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Sona",
+									"Table": "Absences_Linked_Shifts"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona/Child Pipelines/Absences"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
