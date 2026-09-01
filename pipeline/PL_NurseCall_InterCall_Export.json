@@ -4,161 +4,6 @@
 		"description": "Export data to storage account, trigger logic app to retrieve and upload it to sharepoint",
 		"activities": [
 			{
-				"name": "Export InterCall Data",
-				"type": "Copy",
-				"dependsOn": [
-					{
-						"activity": "Set vFileName",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"source": {
-						"type": "AzureSqlSource",
-						"sqlReaderStoredProcedureName": "[InterCall].[Export$DataForSharePoint]",
-						"storedProcedureParameters": {
-							"ExportType": {
-								"type": "String",
-								"value": {
-									"value": "@pipeline().parameters.ExportType",
-									"type": "Expression"
-								}
-							},
-							"Home": {
-								"type": "String",
-								"value": {
-									"value": "@pipeline().parameters.Home",
-									"type": "Expression"
-								}
-							},
-							"ReportEndDate": {
-								"type": "DateTime",
-								"value": {
-									"value": "@variables('vReportEndDate')",
-									"type": "Expression"
-								}
-							}
-						},
-						"queryTimeout": "02:00:00",
-						"partitionOption": "None"
-					},
-					"sink": {
-						"type": "DelimitedTextSink",
-						"storeSettings": {
-							"type": "AzureBlobStorageWriteSettings"
-						},
-						"formatSettings": {
-							"type": "DelimitedTextWriteSettings",
-							"quoteAllText": true,
-							"fileExtension": ".txt"
-						}
-					},
-					"enableStaging": false,
-					"translator": {
-						"type": "TabularTranslator",
-						"typeConversion": true,
-						"typeConversionSettings": {
-							"allowDataTruncation": true,
-							"treatBooleanAsNumber": false
-						}
-					}
-				},
-				"inputs": [
-					{
-						"referenceName": "DS_AH2_TRANSFORM_DB",
-						"type": "DatasetReference",
-						"parameters": {
-							"Schema": "n/a",
-							"Table": "n/a"
-						}
-					}
-				],
-				"outputs": [
-					{
-						"referenceName": "DS_NurseCall_Csv",
-						"type": "DatasetReference",
-						"parameters": {
-							"Directory": {
-								"value": "@variables('vBlobDirectory')",
-								"type": "Expression"
-							},
-							"Filename": {
-								"value": "@variables('vFileName')",
-								"type": "Expression"
-							}
-						}
-					}
-				]
-			},
-			{
-				"name": "Sharepoint Upload Loagic App",
-				"type": "WebActivity",
-				"dependsOn": [
-					{
-						"activity": "Export InterCall Data",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"method": "POST",
-					"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
-					"body": {
-						"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportEndDate')}\",\n    \"blobDirectory\": \"@{variables('vBlobDirectory')}\",\n    \"sharePointDirectory\": \"@{variables('vSharePointDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{pipeline().parameters.Home}\"\n}",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "Set vFileName",
-				"type": "SetVariable",
-				"dependsOn": [
-					{
-						"activity": "Switch Set vSharePointDirectory And vFileNameDate",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "Switch Set Blob Directory",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "vFileName",
-					"value": {
-						"value": "@concat(pipeline().parameters.Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vFileNameDate'),'.csv')",
-						"type": "Expression"
-					}
-				}
-			},
-			{
 				"name": "If Condition - check if true",
 				"type": "IfCondition",
 				"state": "Inactive",
@@ -520,13 +365,217 @@
 						}
 					]
 				}
+			},
+			{
+				"name": "Export Home List",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Switch Set vSharePointDirectory And vFileNameDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Switch Set Blob Directory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT\n    HomeId,\n    Home\nFROM \n    InterCall.InterCallHomes \nWHERE \n    Export = 1",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "Export Data For Each Home",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Export Home List",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Export Home List').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Export InterCall Data",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Set vFileName",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderStoredProcedureName": "[InterCall].[Export$DataForSharePoint]",
+									"storedProcedureParameters": {
+										"ExportType": {
+											"type": "String",
+											"value": {
+												"value": "@pipeline().parameters.ExportType",
+												"type": "Expression"
+											}
+										},
+										"HomeID": {
+											"type": "Int32",
+											"value": {
+												"value": "@item().HomeID",
+												"type": "Expression"
+											}
+										},
+										"ReportEndDate": {
+											"type": "DateTime",
+											"value": {
+												"value": "@variables('vReportEndDate')",
+												"type": "Expression"
+											}
+										}
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_AH2_TRANSFORM_DB",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "n/a",
+										"Table": "n/a"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_NurseCall_Csv",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@variables('vBlobDirectory')",
+											"type": "Expression"
+										},
+										"Filename": {
+											"value": "@variables('vFileName')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Sharepoint Upload Loagic App",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Export InterCall Data",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"url": "https://prod-02.uksouth.logic.azure.com:443/workflows/903c7073354244b39c958df4c32b5808/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=YlUoy6EnlkhMdKMaNCvochikCY-hcJt38yogyvE6wNM",
+								"body": {
+									"value": "{\n    \"extractType\": \"@{pipeline().parameters.ExportType}\",\n    \"reportDate\": \"@{variables('vReportEndDate')}\",\n    \"blobDirectory\": \"@{variables('vBlobDirectory')}\",\n    \"sharePointDirectory\": \"@{variables('vSharePointDirectory')}\",\n    \"fileName\": \"@{variables('vFileName')}\",\n    \"home\": \"@{item().Home}\"\n}",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set vFileName",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vFileName",
+								"value": {
+									"value": "@concat(item().Home,'_NurseCall_Data_export_',pipeline().parameters.ExportType,'_',variables('vFileNameDate'),'.csv')",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
 			}
 		],
 		"parameters": {
 			"ExportType": {
-				"type": "string"
-			},
-			"Home": {
 				"type": "string"
 			}
 		},
