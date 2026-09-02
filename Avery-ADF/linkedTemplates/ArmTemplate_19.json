@@ -1934,31 +1934,47 @@
 			"type": "string",
 			"defaultValue": "Daily"
 		},
-		"SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
-			"type": "string",
-			"defaultValue": "Silvermere"
-		},
 		"SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
 			"type": "string",
 			"defaultValue": "Monthly"
 		},
-		"SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
-			"type": "string",
-			"defaultValue": "Silvermere"
-		},
 		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType": {
 			"type": "string",
 			"defaultValue": "Weekly"
-		},
-		"SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home": {
-			"type": "string",
-			"defaultValue": "Silvermere"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/Averyblob_Fusion_Archive')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Files stored in averyblob fusion container. Connected through the Avery virtual network using the private endpoing",
+				"linkedServiceName": {
+					"referenceName": "AveryblobStorageAccount",
+					"type": "LinkedServiceReference"
+				},
+				"folder": {
+					"name": "AveryPrivateNetwork/AveryblobStorageAccount"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"folderPath": {
+							"value": "@concat('archive/', formatDateTime(utcNow(), 'yyyy'), '/', formatDateTime(utcNow(), 'MM'), '/', formatDateTime(utcNow(), 'dd'), '/')\n",
+							"type": "Expression"
+						},
+						"container": "fusion"
+					}
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/DS_Averyblob_Tribepad')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
@@ -2135,8 +2151,7 @@
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
-							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Daily_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]"
 						}
 					}
 				],
@@ -2174,8 +2189,7 @@
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
-							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Monthly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]"
 						}
 					}
 				],
@@ -2216,8 +2230,7 @@
 							"type": "PipelineReference"
 						},
 						"parameters": {
-							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]",
-							"Home": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_Home')]"
+							"ExportType": "[parameters('SCH_NurseCall_InterCall_Export_Weekly_properties_PL_NurseCall_InterCall_Export_parameters_ExportType')]"
 						}
 					}
 				],
@@ -3192,155 +3205,6 @@
 								}
 							],
 							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Details_Retry')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Retries those companies that failed and were logged for a retry from the PL_Exchequer_Details Pipeline",
-				"activities": [
-					{
-						"name": "Retry Previous Fin Year",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Details_Retry_PreviousYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Retry Current FIN Year",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 60s",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Details_Retry_CurrentYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 60s",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Retry Previous Fin Year",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 60
-						}
-					},
-					{
-						"name": "Prev Yr Email Notification",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Retry Previous Fin Year",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Retry Previous Fin Year"
-							}
-						}
-					},
-					{
-						"name": "Current Yr Email Notification",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Retry Current FIN Year",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Retry Current Fin Year"
-							}
 						}
 					}
 				],
