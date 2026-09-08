@@ -1,0 +1,413 @@
+{
+	"name": "PL_Sona_OrgUnits",
+	"properties": {
+		"activities": [
+			{
+				"name": "Download Org Units",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "PL_Sona_API_Get_Data_ADFv",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"EndPoint": "org_units",
+						"PageSize": "100",
+						"FileName": "All",
+						"AdditionalAPIParams": "&base_only=false"
+					}
+				}
+			},
+			{
+				"name": "Stage OrgUnits",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set DateString",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "JsonSource",
+						"storeSettings": {
+							"type": "AzureBlobStorageReadSettings",
+							"recursive": false,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "JsonReadSettings"
+						}
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"path": "['id']"
+								},
+								"sink": {
+									"name": "OrgUnits_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['name']"
+								},
+								"sink": {
+									"name": "name",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['timezone']"
+								},
+								"sink": {
+									"name": "timezone",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['is_base_entity']"
+								},
+								"sink": {
+									"name": "is_base_entity",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['org_unit_type']['id']"
+								},
+								"sink": {
+									"name": "org_unit_type_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['org_unit_type']['name']"
+								},
+								"sink": {
+									"name": "org_unit_type_name",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['accounting_cost_code']"
+								},
+								"sink": {
+									"name": "accounting_cost_code",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['average_hourly_rate']"
+								},
+								"sink": {
+									"name": "average_hourly_rate",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['paycaptain_company_id']"
+								},
+								"sink": {
+									"name": "paycaptain_company_id",
+									"type": "String"
+								}
+							},
+							{
+								"source": {
+									"path": "['parent_org_unit']['id']"
+								},
+								"sink": {
+									"name": "parent_org_unit_id",
+									"type": "String"
+								}
+							}
+						],
+						"collectionReference": "$['entries']"
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_Sona_Json_WeeklyHrs",
+						"type": "DatasetReference",
+						"parameters": {
+							"FileName": "All_org_units$",
+							"DateString": {
+								"value": "@variables('DateString')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Sona",
+							"Table": "STG_OrgUnits"
+						}
+					}
+				]
+			},
+			{
+				"name": "Set DateString",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Download Org Units",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "DateString",
+					"value": {
+						"value": "@formatDateTime(utcNow(), 'yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Upsert OrgUnits",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Stage OrgUnits",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "upsert",
+						"upsertSettings": {
+							"useTempDB": true,
+							"keys": [
+								"OrgUnit_id"
+							]
+						},
+						"sqlWriterUseTableLock": false,
+						"disableMetricsCollection": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "OrgUnits_id",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "OrgUnit_id",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "name",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "OrgUnit_name",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "timezone",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "timezone",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "is_base_entity",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "is_base_entity",
+									"type": "Boolean",
+									"physicalType": "bit"
+								}
+							},
+							{
+								"source": {
+									"name": "org_unit_type_id",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "org_unit_type_id",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "org_unit_type_name",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "org_unit_type_name",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "accounting_cost_code",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "accounting_cost_code",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "average_hourly_rate",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "average_hourly_rate",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 2,
+									"precision": 10
+								}
+							},
+							{
+								"source": {
+									"name": "paycaptain_company_id",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "paycaptain_company_id",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "parent_org_unit_id",
+									"type": "String",
+									"physicalType": "nvarchar"
+								},
+								"sink": {
+									"name": "parent_org_unit_id",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Sona",
+							"Table": "STG_OrgUnits"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Sona",
+							"Table": "OrgUnits"
+						}
+					}
+				]
+			}
+		],
+		"variables": {
+			"DateString": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Sona"
+		},
+		"annotations": []
+	}
+}
