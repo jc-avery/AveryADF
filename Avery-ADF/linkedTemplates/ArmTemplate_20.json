@@ -45,6 +45,143 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_CurrentYear')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Current Year Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Export_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": {
+									"value": "@pipeline().parameters.ExchequerTable",
+									"type": "Expression"
+								},
+								"Exchequer_YearColumn": {
+									"value": "@pipeline().parameters.ExchequerYearColumn",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Import Current Year Data To SQL",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Import_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": {
+									"value": "@pipeline().parameters.ExchequerTable",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Wait 20s",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Export Current Year Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					},
+					{
+						"name": "Delete and Then Insert New Data",
+						"description": "Deletes the current year data and imports the newly exported and imported data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s Again",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Delete_Insert_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 20s Again",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Import Current Year Data To SQL",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ExchequerTable": {
+						"type": "string"
+					},
+					"ExchequerYearColumn": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_CurrentYear_x2Tables')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1614,56 +1751,6 @@
 								"Sunday",
 								"Tuesday",
 								"Thursday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_11pm')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_YourHippo_Process_Merged_Files",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_WeeklyHrs_3Days",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_MaintenanceApp_Refresh",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2025-04-04T09:22:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								23
 							]
 						}
 					}
