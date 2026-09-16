@@ -22,28 +22,184 @@
 		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "WeeklyHrs_2WeekPrior"
-		},
-		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
-			"type": "int",
-			"defaultValue": 3
-		},
-		"SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
-			"type": "string",
-			"defaultValue": "WeeklyHrs_3WeekPrior"
-		},
-		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
-			"type": "int",
-			"defaultValue": 1
-		},
-		"SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
-			"type": "string",
-			"defaultValue": "WeeklyHrs_PrevWeek"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_CH_TransactionData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Runs the pipelines to copy across posted transactions and Allocations",
+				"activities": [
+					{
+						"name": "Posted Transactions",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CH_PostedTransactions",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Allocations",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Posted Transactions",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CH_Allocation",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Direct Debits",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Allocations",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_CH_DirectDebitData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Cold Harbour"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_AllData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Export_AllData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": {
+									"value": "@pipeline().parameters.ExchequerTable",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Import Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Import_AllData",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": {
+									"value": "@pipeline().parameters.ExchequerTable",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Wait 20s",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Export Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ExchequerTable": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_CurrentYear')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
@@ -1662,95 +1818,6 @@
 								"Monday",
 								"Wednesday",
 								"Friday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_3Week_CatchUp')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "3 Weeks prior to most recent week end",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_3Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-07-13T10:37:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								6
-							],
-							"weekDays": [
-								"Monday",
-								"Friday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_PriorWeek_CatchUp')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Weekly hrs for the week before latest Week End (Latest Sunday)",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_PriorWeek_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-07-13T10:23:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								45
-							],
-							"hours": [
-								20
-							],
-							"weekDays": [
-								"Sunday",
-								"Tuesday",
-								"Thursday"
 							]
 						}
 					}
