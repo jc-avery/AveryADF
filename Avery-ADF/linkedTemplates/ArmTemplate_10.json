@@ -5736,15 +5736,15 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/xPL_CareBlox-Fileshare')]",
+			"name": "[concat(parameters('factoryName'), '/PL_CareBlox_Delete_Files')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "Copy care blox zip files to file share",
+				"description": "removes files older than 30 days in the careblox container",
 				"activities": [
 					{
-						"name": "Copy Zip files",
-						"type": "Copy",
+						"name": "Delete Careblox bak files",
+						"type": "Delete",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -5755,3268 +5755,74 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true
+							"dataset": {
+								"referenceName": "DS_CareBlox_Container",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"enableLogging": false,
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"modifiedDatetimeStart": {
+									"value": "@addDays(utcNow(), -40 )",
+									"type": "Expression"
 								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureFileStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_careblox_Binary",
-								"type": "DatasetReference",
-								"parameters": {}
+								"modifiedDatetimeEnd": {
+									"value": "@addDays(utcNow(), -30 )",
+									"type": "Expression"
+								},
+								"enablePartitionDiscovery": false
 							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_PolestarStorageAcc_Fileshare",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
-				"folder": {
-					"name": "Careblox/Children Pipelines"
+				"variables": {
+					"Date": {
+						"type": "String"
+					}
 				},
 				"annotations": [],
-				"lastPublishTime": "2024-04-10T11:21:25Z"
+				"lastPublishTime": "2024-09-17T11:21:25Z"
 			},
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/xPL_CareBlox-SQL-upsert')]",
+			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Stage_IP_Tables')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
-				"description": "UPSERT from Stage tables to final tables in SQL DB",
 				"activities": [
 					{
-						"name": "tblRoles",
-						"type": "Copy",
+						"name": "Set vDirectory",
+						"description": "Todays date used for directory/storage location in storage account",
+						"type": "SetVariable",
 						"dependsOn": [
 							{
-								"activity": "tblTypes",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "ParquetSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "ParquetReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"RoleID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "RoleID",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RoleName",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "RoleName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Department",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "Department",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "Code",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "Code",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AvailableToGroup",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AvailableToGroup",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AZStorage_careblox_parquet_file",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "tblRoles$",
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Roles",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblTypes",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Set DateString",
+								"activity": "Set vToday",
 								"dependencyConditions": [
 									"Succeeded"
 								]
 							}
 						],
 						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
 							"secureOutput": false,
 							"secureInput": false
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"source": {
-								"type": "ParquetSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "ParquetReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"TypeID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "TypeID",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "TypeName",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "TypeName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TypeDescription",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "TypeDescription",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PayGroup",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "PayGroup",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "StarCode",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "StarCode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "OffDutyGroup",
-											"type": "Double",
-											"physicalType": "DOUBLE"
-										},
-										"sink": {
-											"name": "OffDutyGroup",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "IsDefault",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "IsDefault",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "IsDefaultMultiplier",
-											"type": "Double",
-											"physicalType": "DOUBLE"
-										},
-										"sink": {
-											"name": "IsDefaultMultiplier",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "CSLCode",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "CSLCode",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "IsDefault2",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "IsDefault2",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "IsDefault3",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "IsDefault3",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "Rosterable",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "Rosterable",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "PayType",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "PayType",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "AvailableToGroup",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AvailableToGroup",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd') )",
+								"type": "Expression"
 							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AZStorage_careblox_parquet_file",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "tblTypes$",
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "CareBlox",
-									"Table": "tblTypes"
-								}
-							}
-						]
+						}
 					},
 					{
-						"name": "Upsert to TtblEmpJobs",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblRoles",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    stgtblEmpJobs.JobAutoId,\n    stgtblEmpJobs.EmployeeID,\n    stgtblEmpJobs.ContractedHours,\n    stgtblEmpJobs.Department,\n    stgtblEmpJobs.Role,\n    stgtblEmpJobs.JobNo,\n    DATEADD(s, StartDate, '1970-01-01 00:00:00') AS StartDate,\n    stgtblEmpJobs.Holidays,\n    stgtblEmpJobs.HolidayFull,\n    stgtblEmpJobs.SentToUnit,\n    stgtblEmpJobs.BreakRule,\n    stgtblEmpJobs.ContractID,\n    stgtblEmpJobs.Deleted,\n    DATEADD(s, StartDate, '1970-01-01 00:00:00') AS LastUpdate,\n    stgtblEmpJobs.WorkingArrangements,\n    stgtblEmpJobs.VHEnabled,\n    stgtblEmpJobs.VHBalance,\n    NULL AS VHBalanceDate,\n    stgtblEmpJobs.SicknessThreshold,\n    stgtblEmpJobs.SourceFileName\nFROM \n    CareBlox.STGtblEmpJobs",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"JobAutoID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "JobAutoId",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "JobAutoID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractedHours",
-											"type": "Single",
-											"physicalType": "real"
-										},
-										"sink": {
-											"name": "ContractedHours",
-											"type": "Single",
-											"physicalType": "real"
-										}
-									},
-									{
-										"source": {
-											"name": "Department",
-											"type": "Int16",
-											"physicalType": "smallint"
-										},
-										"sink": {
-											"name": "Department",
-											"type": "Int16",
-											"physicalType": "smallint"
-										}
-									},
-									{
-										"source": {
-											"name": "Role",
-											"type": "Int16",
-											"physicalType": "smallint"
-										},
-										"sink": {
-											"name": "Role",
-											"type": "Int16",
-											"physicalType": "smallint"
-										}
-									},
-									{
-										"source": {
-											"name": "JobNo",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "JobNo",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "StartDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "StartDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "Holidays",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "Holidays",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "HolidayFull",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "HolidayFull",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "BreakRule",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "BreakRule",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ContractID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Deleted",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "Deleted",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "LastUpdate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LastUpdate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "WorkingArrangements",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "WorkingArrangements",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "VHEnabled",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "VHEnabled",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "VHBalance",
-											"type": "Single",
-											"physicalType": "real"
-										},
-										"sink": {
-											"name": "VHBalance",
-											"type": "Single",
-											"physicalType": "real"
-										}
-									},
-									{
-										"source": {
-											"name": "SicknessThreshold",
-											"type": "Single",
-											"physicalType": "real"
-										},
-										"sink": {
-											"name": "SicknessThreshold",
-											"type": "Single",
-											"physicalType": "real"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_EmpJobs",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Upsert to tblEmployees",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Upsert to TtblEmpJobs",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    EmployeeAutoID,\n    EmployeeID,\n    Title,\n    Forename,\n    Middlename,\n    Surname,\n    LocationID,\n    AddressLine1,\n    AddressLine2,\n    AddressLine3,\n    AddressLine4,\n    AddressLine5,\n    PostCode,\n    Country,\n    Telephone,\n    Mobile,\n    Email,\n    CASE \n        WHEN BirthDate < 0 THEN DATEADD(DAY, -(ABS(BirthDate) / 86400), '1970-01-01') --Convert EPOCH number to a positive with ABS(). Divide by 86400 seconds in a day. Subtract this from 1970-01-01\n        ELSE DATEADD(s, BirthDate, '1970-01-01 00:00:00') \n    END AS BirthDate,\n    CountryOfBirth,\n    YearOfEntry,\n    DATEADD(s, DateStarted, '1970-01-01 00:00:00') AS DateStarted,\n    DATEADD(s, LeavingDate, '1970-01-01 00:00:00') AS LeavingDate,\n    LeavingEnteredBy,\n    DATEADD(s, LeavingEnteredOn, '1970-01-01 00:00:00') AS LeavingEnteredOn,\n    Gender,\n    NINumber,\n    EthnicOrigin,\n    Religion,\n    Disability,\n    Nationality,\n    Dependants,\n    AccountNumber,\n    AccountName,\n    SortCode,\n    BankName,\n    BankBranch,\n    BuildingSocRef,\n    MaritalStatus,\n    PayMethod,\n    UploadAsNewStarter,\n    NeedsUploading,\n    HasLeft,\n    PackageID,\n    ImportPackageID,\n    ContractedHours,\n    DefaultPayRate,\n    LeavingReason,\n    LeavingDestination,\n    IncludeInNextPay,\n    OnSick,\n    Export,\n    SageID,\n    TATagID,\n    BankStaff,\n    PostCodeSearch,\n    WorkingTimeWaiver,\n    SentToUnit,\n    BatchID,\n    EmployeeType,\n    HolidayMonthStart,\n    CreatedByID,\n    CreatedByName,\n    DATEADD(s, CreatedDate, '1970-01-01 00:00:00') AS CreatedDate,\n    ShortDisplayName,\n    DisplayColour,\n    ApproverName,\n    ApproverID,\n    IsApprover,\n    TAApprover,\n    RosterUnitList,\n    PrimaryRosterUnit,\n    PortalEnabled,\n    PortalPassword,\n    NoticePeriod,\n    DATEADD(s, DataUpgradedDate, '1970-01-01 00:00:00') AS DataUpgradedDate,\n    DataUpgradedBy,\n    SourceFileName\n  FROM \n    CareBlox.STGtblEmployees",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"EmployeeAutoID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "EmployeeAutoID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "EmployeeAutoID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Title",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Title",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Forename",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Forename",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Middlename",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Middlename",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AddressLine1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AddressLine1",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AddressLine2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AddressLine2",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AddressLine3",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AddressLine3",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AddressLine4",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AddressLine4",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AddressLine5",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AddressLine5",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PostCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PostCode",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Country",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Country",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Telephone",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Telephone",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Mobile",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Mobile",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Email",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Email",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BirthDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "BirthDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "CountryOfBirth",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "CountryOfBirth",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "YearOfEntry",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "YearOfEntry",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "DateStarted",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "DateStarted",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LeavingDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LeavingDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LeavingEnteredBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "LeavingEnteredBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LeavingEnteredOn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LeavingEnteredOn",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "Gender",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Gender",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "NINumber",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "NINumber",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EthnicOrigin",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EthnicOrigin",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Religion",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Religion",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Disability",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Disability",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Nationality",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Nationality",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Dependants",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "Dependants",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "AccountNumber",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AccountNumber",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AccountName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "AccountName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SortCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "SortCode",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BankName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "BankName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BankBranch",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "BankBranch",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BuildingSocRef",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "BuildingSocRef",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "MaritalStatus",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "MaritalStatus",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PayMethod",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "PayMethod",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "UploadAsNewStarter",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "UploadAsNewStarter",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "NeedsUploading",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "NeedsUploading",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "HasLeft",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "HasLeft",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "PackageID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PackageID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ImportPackageID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ImportPackageID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractedHours",
-											"type": "Single",
-											"physicalType": "real"
-										},
-										"sink": {
-											"name": "ContractedHours",
-											"type": "Single",
-											"physicalType": "real"
-										}
-									},
-									{
-										"source": {
-											"name": "DefaultPayRate",
-											"type": "Single",
-											"physicalType": "real"
-										},
-										"sink": {
-											"name": "DefaultPayRate",
-											"type": "Single",
-											"physicalType": "real"
-										}
-									},
-									{
-										"source": {
-											"name": "LeavingReason",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LeavingReason",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LeavingDestination",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LeavingDestination",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "IncludeInNextPay",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "IncludeInNextPay",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "OnSick",
-											"type": "String",
-											"physicalType": "char"
-										},
-										"sink": {
-											"name": "OnSick",
-											"type": "String",
-											"physicalType": "char"
-										}
-									},
-									{
-										"source": {
-											"name": "Export",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Export",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SageID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "SageID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "TATagID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TATagID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BankStaff",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "BankStaff",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "PostCodeSearch",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PostCodeSearch",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "WorkingTimeWaiver",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "WorkingTimeWaiver",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "BatchID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "BatchID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeType",
-											"type": "Int16",
-											"physicalType": "smallint"
-										},
-										"sink": {
-											"name": "EmployeeType",
-											"type": "Int16",
-											"physicalType": "smallint"
-										}
-									},
-									{
-										"source": {
-											"name": "HolidayMonthStart",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "HolidayMonthStart",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedByID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "CreatedByID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedByName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "CreatedByName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreatedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ShortDisplayName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ShortDisplayName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "DisplayColour",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "DisplayColour",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ApproverName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ApproverName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ApproverID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ApproverID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "IsApprover",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "IsApprover",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "TAApprover",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TAApprover",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RosterUnitList",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RosterUnitList",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PrimaryRosterUnit",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PrimaryRosterUnit",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "PortalEnabled",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "PortalEnabled",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "PortalPassword",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "PortalPassword",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "NoticePeriod",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "NoticePeriod",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "DataUpgradedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "DataUpgradedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "DataUpgradedBy",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "DataUpgradedBy",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Employees",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Upsert to tblPayrollData",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Upsert to tblEmployees",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    PayrollID,\n    EmployeeID,\n    EmployeeName,\n    LocationID,\n    RoleID,\n    Role,\n    TypeID,\n    Type,\n    Rate,\n    Units,\n    Comment,\n    DATEADD(s, EnteredDate, '1970-01-01 00:00:00') AS EnteredDate,\n    EnteredBy,\n    EnteredByName,\n    PeriodNo,\n    HasVariance,\n    MonthSplit,\n    Comitted,\n    DATEADD(s, ApprovedDate, '1970-01-01 00:00:00') AS ApprovedDate,\n    ApprovedBy,\n    ApprovedByName,\n    ImportedFromTA,\n    WorkedLocationID,\n    BatchID,\n    DATEADD(s, ItemDate, '1970-01-01 00:00:00') AS ItemDate,\n    SourceFileName\nFROM \n    CareBlox.STGtblPayrollData",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"PayrollID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "PayrollID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PayrollID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EmployeeName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Role",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Role",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Type",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Rate",
-											"type": "Decimal",
-											"physicalType": "money",
-											"scale": 4,
-											"precision": 19
-										},
-										"sink": {
-											"name": "Rate",
-											"type": "Decimal",
-											"physicalType": "money",
-											"scale": 4,
-											"precision": 19
-										}
-									},
-									{
-										"source": {
-											"name": "Units",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "Units",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "Comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Comment",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EnteredDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "EnteredDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "EnteredBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EnteredBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EnteredByName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EnteredByName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "PeriodNo",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PeriodNo",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "HasVariance",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "HasVariance",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "MonthSplit",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "MonthSplit",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Comitted",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Comitted",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ApprovedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ApprovedDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ApprovedBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "ApprovedBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ApprovedByName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "ApprovedByName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ImportedFromTA",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "ImportedFromTA",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "WorkedLocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "WorkedLocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BatchID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "BatchID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ItemDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ItemDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Payroll",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblPeriods",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "Upsert to tblPayrollData",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    PeriodID,\n    CurrentPeriodNum,\n    DATEADD(s, DateCreated, '1970-01-01 00:00:00') AS DateCreated,\n    LocationID,\n    DateRange,\n    GeneratedPayroll,\n    CONCAT(SUBSTRING(DateRange, 7, 4), '-', SUBSTRING(DateRange, 4, 2), '-', SUBSTRING(DateRange, 1, 2)) AS FromDate,\n    CONCAT(SUBSTRING(DateRange, 20, 4), '-', SUBSTRING(DateRange, 17, 2), '-', SUBSTRING(DateRange, 14, 2)) AS ToDate,\n    SourceFileName\nFROM \n    CareBlox.STGtblPeriods\n",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"PeriodID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "PeriodID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PeriodID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "CurrentPeriodNum",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "CurrentPeriodNum",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "DateCreated",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "DateCreated",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "DateRange",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "DateRange",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "GeneratedPayroll",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "GeneratedPayroll",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "FromDate",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "FromDate",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "ToDate",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ToDate",
-											"type": "DateTime",
-											"physicalType": "date"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Periods",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblRates",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblPeriods",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    RatesAutoID,\n    EmployeeID,\n    RoleID,\n    TypeID,\n    Rate,\n    IsDefault,\n    SentToUnit,\n    Deleted,\n    DATEADD(s, LastUpdate, '1970-01-01 00:00:00') AS LastUpdate,\n    SourceFileName\nFROM \n    CareBlox.STGtblRates",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"RatesAutoID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "RatesAutoID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RatesAutoID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Rate",
-											"type": "Decimal",
-											"physicalType": "smallmoney",
-											"scale": 4,
-											"precision": 10
-										},
-										"sink": {
-											"name": "Rate",
-											"type": "Decimal",
-											"physicalType": "smallmoney",
-											"scale": 4,
-											"precision": 10
-										}
-									},
-									{
-										"source": {
-											"name": "IsDefault",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "IsDefault",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "Deleted",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "Deleted",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "LastUpdate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "LastUpdate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Rates",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblShifts",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblRates",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n    ShiftID,\n    HomeID,\n    EmployeeID,\n    RoleID,\n    DATEADD(s, ShiftStart, '1970-01-01 00:00:00') AS ShiftStart,\n    DATEADD(s, ShiftEnd, '1970-01-01 00:00:00') AS ShiftEnd,\n    PayRate,\n    Department,\n    Type,\n    SentToUnit,\n    Deleted,\n    RosterUnitID,\n    CreatedBy,\n    DATEADD(s, CreatedDate, '1970-01-01 00:00:00') AS CreatedDate,\n    DeletedBy,\n    DATEADD(s, DeletedDate, '1970-01-01 00:00:00') AS DeletedDate,\n    ITG_SourceID,\n    ITG_SourceName,\n    ITG_Status,\n    RosterType,\n    SourceFileName\nFROM \n    CareBlox.STGtblShifts",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"ShiftID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "ShiftID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ShiftID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "HomeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "HomeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ShiftStart",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ShiftStart",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ShiftEnd",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ShiftEnd",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "PayRate",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "PayRate",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Department",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Department",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Type",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Type",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "Deleted",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "Deleted",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "RosterUnitID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RosterUnitID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedBy",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "CreatedBy",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "CreatedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "CreatedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "DeletedBy",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "DeletedBy",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "DeletedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "DeletedDate",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ITG_SourceID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "ITG_SourceID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "ITG_SourceName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ITG_SourceName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ITG_Status",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "ITG_Status",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "RosterType",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RosterType",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Shifts",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblTAData",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblShifts",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    LocalID,\n    TAID,\n    EmployeeID,\n    HomeID,\n    RoleID,\n    ShiftID,\n    TAStatus,\n    DATEADD(s, TADateIn, '1970-01-01 00:00:00') AS TADateIn,\n    DATEADD(s, ActualDateIn, '1970-01-01 00:00:00') AS ActualDateIn,\n    DATEADD(s, ConfirmedDateIn, '1970-01-01 00:00:00') AS ConfirmedDateIn,\n    EarlyInFlag,\n    EarlyInComment,\n    LateInFlag,\n    LateInComment,\n    DATEADD(s, TADateOut, '1970-01-01 00:00:00') AS TADateOut,\n    DATEADD(s, ActualDateOut, '1970-01-01 00:00:00') AS ActualDateOut,\n    DATEADD(s, ConfirmedDateOut, '1970-01-01 00:00:00') AS ConfirmedDateOut,\n    EarlyOutFlag,\n    EarlyOutComment,\n    LateOutFlag,\n    LateOutComment,\n    ManagerApprovalRequiredIn,\n    ManagerApprovalRequiredOut,\n    RecordedMinutes,\n    TATagID,\n    ImageFilename,\n    Imported,\n    SrcUnit,\n    ExternalWorkerName,\n    SourceFileName\nFROM \n    CareBlox.STGtblTAData",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"LocalID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "LocalID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "LocalID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "TAID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "TAID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "HomeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "HomeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ShiftID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ShiftID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "TAStatus",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TAStatus",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TADateIn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "TADateIn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ActualDateIn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ActualDateIn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ConfirmedDateIn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ConfirmedDateIn",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "EarlyInFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "EarlyInFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "EarlyInComment",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EarlyInComment",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LateInFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "LateInFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "LateInComment",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LateInComment",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "TADateOut",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "TADateOut",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ActualDateOut",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ActualDateOut",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ConfirmedDateOut",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ConfirmedDateOut",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "EarlyOutFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "EarlyOutFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "EarlyOutComment",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EarlyOutComment",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LateOutFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "LateOutFlag",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "LateOutComment",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LateOutComment",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ManagerApprovalRequiredIn",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "ManagerApprovalRequiredIn",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "ManagerApprovalRequiredOut",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "ManagerApprovalRequiredOut",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "RecordedMinutes",
-											"type": "Int16",
-											"physicalType": "smallint"
-										},
-										"sink": {
-											"name": "RecordedMinutes",
-											"type": "Int16",
-											"physicalType": "smallint"
-										}
-									},
-									{
-										"source": {
-											"name": "TATagID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "TATagID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ImageFilename",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ImageFilename",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Imported",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "Imported",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "SrcUnit",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "SrcUnit",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ExternalWorkerName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ExternalWorkerName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_TAData",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "Set DateString",
+						"name": "Set vToday",
 						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
@@ -9025,381 +5831,1144 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"variableName": "DateString",
+							"variableName": "vToday",
 							"value": {
-								"value": "@utcNow('dd-MM-yyyy')",
+								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
 								"type": "Expression"
 							}
 						}
 					},
 					{
-						"name": "Upsert to TtblEmpJobs Error",
-						"type": "ExecutePipeline",
+						"name": "ForEach Table Stage Data",
+						"type": "ForEach",
 						"dependsOn": [
 							{
-								"activity": "Upsert to TtblEmpJobs",
+								"activity": "Lookup Tables",
 								"dependencyConditions": [
-									"Failed"
+									"Succeeded"
 								]
 							}
 						],
-						"policy": {
-							"secureInput": false
-						},
 						"userProperties": [],
 						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
+							"items": {
+								"value": "@activity('Lookup Tables').output.value",
+								"type": "Expression"
 							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('Upsert to TtblEmpJobs').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Upsert to TtblEmpJobs"
-							}
+							"activities": [
+								{
+									"name": "Stage Data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "ParquetSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "ParquetReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false,
+											"tableOption": "autoCreate",
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ADM_ANAL",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ADM_ANAL",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ADM_TYPE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ADM_TYPE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ALIAS_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ALIAS_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "AUTHORITY",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "AUTHORITY",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "BELONGINGS",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "BELONGINGS",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "BESPFIELDS",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "BESPFIELDS",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "BIRTHDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "BIRTHDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CACA_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CACA_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CNTA_DET_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CNTA_DET_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "COLLECTFEE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "COLLECTFEE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CORE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CORE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "DISABILITY",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "DISABILITY",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ENQ_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ENQ_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "FUNDDEPLDT",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "FUNDDEPLDT",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "FUNERALARR",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "FUNERALARR",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ISALIAS",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ISALIAS",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LASTADDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LASTADDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LASTDIDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LASTDIDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "MARKETING",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "MARKETING",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "NHSNUMBER",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "NHSNUMBER",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "NINUMBER",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "NINUMBER",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "NOOCCREP",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "NOOCCREP",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "NOTES",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "NOTES",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "OCB_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "OCB_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ORIGADDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ORIGADDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "PICTURE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "PICTURE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "REAR_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "REAR_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "RELIGION",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "RELIGION",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "RESPAYINT",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "RESPAYINT",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "RES_CODE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "RES_CODE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "RES_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "RES_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ROOM_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ROOM_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "SEX",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "SEX",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "SOURCE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "SOURCE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "STATUS",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "STATUS",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "TRANSFER",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "TRANSFER",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "TYPE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "TYPE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "USERDEF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "USERDEF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "USERFIELD1",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "USERFIELD1",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "USERFIELD2",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "USERFIELD2",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "USERFIELD3",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "USERFIELD3",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LASTADTIME",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LASTADTIME",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LASTDITIME",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LASTDITIME",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ORIGADTIME",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ORIGADTIME",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ALTCOMMS",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ALTCOMMS",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ASS_ACTBY",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ASS_ACTBY",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ASS_ACTDT",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ASS_ACTDT",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONNECTION",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONNECTION",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONNECTIONDET",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONNECTIONDET",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONTSIGNED",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONTSIGNED",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LANGUAGE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LANGUAGE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "MOVEDINFROM",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "MOVEDINFROM",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "PICID",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "PICID",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "PREVCODE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "PREVCODE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ANNUALASSMTDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ANNUALASSMTDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "APP4DATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "APP4DATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONTINENCE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONTINENCE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "DATEOFASSMT",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "DATEOFASSMT",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "FASTTRACK",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "FASTTRACK",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "INCONTTYPE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "INCONTTYPE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LACCGPAY",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LACCGPAY",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LAPAYSTOPUP",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LAPAYSTOPUP",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "LASTASSMTDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "LASTASSMTDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "OOACCG",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "OOACCG",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "OOALA",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "OOALA",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "OOAPLACE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "OOAPLACE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "PADSPERWEEK",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "PADSPERWEEK",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "TOPUPDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "TOPUPDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "TOPUPVALUE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "TOPUPVALUE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "TYPEOFFUNDING",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "TYPEOFFUNDING",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "VALUEPERWEEK",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "VALUEPERWEEK",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CRM_REF",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CRM_REF",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "STAKEHOLDERFLAG",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "STAKEHOLDERFLAG",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONTINENCEFUND",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONTINENCEFUND",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONTINENCELOOK",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONTINENCELOOK",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CONTINENCETYPE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "CONTINENCETYPE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "DDMANDISSUEDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "DDMANDISSUEDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "FNCANNUAL",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "FNCANNUAL",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ISPROPERTY",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ISPROPERTY",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "OOAPLACELOOK",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "OOAPLACELOOK",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "PROPERTYVALUE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "PROPERTYVALUE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "RESAGREEDATE",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "RESAGREEDATE",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "WEEKDISREGARD",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "WEEKDISREGARD",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "WHOISFINREP",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "WHOISFINREP",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "ETHNICITY",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "ETHNICITY",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												},
+												{
+													"source": {
+														"name": "GENDER",
+														"type": "String",
+														"physicalType": "UTF8"
+													},
+													"sink": {
+														"name": "GENDER",
+														"type": "String",
+														"physicalType": "nvarchar"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_ColdHarbour_Parquet",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "@variables('vDirectory')",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@concat(item().TableName'_Table_',variables('vToday'),'.parquet')",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "ColdHarbour_Bronze",
+												"Table": "Resident"
+											}
+										}
+									]
+								}
+							]
 						}
 					},
 					{
-						"name": "tblTypes Error",
-						"type": "ExecutePipeline",
+						"name": "Lookup Tables",
+						"type": "Lookup",
 						"dependsOn": [
 							{
-								"activity": "tblTypes",
+								"activity": "Set vDirectory",
 								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblTypes').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblTypes"
-							}
-						}
-					},
-					{
-						"name": "tblRoles Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblRoles",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblRoles').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblRoles"
-							}
-						}
-					},
-					{
-						"name": "Upsert to tblEmployees Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Upsert to tblEmployees",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('Upsert to tblEmployees').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Upsert to tblEmployees"
-							}
-						}
-					},
-					{
-						"name": "Upsert to tblPayrollData Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Upsert to tblPayrollData",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('Upsert to tblPayrollData').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "Upsert to tblPayrollData"
-							}
-						}
-					},
-					{
-						"name": "tblPeriods Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblPeriods",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblPeriods').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblPeriods"
-							}
-						}
-					},
-					{
-						"name": "tblRates Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblRates",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblRates').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblRates"
-							}
-						}
-					},
-					{
-						"name": "tblShifts Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblShifts",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblShifts').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblShifts"
-							}
-						}
-					},
-					{
-						"name": "tblTAData Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblTAData",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblTAData').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblTAData"
-							}
-						}
-					},
-					{
-						"name": "tblCalender",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblTAData",
-								"dependencyConditions": [
-									"Completed"
+									"Succeeded"
 								]
 							}
 						],
@@ -9414,1654 +6983,19 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n    UniqueID\n    ,EmployeeID\n    ,DATEADD(SECOND, StartDate % 86400, DATEADD(DAY, StartDate / 86400, '1970-01-01 00:00:00')) AS StartDate\n    ,EmployeeName\n    ,DATEADD(SECOND, EndDate % 86400, DATEADD(DAY, EndDate / 86400, '1970-01-01 00:00:00')) AS EndDate\n    ,Status\n    ,LocationID\n    ,StartDetails\n    ,EndDetails\n    ,DATEADD(SECOND, EnteredOn % 86400, DATEADD(DAY, EnteredOn / 86400, '1970-01-01 00:00:00')) AS EnteredOn\n    ,DATEADD(SECOND, UpdatedOn % 86400, DATEADD(DAY, UpdatedOn / 86400, '1970-01-01 00:00:00')) AS UpdatedOn\n    ,EnteredBy\n    ,UpdatedBy\n    ,Export\n    ,ShowAlert\n    ,Department\n    ,RosterID\n    ,Role\n    ,DaysTaken\n    ,EnteredByID\n    ,BatchId\n    ,AbsenceCode\n    ,AbsenceCategory\n    ,BradfordFactorInclude\n    ,Reviewed\n    ,UpdatedByID\n    ,UpdateType\n    ,DATEADD(SECOND, ExpectedEndDate % 86400, DATEADD(DAY, ExpectedEndDate / 86400, '1970-01-01 00:00:00')) AS ExpectedEndDate\n    ,ActivityID\n    ,ActivityLocationID\n    ,SentToUnit\n    ,SourceFileName\nFROM \n    CareBlox.STGtblCalender",
+								"sqlReaderQuery": "SELECT TOP 3 TableName FROM ColdHarbour.TableExportList",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"UniqueID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "UniqueID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "UniqueID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "StartDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										},
-										"sink": {
-											"name": "StartDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EmployeeName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EndDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										},
-										"sink": {
-											"name": "EndDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "Status",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "Status",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "StartDetails",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "StartDetails",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EndDetails",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EndDetails",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EnteredOn",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										},
-										"sink": {
-											"name": "EnteredOn",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "UpdatedOn",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										},
-										"sink": {
-											"name": "UpdatedOn",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "EnteredBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "EnteredBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "UpdatedBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										},
-										"sink": {
-											"name": "UpdatedBy",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "Export",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "Export",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "ShowAlert",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "ShowAlert",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Department",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Department",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RosterID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "RosterID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "Role",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "Role",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "DaysTaken",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "DaysTaken",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "EnteredByID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "EnteredByID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "BatchId",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "BatchId",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceCode",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AbsenceCode",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceCategory",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "AbsenceCategory",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "BradfordFactorInclude",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "BradfordFactorInclude",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "Reviewed",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "Reviewed",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "UpdatedByID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "UpdatedByID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "UpdateType",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										},
-										"sink": {
-											"name": "UpdateType",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "ExpectedEndDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										},
-										"sink": {
-											"name": "ExpectedEndDate",
-											"type": "DateTime",
-											"physicalType": "smalldatetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ActivityID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "ActivityID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "ActivityLocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "ActivityLocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										},
-										"sink": {
-											"name": "SentToUnit",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_Calender",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblCalender Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblCalender",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblCalender').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblCalender"
-							}
-						}
-					},
-					{
-						"name": "tblAbsenceCodes",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblCalender",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "ParquetSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "ParquetReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AbsenceCode"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AbsenceID",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AbsenceID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceCode",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "AbsenceCode",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceCode2",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "AbsenceCode2",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceGroupDescription",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "AbsenceGroupDescription",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceGroupCode",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "AbsenceGroupCode",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceDescription",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "AbsenceDescription",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceListOrder",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AbsenceListOrder",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "UseBradfordFactor",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "UseBradfordFactor",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "PayTypeNameStub",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "PayTypeNameStub",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ExportToPayroll",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "ExportToPayroll",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "Active",
-											"type": "Boolean",
-											"physicalType": "BOOLEAN"
-										},
-										"sink": {
-											"name": "Active",
-											"type": "Boolean",
-											"physicalType": "bit"
-										}
-									},
-									{
-										"source": {
-											"name": "PayTypeNameStubSalary",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "PayTypeNameStubSalary",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AZStorage_careblox_parquet_file",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "tblAbsenceCodes$",
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Careblox_AbsenceCodes",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						]
-					},
-					{
-						"name": "tblAbsenceCodes Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblAbsenceCodes",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblAbsenceCodes').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblAbsenceCodes"
-							}
-						}
-					},
-					{
-						"name": "tblTypes Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblTypes Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblTypes Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblRoles Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblRoles Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblRoles Error",
-							"errorCode": "tblRoles Error101"
-						}
-					},
-					{
-						"name": "Upsert to TtblEmpJobs Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Upsert to TtblEmpJobs Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "Upsert to TtblEmpJobs Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "Upsert to tblEmployees Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Upsert to tblEmployees Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "Upsert to tblEmployees Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "Upsert to tblPayrollData Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "Upsert to tblPayrollData Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "Upsert to tblPayrollData Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "FtblPeriods Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblPeriods Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblPeriods Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblRates Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblRates Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblRates Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblShifts Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblShifts Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblShifts Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblTAData Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblTAData Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblTAData Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblCalender Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblCalender Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblCalender Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblAbsenceCodes Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblAbsenceCodes Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblAbsenceCodes Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblEmpContracts",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblAbsenceCodes",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "ParquetSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "ParquetReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"LocalID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "LocalID",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "LocalID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractID",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "ContractID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractName",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "ContractName",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ContractDescription",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "ContractDescription",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AvailableTo",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "AvailableTo",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AvailableToGroup",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AvailableToGroup",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AZStorage_careblox_parquet_file",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "tblEmpContracts$",
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
+							"dataset": {
 								"referenceName": "DS_AH2_TRANSFORM_DB",
 								"type": "DatasetReference",
 								"parameters": {
-									"Schema": "Careblox",
-									"Table": "tblEmpContracts"
-								}
-							}
-						]
-					},
-					{
-						"name": "tblEmpContracts Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblEmpContracts",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblEmpContracts').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblEmpContracts"
-							}
-						}
-					},
-					{
-						"name": "tblEmpContracts Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblEmpContracts Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblEmpContracts Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblBreakRules",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblEmpContracts",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "ParquetSource",
-								"additionalColumns": [
-									{
-										"name": "SourceFileName",
-										"value": "$$FILEPATH"
-									}
-								],
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "ParquetReadSettings"
+									"Schema": "n/a",
+									"Table": "n/a"
 								}
 							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AutoID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AutoID",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AutoID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "RuleNo",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "RuleNo",
-											"type": "Byte",
-											"physicalType": "tinyint"
-										}
-									},
-									{
-										"source": {
-											"name": "RuleTitle",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "RuleTitle",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RuleDescription",
-											"type": "String",
-											"physicalType": "UTF8"
-										},
-										"sink": {
-											"name": "RuleDescription",
-											"type": "String",
-											"physicalType": "nvarchar"
-										}
-									},
-									{
-										"source": {
-											"name": "AvailableToGroup",
-											"type": "Int64",
-											"physicalType": "INT64"
-										},
-										"sink": {
-											"name": "AvailableToGroup",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AZStorage_careblox_parquet_file",
-								"type": "DatasetReference",
-								"parameters": {
-									"FileName": "tblBreakRules$",
-									"DateString": {
-										"value": "@variables('DateString')",
-										"type": "Expression"
-									}
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Careblox",
-									"Table": "tblBreakRules"
-								}
-							}
-						]
-					},
-					{
-						"name": "tblBreakRules Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblBreakRules",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblBreakRules').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblBreakRules"
-							}
-						}
-					},
-					{
-						"name": "tblBreakRules Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblBreakRules Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblBreakRules Error",
-							"errorCode": "101"
-						}
-					},
-					{
-						"name": "tblAbsenceHours",
-						"type": "Copy",
-						"dependsOn": [
-							{
-								"activity": "tblBreakRules",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT [AbsenceHoursID]\n      ,[AbsenceRecordID]\n      ,[LocationID]\n      ,[EmployeeID]\n      ,[RecordType]\n      ,DATEADD(SECOND, [ShiftStart] % 86400, DATEADD(DAY, [ShiftStart] / 86400, '1970-01-01 00:00:00')) AS [ShiftStart]\n      ,DATEADD(SECOND, [ShiftStart] % 86400, DATEADD(DAY, [ShiftStart] / 86400, '1970-01-01 00:00:00')) AS [ShiftEnd]\n      ,[Minutes]\n      ,[Status]\n      ,[RoleID]\n      ,[TypeID]\n      ,[Rate]\n      ,[SourceFileName]\n  FROM [CareBlox].[STGtblAbsenceHours]\n\n\n",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "upsert",
-								"upsertSettings": {
-									"useTempDB": true,
-									"keys": [
-										"AbsenceHoursID"
-									]
-								},
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"name": "AbsenceHoursID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "AbsenceHoursID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "AbsenceRecordID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										},
-										"sink": {
-											"name": "AbsenceRecordID",
-											"type": "Int64",
-											"physicalType": "bigint"
-										}
-									},
-									{
-										"source": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "LocationID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "EmployeeID",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RecordType",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "RecordType",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "ShiftStart",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ShiftStart",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "ShiftEnd",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										},
-										"sink": {
-											"name": "ShiftEnd",
-											"type": "DateTime",
-											"physicalType": "datetime"
-										}
-									},
-									{
-										"source": {
-											"name": "Minutes",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "Minutes",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "Status",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "Status",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									},
-									{
-										"source": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "RoleID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										},
-										"sink": {
-											"name": "TypeID",
-											"type": "Int32",
-											"physicalType": "int"
-										}
-									},
-									{
-										"source": {
-											"name": "Rate",
-											"type": "Double",
-											"physicalType": "float"
-										},
-										"sink": {
-											"name": "Rate",
-											"type": "Double",
-											"physicalType": "float"
-										}
-									},
-									{
-										"source": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										},
-										"sink": {
-											"name": "SourceFileName",
-											"type": "String",
-											"physicalType": "varchar"
-										}
-									}
-								],
-								"typeConversion": true,
-								"typeConversionSettings": {
-									"allowDataTruncation": true,
-									"treatBooleanAsNumber": false
-								}
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB_Query",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "CareBlox",
-									"Table": "tblAbsenceHours"
-								}
-							}
-						]
-					},
-					{
-						"name": "tblAbsenceHours Error",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "tblAbsenceHours",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "UT_Send_Email_Param",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
-								"Message": {
-									"value": "@activity('tblAbsenceHours').output.errors[0].Message",
-									"type": "Expression"
-								},
-								"Colour": "Red",
-								"PipelineName": {
-									"value": "@pipeline().Pipeline",
-									"type": "Expression"
-								},
-								"PipelineRunID": {
-									"value": "@pipeline().RunId",
-									"type": "Expression"
-								},
-								"pStepFailed": "tblAbsenceHours"
-							}
-						}
-					},
-					{
-						"name": "tblAbsenceHours Failure",
-						"type": "Fail",
-						"dependsOn": [
-							{
-								"activity": "tblAbsenceHours Error",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"message": "tblAbsenceHours Error",
-							"errorCode": "101"
+							"firstRowOnly": false
 						}
 					}
 				],
@@ -11069,15 +7003,17 @@
 					"elapsedTimeMetric": {}
 				},
 				"variables": {
-					"DateString": {
+					"vToday": {
+						"type": "String"
+					},
+					"vDirectory": {
 						"type": "String"
 					}
 				},
 				"folder": {
-					"name": "Careblox/Children Pipelines"
+					"name": "Cold Harbour"
 				},
-				"annotations": [],
-				"lastPublishTime": "2024-10-02T09:32:42Z"
+				"annotations": []
 			},
 			"dependsOn": []
 		}
