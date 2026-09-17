@@ -21,6 +21,669 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Careblox_TblHR')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy to stage",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set DateString",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "ParquetSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "ParquetReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"preCopyScript": "TRUNCATE TABLE CareBlox.stgtblHR_Records",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AZStorage_careblox_parquet_file",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileName": "tblHR_Records$",
+									"DateString": "@variables('DateString')"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Careblox",
+									"Table": "stgtblHR_Records"
+								}
+							}
+						]
+					},
+					{
+						"name": "Set DateString",
+						"description": "Sets the date string used for Dataset property",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "DateString",
+							"value": {
+								"value": "@utcNow('dd-MM-yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Upsert Data",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Copy to stage",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT\r\n    [HRRecordID]\r\n    ,[EmployeeID]\r\n    ,[HomeID]\r\n    ,[HRChecklistID]\r\n    ,[ItemGroupID]\r\n    ,[ItemName]\r\n    ,[ItemStatus]\r\n    ,[ItemValue1]\r\n    ,[ItemValue2]\r\n    ,[ItemReference]\r\n    ,[ItemNotes]\r\n    ,DATEADD(s, ReviewDueDate, '1970-01-01 00:00:00') AS [ReviewDueDate]\r\n    ,DATEADD(SECOND, ItemExpires / 1000000.0, CAST('1970-01-01 00:00:00' AS datetime2)) AS [ItemExpires]\r\n    ,DATEADD(ss, RequestedDate, '1970-01-01 00:00:00') AS [RequestedDate]\r\n    ,DATEADD(ss, ReceivedDate, '1970-01-01 00:00:00') AS [ReceivedDate]\r\n    ,DATEADD(ss, CreatedDate, '1970-01-01 00:00:00') AS [CreatedDate]\r\n    ,[CreatedByID]\r\n    ,DATEADD(ss, [ClosedDate], '1970-01-01 00:00:00') AS [ClosedDate]\r\n    ,[ClosedByID]\r\n    ,DATEADD(ss, LastUpdatedDate, '1970-01-01 00:00:00') AS [LastUpdatedDate]\r\n    ,[LastUpdatedByID]\r\n    ,[Deleted]\r\nFROM \r\n    CareBlox.stgtblHR_Records",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"HRRecordID"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "HRRecordID",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "HRRecordID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "EmployeeID",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "EmployeeID",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HomeID",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "HomeID",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "HRChecklistID",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "HRChecklistID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemGroupID",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "ItemGroupID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemName",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ItemName",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemStatus",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ItemStatus",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemValue1",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ItemValue1",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemValue2",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ItemValue2",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemReference",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ItemReference",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemNotes",
+											"type": "String",
+											"physicalType": "nvarchar"
+										},
+										"sink": {
+											"name": "ItemNotes",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ReviewDueDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ReviewDueDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "ItemExpires",
+											"type": "DateTime",
+											"physicalType": "datetime2"
+										},
+										"sink": {
+											"name": "ItemExpires",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "RequestedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "RequestedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "ReceivedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ReceivedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "CreatedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "CreatedByID",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "CreatedByID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ClosedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "ClosedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "ClosedByID",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "ClosedByID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "LastUpdatedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "LastUpdatedDate",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "LastUpdatedByID",
+											"type": "Int64",
+											"physicalType": "bigint"
+										},
+										"sink": {
+											"name": "LastUpdatedByID",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "Deleted",
+											"type": "Boolean",
+											"physicalType": "bit"
+										},
+										"sink": {
+											"name": "Deleted",
+											"type": "Boolean",
+											"physicalType": "bit"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "Careblox",
+									"Table": "tblHR_Records"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"DateString": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Careblox/Children Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_ColdHarbour_Rooms')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Extracts the Rooms from the Polestar DB on AH2, to a table in Avery DB on AH2",
+				"activities": [
+					{
+						"name": "Rooms",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "upsert",
+								"upsertSettings": {
+									"useTempDB": true,
+									"keys": [
+										"ROOM_REF"
+									]
+								},
+								"sqlWriterUseTableLock": false,
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"name": "ROOM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "HOME_REF",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CAT",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_CAT",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CAT_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOM_CAT_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_CODE",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "ROOM_CODE",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "ROOM_DESC",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "ROOM_NO_BEDS",
+											"type": "Int32",
+											"physicalType": "int"
+										},
+										"sink": {
+											"name": "ROOM_NO_BEDS",
+											"type": "Int32",
+											"physicalType": "int"
+										}
+									},
+									{
+										"source": {
+											"name": "CHARGEPERIOD",
+											"type": "String",
+											"physicalType": "varchar"
+										},
+										"sink": {
+											"name": "CHARGEPERIOD",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									},
+									{
+										"source": {
+											"name": "CURRENTRATE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										},
+										"sink": {
+											"name": "CURRENTRATE",
+											"type": "Decimal",
+											"physicalType": "decimal",
+											"scale": 2,
+											"precision": 12
+										}
+									},
+									{
+										"source": {
+											"name": "RATEDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										},
+										"sink": {
+											"name": "RATEDATE",
+											"type": "DateTime",
+											"physicalType": "datetime"
+										}
+									},
+									{
+										"source": {
+											"name": "USEFLAG",
+											"type": "String",
+											"physicalType": "char"
+										},
+										"sink": {
+											"name": "USEFLAG",
+											"type": "String",
+											"physicalType": "varchar"
+										}
+									}
+								],
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_AH2_Polestar",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "dbo",
+									"Table": "Rooms"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_Avery",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "ColdHarbour",
+									"Table": "Rooms"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Pricing/Child Pipelines"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-09-05T11:40:20Z"
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/xPL_ColdHarbour_RoomsWithInHomeResidents')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -3007,58 +3670,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Every15Minutes')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_IssueCheck",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-05-21T22:14:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								45,
-								15,
-								30,
-								0
-							],
-							"hours": [
-								1,
-								2,
-								3,
-								4,
-								5,
-								6,
-								7
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Thursday",
-								"Friday",
-								"Saturday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_2am')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -3578,129 +4189,6 @@
 						"          AssumedId,",
 						"          SourceFileName",
 						"     )) ~> ClockingsTable"
-					]
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DF_Sona_Absences_Flatten')]",
-			"type": "Microsoft.DataFactory/factories/dataflows",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "DS_Sona_Json_WeeklyHrs",
-								"type": "DatasetReference"
-							},
-							"name": "SonaAbscenses"
-						}
-					],
-					"sinks": [
-						{
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference"
-							},
-							"name": "InsertAbsenceDays"
-						},
-						{
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference"
-							},
-							"name": "InsertAbsenceLinkedShifts"
-						}
-					],
-					"transformations": [
-						{
-							"name": "FlattenEntries",
-							"description": "Unrolling arrays from entries to columns 'id, days, linked_shifts'"
-						},
-						{
-							"name": "FlattenLinkedShifts"
-						},
-						{
-							"name": "FlattenDays"
-						}
-					],
-					"scriptLines": [
-						"source(output(",
-						"          entries as (absence_subtype_id as string, absence_type_id as string, current_employee_number as string, days as (date as date, status as string)[], documents as string[], ends_at as timestamp, id as string, idx as string, is_open_ended as boolean, is_paid as string, linked_shifts as (end_datetime as string, id as string, is_shift_run as boolean, is_travel_gap as boolean, shift_break as string, shift_run_id as string, start_datetime as string)[], payroll_type as string, starts_at as timestamp, user_id as string, user_internal_id as string)[],",
-						"          page_number as short,",
-						"          page_size as short,",
-						"          total_entries as integer,",
-						"          total_pages as short",
-						"     ),",
-						"     allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false,",
-						"     documentForm: 'documentPerLine') ~> SonaAbscenses",
-						"SonaAbscenses foldDown(unroll(entries),",
-						"     mapColumn(",
-						"          absence_id = entries.id,",
-						"          days = entries.days,",
-						"          linked_shifts = entries.linked_shifts",
-						"     ),",
-						"     skipDuplicateMapInputs: false,",
-						"     skipDuplicateMapOutputs: false) ~> FlattenEntries",
-						"FlattenEntries foldDown(unroll(linked_shifts),",
-						"     mapColumn(",
-						"          absence_id,",
-						"          linked_shift_id = linked_shifts.id,",
-						"          linked_shift_start_datetime = linked_shifts.start_datetime,",
-						"          linked_shift_is_shift_run = linked_shifts.is_shift_run,",
-						"          linked_shift_shift_run_id = linked_shifts.shift_run_id,",
-						"          linked_shift_is_travel_gap = linked_shifts.is_travel_gap,",
-						"          linked_shift_end_datetime = linked_shifts.end_datetime",
-						"     ),",
-						"     skipDuplicateMapInputs: false,",
-						"     skipDuplicateMapOutputs: false) ~> FlattenLinkedShifts",
-						"FlattenEntries foldDown(unroll(days),",
-						"     mapColumn(",
-						"          absence_id,",
-						"          days_status = days.status,",
-						"          days_date = days.date",
-						"     ),",
-						"     skipDuplicateMapInputs: false,",
-						"     skipDuplicateMapOutputs: false) ~> FlattenDays",
-						"FlattenDays sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     deletable:false,",
-						"     insertable:true,",
-						"     updateable:false,",
-						"     upsertable:false,",
-						"     format: 'table',",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     errorHandlingOption: 'stopOnFirstError',",
-						"     mapColumn(",
-						"          absence_id,",
-						"          days_status,",
-						"          days_date",
-						"     )) ~> InsertAbsenceDays",
-						"FlattenLinkedShifts sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     deletable:false,",
-						"     insertable:true,",
-						"     updateable:false,",
-						"     upsertable:false,",
-						"     format: 'table',",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     errorHandlingOption: 'stopOnFirstError',",
-						"     mapColumn(",
-						"          absence_id,",
-						"          linked_shift_id,",
-						"          linked_shift_start_datetime,",
-						"          linked_shift_is_shift_run,",
-						"          linked_shift_shift_run_id,",
-						"          linked_shift_is_travel_gap,",
-						"          linked_shift_end_datetime",
-						"     )) ~> InsertAbsenceLinkedShifts"
 					]
 				}
 			},

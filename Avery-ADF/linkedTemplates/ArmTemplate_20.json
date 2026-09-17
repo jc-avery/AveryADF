@@ -14,20 +14,258 @@
 		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
 			"type": "string",
 			"defaultValue": "FullWeekData"
-		},
-		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
-			"type": "int",
-			"defaultValue": 2
-		},
-		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
-			"type": "string",
-			"defaultValue": "WeeklyHrs_2WeekPrior"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_NominalCodes_AllCompanies')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Export the Nominal Codes (GL Codes) from exchequer for ALL Exch Companies",
+				"activities": [
+					{
+						"name": "Company List",
+						"description": "List company codes ",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT ExchCode FROM \nExchequer_Bronze.Companies\nORDER BY\n\tExchCode ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Company",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Company List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Company List').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy Nominal Codes to AH2",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,glCode\n\t,glName\n\t,glParent\n\t,glType\n\t,glAltCode\n\t,glClass\n\t,glNomStr\n\t,glInactive\nFROM \n\t@{item().ExchCode}.NOMINAL\nORDER BY \n\tglCode ASC",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false,
+											"tableOption": "autoCreate",
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glCode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glCode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glParent",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glParent",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glType",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glType",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glAltCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glAltCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glClass",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glClass",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glNomStr",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glNomStr",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glInactive",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glInactive",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_Exchequer",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer_Bronze",
+												"Table": "NOMINAL_ALL"
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Exch_Schema": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_TransactionData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
@@ -1773,51 +2011,6 @@
 							],
 							"monthDays": [
 								1
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Sona_WeeklyHrs_2Week_CatchUp')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "2 Weeks prior to most recent week end (Latest Sunday)",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"WeeksBack": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
-							"FileNameType": "[parameters('SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-07-13T10:36:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								20
-							],
-							"weekDays": [
-								"Monday",
-								"Wednesday",
-								"Friday"
 							]
 						}
 					}

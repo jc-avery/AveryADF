@@ -34680,7 +34680,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_IssueCheck')]",
+			"name": "[concat(parameters('factoryName'), '/xPL_Exchequer_IssueCheck')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -49043,6 +49043,135 @@
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_Polestar')]",
 				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
 				"[concat(variables('factoryId'), '/linkedServices/AH2_TRANSFORM_DB')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Radar_Resident_Import')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Import MCM Service Users",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "[['SUReference']"
+										},
+										"sink": {
+											"name": "SUReference",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['Forenames']"
+										},
+										"sink": {
+											"name": "Forenames",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['Surname']"
+										},
+										"sink": {
+											"name": "Surname",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['LocationName']"
+										},
+										"sink": {
+											"name": "LocationName",
+											"type": "String"
+										}
+									},
+									{
+										"source": {
+											"path": "[['LocationID']"
+										},
+										"sink": {
+											"name": "LocationID",
+											"type": "String"
+										}
+									}
+								],
+								"collectionReference": "$['ServiceUsers']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_PolestartStorage_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "radar",
+									"Directory": {
+										"value": "@concat('')",
+										"type": "Expression"
+									},
+									"Filename": "MCM Enpoint.json"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "MCM",
+									"Table": "Radar_ServiceUsers"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Radar/Radar Resident File"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_PolestartStorage_Json')]",
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
 			]
 		},
 		{
@@ -105905,6 +106034,51 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/DS_PolestartStorage_Json')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "PolestarStorageAcc",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Container": {
+						"type": "string"
+					},
+					"Directory": {
+						"type": "string"
+					},
+					"Filename": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobStorageLocation",
+						"fileName": {
+							"value": "@dataset().Filename",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().Directory",
+							"type": "Expression"
+						},
+						"container": {
+							"value": "@dataset().Container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/DS_Radar_AzureStorage')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -109508,16 +109682,8 @@
 			"apiVersion": "2018-06-01",
 			"properties": {
 				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_IssueCheck",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
+				"runtimeState": "Stopped",
+				"pipelines": [],
 				"type": "ScheduleTrigger",
 				"typeProperties": {
 					"recurrence": {
@@ -109552,9 +109718,7 @@
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Exchequer_IssueCheck')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SCH_EveryDay_1am')]",
@@ -112172,14 +112336,16 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Radar_Resident_Import')]",
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_NominalCodes_AllCompanies')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Export the Nominal Codes (GL Codes) from exchequer for ALL Exch Companies",
 				"activities": [
 					{
-						"name": "Import MCM Service Users",
-						"type": "Copy",
+						"name": "Company List",
+						"description": "List company codes ",
+						"type": "Lookup",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -112191,158 +112357,231 @@
 						"userProperties": [],
 						"typeProperties": {
 							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "SELECT ExchCode FROM \nExchequer_Bronze.Companies\nORDER BY\n\tExchCode ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
 							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['SUReference']"
-										},
-										"sink": {
-											"name": "SUReference",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['Forenames']"
-										},
-										"sink": {
-											"name": "Forenames",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['Surname']"
-										},
-										"sink": {
-											"name": "Surname",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['LocationName']"
-										},
-										"sink": {
-											"name": "LocationName",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['LocationID']"
-										},
-										"sink": {
-											"name": "LocationID",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['ServiceUsers']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_PolestartStorage_Json",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "radar",
-									"Directory": {
-										"value": "@concat('')",
-										"type": "Expression"
-									},
-									"Filename": "MCM Enpoint.json"
-								}
-							}
-						],
-						"outputs": [
-							{
+							"dataset": {
 								"referenceName": "DS_AH2_TRANSFORM_DB",
 								"type": "DatasetReference",
 								"parameters": {
-									"Schema": "MCM",
-									"Table": "Radar_ServiceUsers"
+									"Schema": "n/a",
+									"Table": "n/a"
 								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "For Each Company",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Company List",
+								"dependencyConditions": [
+									"Succeeded"
+								]
 							}
-						]
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Company List').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Copy Nominal Codes to AH2",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlServerSource",
+											"sqlReaderQuery": {
+												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n\t,glCode\n\t,glName\n\t,glParent\n\t,glType\n\t,glAltCode\n\t,glClass\n\t,glNomStr\n\t,glInactive\nFROM \n\t@{item().ExchCode}.NOMINAL\nORDER BY \n\tglCode ASC",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false,
+											"tableOption": "autoCreate",
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glCode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glCode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glName",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glParent",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glParent",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glType",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glType",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glAltCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glAltCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glClass",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glClass",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "glNomStr",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "glNomStr",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "glInactive",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "glInactive",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_OnPrem_Exchequer",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer_Bronze",
+												"Table": "NOMINAL_ALL"
+											}
+										}
+									]
+								}
+							]
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
+				"variables": {
+					"Exch_Schema": {
+						"type": "String"
+					}
+				},
 				"folder": {
-					"name": "Radar/Radar Resident File"
+					"name": "Exchequer"
 				},
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('factoryId'), '/datasets/DS_PolestartStorage_Json')]",
-				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/DS_PolestartStorage_Json')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageAcc",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"Container": {
-						"type": "string"
-					},
-					"Directory": {
-						"type": "string"
-					},
-					"Filename": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "Json",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"fileName": {
-							"value": "@dataset().Filename",
-							"type": "Expression"
-						},
-						"folderPath": {
-							"value": "@dataset().Directory",
-							"type": "Expression"
-						},
-						"container": {
-							"value": "@dataset().Container",
-							"type": "Expression"
-						}
-					}
-				},
-				"schema": {}
-			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/linkedServices/PolestarStorageAcc')]"
+				"[concat(variables('factoryId'), '/datasets/DS_AH2_TRANSFORM_DB')]",
+				"[concat(variables('factoryId'), '/datasets/DS_OnPrem_Exchequer')]"
 			]
 		}
 	]
