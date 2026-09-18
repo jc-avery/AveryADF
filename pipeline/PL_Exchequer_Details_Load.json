@@ -4,7 +4,7 @@
 		"description": "The Details (Ledger) from Exchequer for the current and previous financial year",
 		"activities": [
 			{
-				"name": "Current and Previous Year",
+				"name": "Current and Previous Years",
 				"description": "Calculate the Current and Previous Fin Years",
 				"type": "Lookup",
 				"dependsOn": [],
@@ -19,7 +19,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\nDECLARE @T AS udf.INT_List\n\nINSERT INTO @T\nSELECT DISTINCT\n    ExchequerYear AS CurrentYear\nFROM \n    Exchequer.CompanyPeriods \nWHERE \n    PeriodReportDate = @CurrentPeriod\nORDER BY\n    ExchequerYear DESC\n\nSELECT\n    STRING_AGG (ExchequerYear, ',')  AS ExchequerYears\nFROM \n    (\n        SELECT \n            INT_Value - 1 AS ExchequerYear \n        FROM @T\n        UNION\n        SELECT \n            INT_Value\n        FROM @T\n    ) AS x",
+						"sqlReaderQuery": "DECLARE @Today AS DATE = '2026-01-01'\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\nDECLARE @T AS udf.INT_List\n\nINSERT INTO @T\nSELECT DISTINCT\n    ExchequerYear AS CurrentYear\nFROM \n    Exchequer.CompanyPeriods \nWHERE \n    PeriodReportDate = @CurrentPeriod\nORDER BY\n    ExchequerYear DESC\n\nSELECT \n    INT_Value - 1 AS ExchequerYear \nFROM @T\nUNION\nSELECT \n    INT_Value\nFROM @T",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
@@ -1406,14 +1406,9 @@
 			{
 				"name": "Set variable1",
 				"type": "SetVariable",
-				"dependsOn": [
-					{
-						"activity": "Current and Previous Year",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
+				"dependsOn": [],
 				"policy": {
 					"secureOutput": false,
 					"secureInput": false
@@ -1422,9 +1417,60 @@
 				"typeProperties": {
 					"variableName": "ExchequerYears",
 					"value": {
-						"value": "@activity('Current and Previous Year').output.value",
+						"value": "@activity('Current and Previous Year').output.firstRow.ExchequerYears",
 						"type": "Expression"
 					}
+				}
+			},
+			{
+				"name": "Get PartitionID and Delete",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Current and Previous Years",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Current and Previous Years').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Lookup Partition ID",
+							"type": "Lookup",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": "SELECT $PARTITION.pf_FinancialTransactions_ExchequerYear(@{item().ExchequerYear}) AS PartitionID",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"dataset": {
+									"referenceName": "DS_AH2_TRANSFORM_DB",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "n/a",
+										"Table": "n/a"
+									}
+								}
+							}
+						}
+					]
 				}
 			}
 		],
