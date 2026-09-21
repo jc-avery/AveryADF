@@ -4,8 +4,8 @@
 		"description": "The Details (Ledger) from Exchequer for the current and previous financial year",
 		"activities": [
 			{
-				"name": "Current and Previous Years",
-				"description": "Calculate the Current and Previous Fin Years",
+				"name": "Lookup Years and PartionIDs",
+				"description": "Calculate the Current and Previous Fin Years and the partitions for them",
 				"type": "Lookup",
 				"dependsOn": [],
 				"policy": {
@@ -19,7 +19,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "DECLARE @Today AS DATE = '2026-01-01'\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\nDECLARE @T AS udf.INT_List\n\nINSERT INTO @T\nSELECT DISTINCT\n    ExchequerYear AS CurrentYear\nFROM \n    Exchequer.CompanyPeriods \nWHERE \n    PeriodReportDate = @CurrentPeriod\nORDER BY\n    ExchequerYear DESC\n\nSELECT \n    INT_Value - 1 AS ExchequerYear \nFROM @T\nUNION\nSELECT \n    INT_Value\nFROM @T",
+						"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\nDECLARE @T AS udf.INT_List\n\nINSERT INTO @T\nSELECT DISTINCT\n    ExchequerYear AS CurrentYear\nFROM \n    Exchequer.CompanyPeriods \nWHERE \n    PeriodReportDate = @CurrentPeriod\nORDER BY\n    ExchequerYear DESC\n\nSELECT \n    ExchequerYear,\n    $PARTITION.pf_FinancialTransactions_ExchequerYear(ExchequerYear) AS PartitionID\nFROM\n(\n    SELECT \n        INT_Value - 1 AS ExchequerYear\n    FROM @T\n    UNION\n    SELECT \n        INT_Value\n    FROM @T\n) AS x",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
@@ -1404,30 +1404,36 @@
 				]
 			},
 			{
-				"name": "Set variable1",
+				"name": "Set ExchequerYears String",
 				"type": "SetVariable",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "Truncate Partition and Append Var",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"secureOutput": false,
 					"secureInput": false
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"variableName": "ExchequerYears",
+					"variableName": "ExchequerYearsString",
 					"value": {
-						"value": "@activity('Current and Previous Year').output.firstRow.ExchequerYears",
+						"value": "@join(variables('ExchequerYearsArray'), ',')",
 						"type": "Expression"
 					}
 				}
 			},
 			{
-				"name": "Get PartitionID and Delete",
+				"name": "Truncate Partition and Append Var",
+				"description": "Truncate Partitions, append exchequer years for string variable",
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "Current and Previous Years",
+						"activity": "Lookup Years and PartionIDs",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -1436,14 +1442,14 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@activity('Current and Previous Years').output.value",
+						"value": "@activity('Lookup Years and PartionIDs').output.value",
 						"type": "Expression"
 					},
 					"isSequential": true,
 					"activities": [
 						{
-							"name": "Lookup Partition ID",
-							"type": "Lookup",
+							"name": "Truncate Partitions",
+							"type": "Script",
 							"dependsOn": [],
 							"policy": {
 								"timeout": "0.12:00:00",
@@ -1453,32 +1459,901 @@
 								"secureInput": false
 							},
 							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "AH2_TRANSFORM_DB",
+								"type": "LinkedServiceReference"
+							},
 							"typeProperties": {
-								"source": {
-									"type": "AzureSqlSource",
-									"sqlReaderQuery": "SELECT $PARTITION.pf_FinancialTransactions_ExchequerYear(@{item().ExchequerYear}) AS PartitionID",
-									"queryTimeout": "02:00:00",
-									"partitionOption": "None"
-								},
-								"dataset": {
-									"referenceName": "DS_AH2_TRANSFORM_DB",
-									"type": "DatasetReference",
-									"parameters": {
-										"Schema": "n/a",
-										"Table": "n/a"
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "TRUNCATE TABLE Exchequer_Silver.FinancialTransactions\nWITH (PARTITIONS (@{item().PartitionID}))",
+											"type": "Expression"
+										}
 									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						},
+						{
+							"name": "Append Years",
+							"type": "AppendVariable",
+							"dependsOn": [
+								{
+									"activity": "Truncate Partitions",
+									"dependencyConditions": [
+										"Succeeded"
+									]
 								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ExchequerYearsArray",
+								"value": "@string(item().ExchequerYear)"
 							}
 						}
 					]
 				}
+			},
+			{
+				"name": "Load FinancialTransactions table",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set ExchequerYears String",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT \n    HD.HomeID\n\t,HD.IntranetID\n\t,HD.HomeName\n    ,Lines.ExchCompanyCode\n\n    ,P.ExchequerYear\n    ,P.PeriodYear\n    ,P.PeriodNo\n    ,YEAR(P.PeriodReportDate)                       AS CalendarYear\n    ,MONTH(P.PeriodReportDate)                      AS CalendarMonth\n    ,P.CalendarMonthLongName\n    ,P.CalendarFullDescription\n    ,P.PeriodReportDate\n    ,P.QuarterNo\n\n    ,Lines.tlFolioNum                               AS FolioNum\n    ,Lines.tlRunNo                                  AS RunNo\n    ,Lines.tlDocType                                AS DocType\n    ,CASE\n        WHEN Lines.tlDocType = 0 THEN 'Sales Invoice'\n        WHEN Lines.tlDocType = 1 THEN 'Sales Receipt'\n        WHEN Lines.tlDocType = 2 THEN 'Sales Credit Note'\n        WHEN Lines.tlDocType = 3 THEN 'Sales Journal Invoice'\n        WHEN Lines.tlDocType = 4 THEN 'Sales Journal Credit Note'\n        WHEN Lines.tlDocType = 15 THEN 'Purchase Invoice'\n        WHEN Lines.tlDocType = 16 THEN 'Purchase Payment'\n        WHEN Lines.tlDocType = 17 THEN 'Purchase Credit Note'\n        WHEN Lines.tlDocType = 18 THEN 'Purchase Journal Invoice'\n        WHEN Lines.tlDocType = 19 THEN 'Purchase Journal Credit Note'\n        WHEN Lines.tlDocType = 20 THEN 'Purchase Refund'\n        WHEN Lines.tlDocType = 21 THEN 'Purchase Payment with Invoice'\n        WHEN Lines.tlDocType = 22 THEN 'Purchase Quotation'\n        WHEN Lines.tlDocType = 30 THEN 'Nominal Transfer'\n        WHEN Lines.tlDocType = 31 THEN 'Control Record'\n        ELSE ''\n    END                                             AS DocTypeName\n    ,Lines.tlGLCode                                 AS GLCode\n    ,ISNULL(N.GLName, '')                           AS GLName\n    \n    ,TRY_CONVERT(DATE, Lines.tlLineDate)            AS LineDate\n    ,Lines.tlRecStatus                              AS RecStatus\n    ,TRY_CONVERT(DATE, Lines.tlReconciliationDate)  AS ReconciliationDate\n    ,Lines.tlOurRef                                 AS ExchequerRef\n\n    ,thYourRef AS YourRef\n\t,CASE WHEN Lines.tlDocType != 30 \n        THEN thLongYourRefTrans ELSE '' END         AS AltRef\n    ,CASE WHEN Lines.tlDocType = 30 \n        THEN thLongYourRefTrans ELSE '' END         AS JournalDesc\n    ,Header.thCustSupp                              AS CustSupp\n\n    ,Lines.tlAcCode                                 AS AcCode\n    ,ISNULL(CS.acCompany, '')                       AS AccountName\n    ,Lines.tlDescription                            AS LineDescription\n    ,Lines.tlQty                                    AS Qty\n    ,Lines.tlQtyMul                                 AS QtyMul\n    ,Lines.tlNetValue                               AS LineNetValue\n    ,Lines.tlDiscount                               AS LineDiscount\n    ,Lines.tlCurrency                               AS Currency\n    ,0.00 /*Lines.tlPreviousBalance */                   AS PreviousBalance\n    ,Lines.tlLineType                               AS LineType\n    ,Lines.tlLineNo                                 AS TransLineNo\n    ,Lines.tlVATCode                                AS LineVATCode\n    ,Lines.tlVATAmount                              AS LineVATAmount\n    ,Lines.tlPaymentCode                            AS PaymentCode\n    ,Lines.tlItemNo                                 AS ItemNo\n    ,Lines.tlJobCode                                AS JobCOde\n\n    ,TRY_CONVERT(DATE, Header.thCreationDate)       AS CreationDate\n    ,TRY_CONVERT(DATE, Header.thTransDate)          AS TransactionDate\n\t,TRY_CONVERT(DATE, Header.thDueDate)            AS DueDate\n    ,TRY_CONVERT(DATE, Header.thPostedDate)         AS PostedDate\n\n    ,Header.thNetValue                              AS DocumentNetValue\n    ,Header.thTotalVAT                              AS DocumentTotalVAT\n    ,Header.thAmountSettled                         AS DocumentAmountSettled\n    ,Header.thAuthorisedAmnt                        AS DocumentAuthorisedAmnt\n    ,Header.thTotalLineDiscount                     AS DocumentTotalLineDiscount\n    ,Header.thSettleDiscAmount                      AS DocumentSettleDiscAmount\n    ,Header.thTotalOrdered                          AS DocumentTotalOrdered\n    ,Header.thTotalOrderOS                          AS DocumentTotalOrderOS\n    ,Header.thRemitNo                               AS DocumentRemitNo\n\n\t,Header.thOriginator                            AS Originator\n    ,ISNULL(Originator.UserName, '')                AS OriginatorUserName\n\t,Header.thOperator                              AS Operator\n    ,ISNULL(Operator.UserName, '')                  AS OperatorUserName\n    \n    ,Lines.PositionId                               AS LinePositionId\n\t,Header.PositionId                              AS DocumentPositionId\n\n    ,'FolioNum'                                     AS HeaderJoinMethod\nFROM\n    Exchequer_Bronze.Details AS Lines\n\n    INNER JOIN Avery.HomeDetails AS HD\n        ON HD.ExchCode = Lines.ExchCompanyCode\n\n    INNER JOIN Exchequer_Bronze.Document AS Header \n        ON Header.thFolioNum = Lines.tlFolioNum\n        AND Header.ExchCompanyCode = Lines.ExchCompanyCode\n\n    LEFT JOIN Exchequer_Bronze.CustSupp AS CS\n        ON CS.acCode = Lines.tlAcCode\n        AND CS.ExchCompanyCode = Lines.ExchCompanyCode\n\n    LEFT JOIN Exchequer.CompanyPeriods AS P\n        ON P.ExchCompanyCode = Lines.ExchCompanyCode\n        AND P.ExchequerYear = Lines.tlYear\n        AND P.PeriodNo = Lines.tlPeriod\n\n    LEFT JOIN Exchequer.NominalCodes AS N\n        ON N.ExchCompanyCode = Lines.ExchCompanyCode\n        AND N.glCode = Lines.tlGLCode\n\n    LEFT JOIN Exchequer_Bronze.MlocStk AS Originator\n        ON Originator.ExchCompanyCode = Header.ExchCompanyCode\n        AND Originator.varCode1Trans1 = Header.thOriginator\n\n    LEFT JOIN Exchequer_Bronze.MlocStk AS Operator\n        ON Operator.ExchCompanyCode = Header.ExchCompanyCode\n        AND Operator.varCode1Trans1 = Header.thOperator\nWHERE\n    Lines.tlYear IN (@{variables('ExchequerYearsString')})\n\nUNION ALL\n\nSELECT \n    HD.HomeID\n\t,HD.IntranetID\n\t,HD.HomeName\n    ,Lines.ExchCompanyCode\n\n    ,P.ExchequerYear\n    ,P.PeriodYear\n    ,P.PeriodNo\n    ,YEAR(P.PeriodReportDate)                       AS CalendarYear\n    ,MONTH(P.PeriodReportDate)                      AS CalendarMonth\n    ,P.CalendarMonthLongName\n    ,P.CalendarFullDescription\n    ,P.PeriodReportDate\n    ,P.QuarterNo\n\n    ,Lines.tlFolioNum                               AS FolioNum\n    ,Lines.tlRunNo                                  AS RunNo\n    ,Lines.tlDocType                                AS DocType\n    ,CASE\n        WHEN Lines.tlDocType = 0 THEN 'Sales Invoice'\n        WHEN Lines.tlDocType = 1 THEN 'Sales Receipt'\n        WHEN Lines.tlDocType = 2 THEN 'Sales Credit Note'\n        WHEN Lines.tlDocType = 3 THEN 'Sales Journal Invoice'\n        WHEN Lines.tlDocType = 4 THEN 'Sales Journal Credit Note'\n        WHEN Lines.tlDocType = 15 THEN 'Purchase Invoice'\n        WHEN Lines.tlDocType = 16 THEN 'Purchase Payment'\n        WHEN Lines.tlDocType = 17 THEN 'Purchase Credit Note'\n        WHEN Lines.tlDocType = 18 THEN 'Purchase Journal Invoice'\n        WHEN Lines.tlDocType = 19 THEN 'Purchase Journal Credit Note'\n        WHEN Lines.tlDocType = 20 THEN 'Purchase Refund'\n        WHEN Lines.tlDocType = 21 THEN 'Purchase Payment with Invoice'\n        WHEN Lines.tlDocType = 22 THEN 'Purchase Quotation'\n        WHEN Lines.tlDocType = 30 THEN 'Nominal Transfer'\n        WHEN Lines.tlDocType = 31 THEN 'Control Record'\n        ELSE ''\n    END                                             AS DocTypeName\n    ,Lines.tlGLCode                                 AS GLCode\n    ,ISNULL(N.GLName, '')                           AS GLName\n    \n    ,'1900-01-01' /*TRY_CONVERT(DATE, Lines.tlLineDate)*/           AS LineDate\n    ,Lines.tlRecStatus                              AS RecStatus\n    ,TRY_CONVERT(DATE, Lines.tlReconciliationDate)  AS ReconciliationDate\n    ,Lines.tlOurRef                                 AS ExchequerRef\n\n    ,thYourRef AS YourRef\n\t,CASE WHEN Lines.tlDocType != 30 \n        THEN thLongYourRefTrans ELSE '' END         AS AltRef\n    ,CASE WHEN Lines.tlDocType = 30 \n        THEN thLongYourRefTrans ELSE '' END         AS JournalDesc\n    ,Header.thCustSupp                              AS CustSupp\n\n    ,Lines.tlAcCode                                 AS AcCode\n    ,ISNULL(CS.acCompany, '')                       AS AccountName\n    ,Lines.tlDescription                            AS LineDescription\n    ,Lines.tlQty                                    AS Qty\n    ,Lines.tlQtyMul                                 AS QtyMul\n    ,Lines.tlNetValue                               AS LineNetValue\n    ,Lines.tlDiscount                               AS LineDiscount\n    ,Lines.tlCurrency                               AS Currency\n    ,0.00 /*Lines.tlPreviousBalance */                    AS PreviousBalance\n    ,Lines.tlLineType                               AS LineType\n    ,Lines.tlLineNo                                 AS TransLineNo\n    ,Lines.tlVATCode                                AS LineVATCode\n    ,Lines.tlVATAmount                              AS LineVATAmount\n    ,Lines.tlPaymentCode                            AS PaymentCode\n    ,Lines.tlItemNo                                 AS ItemNo\n    ,Lines.tlJobCode                                AS JobCOde\n\n    ,TRY_CONVERT(DATE, Header.thCreationDate)       AS CreationDate\n    ,TRY_CONVERT(DATE, Header.thTransDate)          AS TransactionDate\n\t,TRY_CONVERT(DATE, Header.thDueDate)            AS DueDate\n    ,TRY_CONVERT(DATE, Header.thPostedDate)         AS PostedDate\n\n    ,Header.thNetValue                              AS DocumentNetValue\n    ,Header.thTotalVAT                              AS DocumentTotalVAT\n    ,Header.thAmountSettled                         AS DocumentAmountSettled\n    ,Header.thAuthorisedAmnt                        AS DocumentAuthorisedAmnt\n    ,Header.thTotalLineDiscount                     AS DocumentTotalLineDiscount\n    ,Header.thSettleDiscAmount                      AS DocumentSettleDiscAmount\n    ,Header.thTotalOrdered                          AS DocumentTotalOrdered\n    ,Header.thTotalOrderOS                          AS DocumentTotalOrderOS\n    ,Header.thRemitNo                               AS DocumentRemitNo\n\n\t,Header.thOriginator                            AS Originator\n    ,ISNULL(Originator.UserName, '')                AS OriginatorUserName\n\t,Header.thOperator                              AS Operator\n    ,ISNULL(Operator.UserName, '')                  AS OperatorUserName\n    \n    ,Lines.PositionId                               AS LinePositionId\n\t,Header.PositionId                              AS DocumentPositionId       \n\n    ,'OurRef' AS HeaderJoinMethod            \nFROM\n    Exchequer_Bronze.Details AS Lines\n\n    INNER JOIN Avery.HomeDetails AS HD\n        ON HD.ExchCode = Lines.ExchCompanyCode\n\n    INNER JOIN Exchequer_Bronze.Document AS Header\n        ON Header.ExchCompanyCode = Lines.ExchCompanyCode\n       AND Header.thOurRef = Lines.tlOurRef\n\n    LEFT JOIN Exchequer_Bronze.CustSupp AS CS\n        ON CS.acCode = Lines.tlAcCode\n        AND CS.ExchCompanyCode = Lines.ExchCompanyCode\n\n    LEFT JOIN Exchequer.CompanyPeriods AS P\n        ON P.ExchCompanyCode = Lines.ExchCompanyCode\n        AND P.ExchequerYear = Lines.tlYear\n        AND P.PeriodNo = Lines.tlPeriod\n\n    LEFT JOIN Exchequer.NominalCodes AS N\n        ON N.ExchCompanyCode = Lines.ExchCompanyCode\n        AND N.glCode = Lines.tlGLCode\n\n    LEFT JOIN Exchequer_Bronze.MlocStk AS Originator\n        ON Originator.ExchCompanyCode = Header.ExchCompanyCode\n        AND Originator.varCode1Trans1 = Header.thOriginator\n\n    LEFT JOIN Exchequer_Bronze.MlocStk AS Operator\n        ON Operator.ExchCompanyCode = Header.ExchCompanyCode\n        AND Operator.varCode1Trans1 = Header.thOperator\nWHERE\n    Lines.tlYear IN (@{variables('ExchequerYearsString')})  \n    AND Lines.tlGLCode > 0\n    AND Lines.tlFolioNum = 0\n    AND(\n        Lines.tlCurrency != 0\n        OR\n\t\t    (\n\t\t    Lines.tlCurrency = 0\n\t\t    AND Lines.tlGLCode = 83050\n\t\t    )\n\t    OR\n\t\t    (\n\t\t    Lines.tlCurrency = 0\n\t\t    AND Lines.tlGLCode = 83045\n\t\t    )\n        )",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "HomeID",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "HomeID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "IntranetID",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "IntranetID",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "HomeName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "HomeName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ExchCompanyCode",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "ExchCompanyCode",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ExchequerYear",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "ExchequerYear",
+									"type": "Int16",
+									"physicalType": "smallint"
+								}
+							},
+							{
+								"source": {
+									"name": "PeriodYear",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "PeriodYear",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "PeriodNo",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "PeriodNo",
+									"type": "Byte",
+									"physicalType": "tinyint"
+								}
+							},
+							{
+								"source": {
+									"name": "CalendarYear",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "CalendarYear",
+									"type": "Int16",
+									"physicalType": "smallint"
+								}
+							},
+							{
+								"source": {
+									"name": "CalendarMonth",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "CalendarMonth",
+									"type": "Byte",
+									"physicalType": "tinyint"
+								}
+							},
+							{
+								"source": {
+									"name": "CalendarMonthLongName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "CalendarMonthLongName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "CalendarFullDescription",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "CalendarFullDescription",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "PeriodReportDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "PeriodReportDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "QuarterNo",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "QuarterNo",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "FolioNum",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "FolioNum",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "RunNo",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "RunNo",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "DocType",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "DocType",
+									"type": "Byte",
+									"physicalType": "tinyint"
+								}
+							},
+							{
+								"source": {
+									"name": "DocTypeName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "DocTypeName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "GLCode",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "GLCode",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "GLName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "GLName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "LineDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "LineDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "RecStatus",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "RecStatus",
+									"type": "Byte",
+									"physicalType": "tinyint"
+								}
+							},
+							{
+								"source": {
+									"name": "ReconciliationDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "ReconciliationDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "ExchequerRef",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "ExchequerRef",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "YourRef",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "YourRef",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AltRef",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "AltRef",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "JournalDesc",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "JournalDesc",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "CustSupp",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "CustSupp",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AcCode",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "AcCode",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "AccountName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "AccountName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "LineDescription",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "LineDescription",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Qty",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "Qty",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "QtyMul",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "QtyMul",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "LineNetValue",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "LineNetValue",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "LineDiscount",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "LineDiscount",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "Currency",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "Currency",
+									"type": "Byte",
+									"physicalType": "tinyint"
+								}
+							},
+							{
+								"source": {
+									"name": "PreviousBalance",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 2,
+									"precision": 2
+								},
+								"sink": {
+									"name": "PreviousBalance",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "LineType",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "LineType",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "TransLineNo",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "TransLineNo",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "LineVATCode",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "LineVATCode",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "LineVATAmount",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "LineVATAmount",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "PaymentCode",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "PaymentCode",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "ItemNo",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "ItemNo",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "JobCOde",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "JobCode",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "CreationDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "DocumentCreationDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "TransactionDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "DocumentTransactionDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "DueDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "DocumentDueDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "PostedDate",
+									"type": "Date",
+									"physicalType": "date"
+								},
+								"sink": {
+									"name": "DocumentPostedDate",
+									"type": "Date",
+									"physicalType": "date"
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentNetValue",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentNetValue",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentTotalVAT",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentTotalVAT",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentAmountSettled",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentAmountSettled",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentAuthorisedAmnt",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentAuthorisedAmnt",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentTotalLineDiscount",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentTotalLineDiscount",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentSettleDiscAmount",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentSettleDiscAmount",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentTotalOrdered",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentTotalOrdered",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentTotalOrderOS",
+									"type": "Double",
+									"physicalType": "float"
+								},
+								"sink": {
+									"name": "DocumentTotalOrderOS",
+									"type": "Decimal",
+									"physicalType": "decimal",
+									"scale": 4,
+									"precision": 18
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentRemitNo",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "DocumentRemitNo",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Originator",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "Originator",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "OriginatorUserName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "OriginatorUserName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Operator",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "Operator",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "OperatorUserName",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "OperatorUserName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "LinePositionId",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "LinePositionId",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "DocumentPositionId",
+									"type": "Int32",
+									"physicalType": "int"
+								},
+								"sink": {
+									"name": "DocumentPositionId",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "HeaderJoinMethod",
+									"type": "String",
+									"physicalType": "varchar"
+								},
+								"sink": {
+									"name": "HeaderJoinMethod",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Exchequer_Silver",
+							"Table": "FinancialTransactions"
+						}
+					}
+				]
 			}
 		],
 		"variables": {
 			"Exch_Schema": {
 				"type": "String"
 			},
-			"ExchequerYears": {
+			"ExchequerYearsArray": {
+				"type": "Array"
+			},
+			"ExchequerYearsString": {
 				"type": "String"
 			}
 		},
