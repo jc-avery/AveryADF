@@ -6,12 +6,645 @@
 			"type": "string",
 			"metadata": "Data Factory name",
 			"defaultValue": "Avery-ADF"
+		},
+		"AveryblobFileShare_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AveryblobFileShare'"
+		},
+		"AveryblobStorageAccount_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AveryblobStorageAccount'"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_OnPrem_Exchequer')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "OnPrem_Exchequer_Avery_DC",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"Schema": {
+						"type": "string"
+					},
+					"Table": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "OnPrem"
+				},
+				"annotations": [],
+				"type": "SqlServerTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().Schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().Table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/FusionMySQL')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "OnPremFusionMySQL",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"TableName": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Fusion"
+				},
+				"annotations": [],
+				"type": "MySqlTable",
+				"schema": [],
+				"typeProperties": {
+					"tableName": {
+						"value": "@dataset().TableName",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobFileShare')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureFileStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AveryblobFileShare_connectionString')]",
+					"fileShare": "averyblobfileshare"
+				},
+				"connectVia": {
+					"referenceName": "AveryVirtualNetworkIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AveryblobStorageAccount')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobStorage",
+				"typeProperties": {
+					"connectionString": "[parameters('AveryblobStorageAccount_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AveryVirtualNetworkIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_2am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Every day at 2am",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_YourHIppo_UniqueResults",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2024-03-12T16:04:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								2
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DF_SoftWorks_JSON_Employee')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB_SoftWorks_Employee_JSON",
+								"type": "DatasetReference"
+							},
+							"name": "EmployeeJSONTable"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB_SoftWorks_Clockings_JSON",
+								"type": "DatasetReference"
+							},
+							"name": "ClockingsJSONTable"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB_SoftWorks_Employee",
+								"type": "DatasetReference"
+							},
+							"name": "EmployeeTable"
+						},
+						{
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB_SoftWorks_Clockings",
+								"type": "DatasetReference"
+							},
+							"name": "ClockingsTable"
+						}
+					],
+					"transformations": [
+						{
+							"name": "EmployeeDateConversion"
+						},
+						{
+							"name": "EmployeeUpsertCondition",
+							"description": "Upsert condition set to always be true so all fields are updated with latest values and any new records are inserted. The Key column used to check for upsert is the EmployeeNumber and is set on the sink task and "
+						},
+						{
+							"name": "ClockingsDateConversion"
+						},
+						{
+							"name": "ClockingsUpsertCondition"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          department as string,",
+						"          clockNumber as string,",
+						"          clocking as string,",
+						"          dateOfBirth as string,",
+						"          dateStarted as string,",
+						"          dateTerminated as string,",
+						"          firstname as string,",
+						"          surname as string,",
+						"          employeeName as string,",
+						"          employeeNumber as string,",
+						"          employeeEmail as string,",
+						"          employeeStatus as string,",
+						"          salary as string,",
+						"          roster as string,",
+						"          hourlyRate as string,",
+						"          payType as string,",
+						"          payNumber as string,",
+						"          masterPolicy as string,",
+						"          supervisorName as string,",
+						"          employeeCostCentre as string,",
+						"          allocationGroup as string,",
+						"          shiftlessPattern as string,",
+						"          defaultBalanceCategory as string,",
+						"          employeeGender as string,",
+						"          healthcareBankGroup as string,",
+						"          healthcareBankStatus as string,",
+						"          selfRosteringGroup as string,",
+						"          nextofKinContact as string,",
+						"          {nextofKinTel.Number} as string,",
+						"          nextofKinRelationship as string,",
+						"          telephoneNo as string,",
+						"          username as string,",
+						"          nameAsSupervisor as string,",
+						"          address1 as string,",
+						"          address2 as string,",
+						"          address3 as string,",
+						"          address4 as string,",
+						"          postcode as string,",
+						"          nINumber as string,",
+						"          accountName as string,",
+						"          sortCode as string,",
+						"          accountNumber as string,",
+						"          item as string,",
+						"          notes as string,",
+						"          documentReference as string,",
+						"          documentName as string,",
+						"          jobTitle as string,",
+						"          sickLeaveEntitlement as string,",
+						"          holidayEntitlement as string,",
+						"          modeofTransport as string,",
+						"          homeLegalName as string,",
+						"          reviewDate as string,",
+						"          isSupervisor as string,",
+						"          salaried as string,",
+						"          costCentre as string,",
+						"          deptExportCode as string,",
+						"          deptImportCode as string,",
+						"          comments as string,",
+						"          softworksID as string,",
+						"          SourceFileName as string,",
+						"          RowID as integer",
+						"     ),",
+						"     allowSchemaDrift: false,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> EmployeeJSONTable",
+						"source(output(",
+						"          empNo as string,",
+						"          clockId as string,",
+						"          absId as string,",
+						"          deptId as string,",
+						"          jobId as string,",
+						"          projId as string,",
+						"          absoluteClockTime as string,",
+						"          clockType as string,",
+						"          clocDate as string,",
+						"          clockTime as string,",
+						"          seconds as string,",
+						"          effectiveDate as string,",
+						"          clockDuration as string,",
+						"          application as string,",
+						"          sourceType as long,",
+						"          sourceData as string,",
+						"          sourceEdit as string,",
+						"          sourceClockingType as string,",
+						"          longitude as string,",
+						"          latitude as string,",
+						"          accuracy as string,",
+						"          decision as string,",
+						"          delCode as string,",
+						"          userId as string,",
+						"          dateEntered as string,",
+						"          deleted as string,",
+						"          duplicate as string,",
+						"          ignore as string,",
+						"          inOut as string,",
+						"          inClocking as string,",
+						"          outClocking as string,",
+						"          isActive as string,",
+						"          new as string,",
+						"          standard as string,",
+						"          overtime as string,",
+						"          callIn as string,",
+						"          clockFlag as string,",
+						"          edited as string,",
+						"          calcInsert as string,",
+						"          infringe as string,",
+						"          previous as string,",
+						"          problem as string,",
+						"          twUser as string,",
+						"          shiftMove as string,",
+						"          showFlags as string,",
+						"          showLongFlags as string,",
+						"          isOverMidnight as string,",
+						"          deviceTime as long,",
+						"          TimeZone as string,",
+						"          TimeZoneCod as long,",
+						"          PrevAbsTime as long,",
+						"          ReasonId as string,",
+						"          Comments as string,",
+						"          ApprovalState as string,",
+						"          ApprovalStateCaption as string,",
+						"          PrevApprovalState as string,",
+						"          LocationText as string,",
+						"          LocationEditText as string,",
+						"          LocationTextExtended as string,",
+						"          Offline as string,",
+						"          AttachedDocumentId as string,",
+						"          AssumedId as string,",
+						"          SourceFileName as string,",
+						"          RowID as integer",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     format: 'table') ~> ClockingsJSONTable",
+						"EmployeeJSONTable derive(dateOfBirth = substring(dateOfBirth, 5, 4) + '-' + substring(dateOfBirth, 3, 2) + '-' + substring(dateOfBirth, 1, 2),",
+						"          dateStarted = case(substring(dateStarted, 5, 2) > substring(toString(year(currentUTC())), 3, 2), '19' + substring(dateStarted, 5, 2) + '-' + substring(dateStarted, 3, 2) + '-' + substring(dateStarted, 1, 2), '20' + substring(dateStarted, 5, 2) + '-' + substring(dateStarted, 3, 2) + '-' + substring(dateStarted, 1, 2)),",
+						"          dateTerminated = case(dateTerminated=='301299', '2099-12-30', '20' + substring(dateTerminated, 5, 2) + '-' + substring(dateTerminated, 3, 2) + '-' + substring(dateTerminated, 1, 2)),",
+						"          reviewDate = case(reviewDate == '', '1900-01-01', substring(reviewDate, 5, 4) + '-' + substring(reviewDate, 3, 2) + '-' + substring(reviewDate, 1, 2)),",
+						"          RowTimeStamp = currentUTC()) ~> EmployeeDateConversion",
+						"EmployeeDateConversion alterRow(upsertIf(true())) ~> EmployeeUpsertCondition",
+						"ClockingsJSONTable derive(ClockDateCon = substring(clocDate, 5, 4) + '-' + substring(clocDate, 3, 2) + '-' + substring(clocDate, 1, 2),",
+						"          EffectiveDateCon = substring(effectiveDate, 5, 4) + '-' + substring(effectiveDate, 3, 2) + '-' + substring(effectiveDate, 1, 2),",
+						"          DateEnteredCon = substring(dateEntered, 5, 4) + '-' + substring(dateEntered, 3, 2) + '-' + substring(dateEntered, 1, 2),",
+						"          ClockTimeCon = toTimestamp(clockTime, 'HH:mm')) ~> ClockingsDateConversion",
+						"ClockingsDateConversion alterRow(upsertIf(true())) ~> ClockingsUpsertCondition",
+						"EmployeeUpsertCondition sink(allowSchemaDrift: false,",
+						"     validateSchema: false,",
+						"     input(",
+						"          Department as string,",
+						"          ClockNumber as string,",
+						"          Clocking as string,",
+						"          DateOfBirth as date,",
+						"          DateStarted as date,",
+						"          DateTerminated as date,",
+						"          Firstname as string,",
+						"          Surname as string,",
+						"          EmployeeName as string,",
+						"          EmployeeNumber as string,",
+						"          EmployeeEmail as string,",
+						"          EmployeeStatus as string,",
+						"          Salary as string,",
+						"          Roster as string,",
+						"          HourlyRate as decimal(8,2),",
+						"          PayType as string,",
+						"          PayNumber as string,",
+						"          MasterPolicy as string,",
+						"          SupervisorName as string,",
+						"          EmployeeCostCentre as string,",
+						"          AllocationGroup as string,",
+						"          ShiftlessPattern as string,",
+						"          DefaultBalanceCategory as string,",
+						"          EmployeeGender as string,",
+						"          HealthcareBankGroup as string,",
+						"          HealthcareBankStatus as string,",
+						"          SelfRosteringGroup as string,",
+						"          NextofKinContact as string,",
+						"          NextofKinTelNumber as string,",
+						"          NextofKinRelationship as string,",
+						"          TelephoneNo as string,",
+						"          Username as string,",
+						"          NameAsSupervisor as string,",
+						"          Address1 as string,",
+						"          Address2 as string,",
+						"          Address3 as string,",
+						"          Address4 as string,",
+						"          Postcode as string,",
+						"          NINumber as string,",
+						"          AccountName as string,",
+						"          SortCode as string,",
+						"          AccountNumber as string,",
+						"          Item as string,",
+						"          Notes as string,",
+						"          DocumentReference as string,",
+						"          DocumentName as string,",
+						"          JobTitle as string,",
+						"          SickLeaveEntitlement as string,",
+						"          HolidayEntitlement as string,",
+						"          ModeofTransport as string,",
+						"          HomeLegalName as string,",
+						"          ReviewDate as date,",
+						"          IsSupervisor as boolean,",
+						"          Salaried as boolean,",
+						"          CostCentre as string,",
+						"          DeptExportCode as string,",
+						"          DeptImportCode as string,",
+						"          Comments as string,",
+						"          SoftworksID as string,",
+						"          SourceFileName as string,",
+						"          RowTimeStamp as timestamp,",
+						"          RowID as integer",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:false,",
+						"     upsertable:true,",
+						"     keys:['EmployeeNumber'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          Department = department,",
+						"          ClockNumber = clockNumber,",
+						"          Clocking = clocking,",
+						"          DateOfBirth = dateOfBirth,",
+						"          DateStarted = dateStarted,",
+						"          DateTerminated = dateTerminated,",
+						"          Firstname = firstname,",
+						"          Surname = surname,",
+						"          EmployeeName = employeeName,",
+						"          EmployeeNumber = employeeNumber,",
+						"          EmployeeEmail = employeeEmail,",
+						"          EmployeeStatus = employeeStatus,",
+						"          Salary = salary,",
+						"          Roster = roster,",
+						"          HourlyRate = hourlyRate,",
+						"          PayType = payType,",
+						"          PayNumber = payNumber,",
+						"          MasterPolicy = masterPolicy,",
+						"          SupervisorName = supervisorName,",
+						"          EmployeeCostCentre = employeeCostCentre,",
+						"          AllocationGroup = allocationGroup,",
+						"          ShiftlessPattern = shiftlessPattern,",
+						"          DefaultBalanceCategory = defaultBalanceCategory,",
+						"          EmployeeGender = employeeGender,",
+						"          HealthcareBankGroup = healthcareBankGroup,",
+						"          HealthcareBankStatus = healthcareBankStatus,",
+						"          SelfRosteringGroup = selfRosteringGroup,",
+						"          NextofKinContact = nextofKinContact,",
+						"          NextofKinTelNumber = {nextofKinTel.Number},",
+						"          NextofKinRelationship = nextofKinRelationship,",
+						"          TelephoneNo = telephoneNo,",
+						"          Username = username,",
+						"          NameAsSupervisor = nameAsSupervisor,",
+						"          Address1 = address1,",
+						"          Address2 = address2,",
+						"          Address3 = address3,",
+						"          Address4 = address4,",
+						"          Postcode = postcode,",
+						"          NINumber = nINumber,",
+						"          AccountName = accountName,",
+						"          SortCode = sortCode,",
+						"          AccountNumber = accountNumber,",
+						"          Item = item,",
+						"          Notes = notes,",
+						"          DocumentReference = documentReference,",
+						"          DocumentName = documentName,",
+						"          JobTitle = jobTitle,",
+						"          SickLeaveEntitlement = sickLeaveEntitlement,",
+						"          HolidayEntitlement = holidayEntitlement,",
+						"          ModeofTransport = modeofTransport,",
+						"          HomeLegalName = homeLegalName,",
+						"          ReviewDate = reviewDate,",
+						"          IsSupervisor = isSupervisor,",
+						"          Salaried = salaried,",
+						"          CostCentre = costCentre,",
+						"          DeptExportCode = deptExportCode,",
+						"          DeptImportCode = deptImportCode,",
+						"          Comments = comments,",
+						"          SoftworksID = softworksID,",
+						"          SourceFileName,",
+						"          RowTimeStamp",
+						"     )) ~> EmployeeTable",
+						"ClockingsUpsertCondition sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     input(",
+						"          EmpNo as integer,",
+						"          ClockId as string,",
+						"          AbsId as string,",
+						"          DeptId as string,",
+						"          JobId as string,",
+						"          ProjId as string,",
+						"          AbsoluteClockTime as string,",
+						"          ClockType as string,",
+						"          ClockDate as date,",
+						"          ClockTime as timestamp,",
+						"          Seconds as string,",
+						"          EffectiveDate as date,",
+						"          ClockDuration as string,",
+						"          Application as string,",
+						"          SourceType as long,",
+						"          SourceData as string,",
+						"          SourceEdit as string,",
+						"          SourceClockingType as string,",
+						"          Longitude as string,",
+						"          Latitude as string,",
+						"          Accuracy as string,",
+						"          Decision as string,",
+						"          DelCode as string,",
+						"          UserId as string,",
+						"          DateEntered as date,",
+						"          Deleted as string,",
+						"          Duplicate as string,",
+						"          Ignore as string,",
+						"          InOut as string,",
+						"          InClocking as string,",
+						"          OutClocking as string,",
+						"          IsActive as string,",
+						"          New as string,",
+						"          Standard as string,",
+						"          Overtime as string,",
+						"          CallIn as string,",
+						"          ClockFlag as string,",
+						"          Edited as string,",
+						"          CalcInsert as string,",
+						"          Infringe as string,",
+						"          Previous as string,",
+						"          Problem as string,",
+						"          TwUser as string,",
+						"          ShiftMove as string,",
+						"          ShowFlags as string,",
+						"          ShowLongFlags as string,",
+						"          IsOverMidnight as string,",
+						"          DeviceTime as long,",
+						"          TimeZone as string,",
+						"          TimeZoneCod as long,",
+						"          PrevAbsTime as long,",
+						"          ReasonId as string,",
+						"          Comments as string,",
+						"          ApprovalState as string,",
+						"          ApprovalStateCaption as string,",
+						"          PrevApprovalState as string,",
+						"          LocationText as string,",
+						"          LocationEditText as string,",
+						"          LocationTextExtended as string,",
+						"          Offline as string,",
+						"          AttachedDocumentId as string,",
+						"          AssumedId as string,",
+						"          SourceFileName as string,",
+						"          RowID as integer",
+						"     ),",
+						"     deletable:false,",
+						"     insertable:false,",
+						"     updateable:false,",
+						"     upsertable:true,",
+						"     keys:['EmpNo','ClockId','AbsId','JobId','AbsoluteClockTime'],",
+						"     format: 'table',",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     errorHandlingOption: 'stopOnFirstError',",
+						"     mapColumn(",
+						"          EmpNo = empNo,",
+						"          ClockId = clockId,",
+						"          AbsId = absId,",
+						"          DeptId = deptId,",
+						"          JobId = jobId,",
+						"          ProjId = projId,",
+						"          AbsoluteClockTime = absoluteClockTime,",
+						"          ClockType = clockType,",
+						"          ClockDate = ClockDateCon,",
+						"          ClockTime = ClockTimeCon,",
+						"          Seconds = seconds,",
+						"          EffectiveDate = EffectiveDateCon,",
+						"          ClockDuration = clockDuration,",
+						"          Application = application,",
+						"          SourceType = sourceType,",
+						"          SourceData = sourceData,",
+						"          SourceEdit = sourceEdit,",
+						"          SourceClockingType = sourceClockingType,",
+						"          Longitude = longitude,",
+						"          Latitude = latitude,",
+						"          Accuracy = accuracy,",
+						"          Decision = decision,",
+						"          DelCode = delCode,",
+						"          UserId = userId,",
+						"          DateEntered = DateEnteredCon,",
+						"          Deleted = deleted,",
+						"          Duplicate = duplicate,",
+						"          Ignore = ignore,",
+						"          InOut = inOut,",
+						"          InClocking = inClocking,",
+						"          OutClocking = outClocking,",
+						"          IsActive = isActive,",
+						"          New = new,",
+						"          Standard = standard,",
+						"          Overtime = overtime,",
+						"          CallIn = callIn,",
+						"          ClockFlag = clockFlag,",
+						"          Edited = edited,",
+						"          CalcInsert = calcInsert,",
+						"          Infringe = infringe,",
+						"          Previous = previous,",
+						"          Problem = problem,",
+						"          TwUser = twUser,",
+						"          ShiftMove = shiftMove,",
+						"          ShowFlags = showFlags,",
+						"          ShowLongFlags = showLongFlags,",
+						"          IsOverMidnight = isOverMidnight,",
+						"          DeviceTime = deviceTime,",
+						"          TimeZone,",
+						"          TimeZoneCod,",
+						"          PrevAbsTime,",
+						"          ReasonId,",
+						"          Comments,",
+						"          ApprovalState,",
+						"          ApprovalStateCaption,",
+						"          PrevApprovalState,",
+						"          LocationText,",
+						"          LocationEditText,",
+						"          LocationTextExtended,",
+						"          Offline,",
+						"          AttachedDocumentId,",
+						"          AssumedId,",
+						"          SourceFileName",
+						"     )) ~> ClockingsTable"
+					]
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/DF_Sona_Absences_Flatten')]",
 			"type": "Microsoft.DataFactory/factories/dataflows",
@@ -132,6 +765,1106 @@
 						"     )) ~> InsertAbsenceLinkedShifts"
 					]
 				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_Delete_Insert_PreviousYear')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Used to update Exchequer.Details table used in the GL Hist Report",
+				"activities": [
+					{
+						"name": "For Each Company Delete Current Year Data",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Company List And Previous Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Company List And Previous Year').output.value",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"batchCount": 10,
+							"activities": [
+								{
+									"name": "Delete Previous Year",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "EXEC Exchequer.DeleteDetails$CompanyAndYear @tlYear = @{item().ExchequerYear}, @ExchCompanyCode = '@{item().ExchCode}'",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Insert Previous Year Data",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "Delete Previous Year",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderQuery": {
+												"value": "SELECT\n\tL.ExchCompanyCode\n\t,HD.HomeID AS HomeID\n\t,HD.IntranetID AS IntranetID\n\t,HD.Homename AS Homename\n\t,L.[tlFolioNum]\n\t,L.[tlLineNo]\n\t,L.[tlRunNo]\n\t,L.[tlGLCode]\n    ,NominalCodes.glName AS GL_Name\n\t,L.[tlNominalMode]\n\t,L.[tlCurrency]\n    ,CompanyPeriods.PeriodReportDate\n\t,L.[tlYear]\n    ,CompanyPeriods.[PeriodYear]\n\t,L.[tlPeriod]\n    ,CompanyPeriods.CalendarMonthLongName\n    ,CalendarFullDescription\n    ,H.[thCreationDate]\n    ,H.[thPostedDate]\n\t,L.[tlDepartment]\n\t,L.[tlCostCentre]\n\t,L.[tlDocType]\n\t,L.[tlQty]\n\t,L.[tlQtyMul]\n\t,L.[tlNetValue]\n\t,L.[tlDiscount]\n\t,L.[tlVATCode]\n\t,L.[tlVATAmount]\n\t,L.[tlPaymentCode]\n\t,L.[tlOldPBal]\n\t,L.[tlRecStatus]\n\t,L.[tlDiscFlag]\n\t,L.[tlQtyWOFF]\n\t,L.[tlQtyDel]\n\t,L.[tlCost]\n\t,L.[tlAcCode]\n\t,L.[tlLineDate]\n\t,L.[tlItemNo]\n\t,L.[tlDescription]\n\t,L.[tlJobCode]\n\t,L.[tlAnalysisCode]\n\t,L.[tlOurRef]\n\t,L.[tlPreviousBalance]\n\t,L.[PositionId] AS DetailsPositionId\n\t,H.thYourRef\n\t,H.thLongYourRefTrans\n\t,H.thOurRef\n\t,H.thDueDate\n\t,H.PositionId AS DocumentPositionId\n\t,H.thOriginator --Entry?\n\t,H.thOperator --Posted by?\nFROM \n\tExchequer_Bronze.DETAILS AS L\n\n\tLEFT JOIN Exchequer_Bronze.DOCUMENT AS H\n\t\tON H.thOurRef = L.tlOurRef\n        AND H.ExchCompanyCode = L.ExchCompanyCode\n\n    LEFT JOIN Avery.HomeDetails AS HD\n        ON HD.ExchCode = L.ExchCompanyCode\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = L.ExchCompanyCode\n        AND CompanyPeriods.ExchequerYear = L.tlYear\n        AND CompanyPeriods.PeriodNo = L.tlPeriod\n\n    LEFT JOIN Exchequer.NominalCodes\n        ON NominalCodes.glCode = L.tlGLCode\n        AND NominalCodes.ExchCompanyCode = L.ExchCompanyCode\nWHERE \n\t L.tlYear = '@{item().ExchequerYear}'\n\t AND L.ExchCompanyCode = '@{item().ExchCode}'\n     AND L.tlGLCode > 0\n\t--Exclude rows with 0 tlCurrency, but include \n\t--those with 0 tlCurrency and tlGLCode 83050\n\t AND (\n\t\tL.tlCurrency != 0\n\t\tOR\n\t\t\t(\n\t\t\tL.tlCurrency = 0\n\t\t\tAND L.tlGLCode = 83050\n\t\t\t)\n\t\tOR\n\t\t\t(\n\t\t\tL.tlCurrency = 0\n\t\t\tAND L.tlGLCode = 83045\n\t\t\t)\n\t\t)\n\n        --2:08\n        --711 229\nORDER BY\n    L.tlYear ASC,\n    L.tlPeriod ASC,\n    L.ExchCompanyCode ASC",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false,
+											"disableMetricsCollection": false
+										},
+										"enableStaging": false,
+										"parallelCopies": 2,
+										"dataIntegrationUnits": 8,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "ExchCompanyCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "HomeID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "IntranetID",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "IntranetID",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "Homename",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "Homename",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlOurRef",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlOurRef",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thYourRef",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thYourRef",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thLongYourRefTrans",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thLongYourRefTrans",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlFolioNum",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlFolioNum",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlLineNo",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlLineNo",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlRunNo",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlRunNo",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlGLCode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlGLCode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "GL_Name",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "GL_Name",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlNominalMode",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlNominalMode",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlCurrency",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlCurrency",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "PeriodReportDate",
+														"type": "Date",
+														"physicalType": "date"
+													},
+													"sink": {
+														"name": "PeriodReportDate",
+														"type": "Date",
+														"physicalType": "date"
+													}
+												},
+												{
+													"source": {
+														"name": "tlYear",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlYear",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "PeriodYear",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "CalendarYear",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlPeriod",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlPeriod",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "CalendarMonthLongName",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "CalendarMonth",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "CalendarFullDescription",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "CalendarFullDescription",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thCreationDate",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thCreationDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thPostedDate",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thPostedDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlLineDate",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlLineDate",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDepartment",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlDepartment",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlCostCentre",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlCostCentre",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDocType",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlDocType",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQty",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQty",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQtyMul",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQtyMul",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlNetValue",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlNetValue",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDiscount",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlDiscount",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlVATCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlVATCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlVATAmount",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlVATAmount",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlPaymentCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlPaymentCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlOldPBal",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlOldPBal",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlRecStatus",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "tlRecStatus",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDiscFlag",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlDiscFlag",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQtyWOFF",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQtyWOFF",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlQtyDel",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlQtyDel",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlCost",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlCost",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "tlAcCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlAcCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlItemNo",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlItemNo",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlDescription",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlDescription",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlJobCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlJobCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlAnalysisCode",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "tlAnalysisCode",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "tlPreviousBalance",
+														"type": "Double",
+														"physicalType": "float"
+													},
+													"sink": {
+														"name": "tlPreviousBalance",
+														"type": "Double",
+														"physicalType": "float"
+													}
+												},
+												{
+													"source": {
+														"name": "DetailsPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "DetailsPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "DocumentPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													},
+													"sink": {
+														"name": "DocumentPositionId",
+														"type": "Int32",
+														"physicalType": "int"
+													}
+												},
+												{
+													"source": {
+														"name": "thOriginator",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thOriginator",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												},
+												{
+													"source": {
+														"name": "thOperator",
+														"type": "String",
+														"physicalType": "varchar"
+													},
+													"sink": {
+														"name": "thOperator",
+														"type": "String",
+														"physicalType": "varchar"
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "n/a",
+												"Table": "n/a"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer",
+												"Table": "Details"
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Company List And Previous Year",
+						"description": "List company codes to be exported",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @PreviousYear AS DATE = DATEFROMPARTS(YEAR(DATEADD(YEAR,-1,@Today)), MONTH(@Today), 1)\n\nSELECT\n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @PreviousYear\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vToday": {
+						"type": "String"
+					},
+					"vDirectory": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Exchequer/Bronze Child Pipelines/Previous Year"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_Import_PreviousYear')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Set vDirectory",
+						"description": "Todays date used for directory/storage location in storage account",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vToday",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/', pipeline().parameters.Exchequer_Table,'/previousyear')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vToday",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Delete Previous Table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vToday",
+							"value": {
+								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get FileList",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "ForEach Company Delete the Previous Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "DS_Polestar_Storage",
+								"type": "DatasetReference",
+								"parameters": {
+									"Container": "exchequer",
+									"Directory": {
+										"value": "@variables('vDirectory')",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"childItems",
+								"itemName"
+							],
+							"storeSettings": {
+								"type": "AzureBlobStorageReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "BinaryReadSettings"
+							}
+						}
+					},
+					{
+						"name": "ForEach File Import Into SQL Table",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get FileList",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get FileList').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Import Data",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "ParquetSource",
+											"storeSettings": {
+												"type": "AzureBlobStorageReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "ParquetReadSettings"
+											}
+										},
+										"sink": {
+											"type": "AzureSqlSink",
+											"writeBehavior": "insert",
+											"sqlWriterUseTableLock": false
+										},
+										"enableStaging": false,
+										"enableSkipIncompatibleRow": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "DS_Exchequer_Parquet",
+											"type": "DatasetReference",
+											"parameters": {
+												"Directory": {
+													"value": "@variables('vDirectory')",
+													"type": "Expression"
+												},
+												"FileName": {
+													"value": "@item().Name",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "DS_AH2_TRANSFORM_DB",
+											"type": "DatasetReference",
+											"parameters": {
+												"Schema": "Exchequer_Bronze",
+												"Table": {
+													"value": "Details",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					},
+					{
+						"name": "Delete Previous Table",
+						"type": "Script",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "TRUNCATE TABLE Exchequer_Bronze.DeleteDetails$Year",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Lookup Companies and Year",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @PreviousYear AS DATE = DATEFROMPARTS(YEAR(DATEADD(YEAR,-1,@Today)), MONTH(@Today), 1)\n\nSELECT\n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @PreviousYear\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "n/a",
+									"Table": "n/a"
+								}
+							},
+							"firstRowOnly": false
+						}
+					},
+					{
+						"name": "ForEach Company Delete the Previous Year",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Lookup Companies and Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Lookup Companies and Year').output.value",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Delete Copanies Previous Year_copy1",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "AH2_TRANSFORM_DB",
+										"type": "LinkedServiceReference"
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@concat(\r\n    'EXEC Exchequer_Bronze.Delete',\r\n    pipeline().parameters.Exchequer_Table,\r\n    '$CompanyAndYear @Year = ',\r\n    string(item().ExchequerYear),\r\n    ', @ExchCompanyCode = ''',\r\n    item().ExchCode,\r\n    ''''\r\n)",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"Exchequer_Table": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"vToday": {
+						"type": "String"
+					},
+					"vDirectory": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Exchequer/Bronze Child Pipelines/Previous Year"
+				},
+				"annotations": []
 			},
 			"dependsOn": []
 		},
@@ -2476,2055 +4209,6 @@
 				},
 				"folder": {
 					"name": "Avery"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_CQC_Proces_API_Results')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Runs pipelines to copy files from file share, then process them into SQL tables.",
-				"activities": [
-					{
-						"name": "Copy Files to Azure storage",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_CopyAPI_Responses",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Process Location Details",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Copy Files to Azure storage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_Upsert_Location",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Process Provider details",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Process Location Details",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_Upsert_Provider",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Update Home ratings",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Process Provider details",
-								"dependencyConditions": [
-									"Completed"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_CQC_Upsert_HomeAssessment",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "CQC"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Barclays_DD')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Exports the DD report for the 3 homes that bank with Barclays. Saves to container which is monitored by a logic app, which will save to share point.",
-				"activities": [
-					{
-						"name": "Lookup Home details",
-						"type": "Lookup",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "DelimitedTextSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "DelimitedTextReadSettings"
-								}
-							},
-							"dataset": {
-								"referenceName": "DS_Polestar_storage_csv",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "user",
-									"FileName": "DDReportDetails.csv"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "For Each Home",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Lookup Home details",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Lookup Home details').output.value",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Export DD Reports",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "WITH DirectDebitData AS (\n\tSELECT \n\t\tCONCAT(RTRIM(Contact_Hd_Res.Forenames), ' ', RTRIM(Contact_Hd_Res.Surname)) AS [Debtor Name],\n\t\tREPLACE(CASE\n\t\t\tWHEN DirectD_Dt.BkSortCode != '' THEN\n\t\t\t\tDirectD_Dt.BkSortCode\n\t\t\tELSE\n\t\t\t\tisnull(Contact_Hd_FS.BkSortCode, space(8))\n\t\tEND, '-', '') AS [Debtor Sort Code],\n\t\tCASE\n\t\t\tWHEN DirectD_Dt.BankAcc != '' THEN\n\t\t\t\tRTRIM(DirectD_Dt.BankAcc)\n\t\t\tELSE\n\t\t\t\tRTRIM(FundSrc_Hd.BankAcc)\n\t\tEND AS [Debtor Account Number],\n\t\tRTRIM(Resident.Res_Code) AS [Collection Details],\n\t\tDirectD_Dt.Amount,\n\t\tCAST(DirectD_Dt.Amount AS NUMERIC(18, 2)) AS [Debtor Amount],\n\t\tCASE \n\t\t\tWHEN DirectD_Dt.DDTranType = '17' THEN '17 - Standard Ongoing Collection'\n\t\t\tWHEN DirectD_Dt.DDTranType = '01' THEN '01 - First Collection'\n\t\t\tWHEN DirectD_Dt.DDTranType = '18' THEN '18 - '\n\t\t\tWHEN DirectD_Dt.DDTranType = '19' THEN '19 - '\n\t\t\tELSE DirectD_Dt.DDTranType\n\t\tEND AS [Transaction Type],\n\n\t\tDirectD_Dt.DDHd_Ref,\n\t\tDirectD_Dt.DDDT_REF,\n\t\tDirectD_Dt.DUE_DATE\n\tFROM \n\t\tDirectD_Dt (NOLOCK)\n\t\tJOIN DirectD_Hd (NOLOCK)\n\t\t\tON DirectD_Hd.DDHd_Ref = DirectD_Dt.DDHd_Ref\n\t\t\t   AND DirectD_Hd.BatchNo\n\t\t\t   BETWEEN 0 AND 9999999999\n\t\tJOIN FundSrc_Hd (NOLOCK)\n\t\t\tLEFT JOIN Contact_Dt AS Contact_Dt_FS (NOLOCK)\n\t\t\t\tJOIN Contact_Hd AS Contact_Hd_FS (NOLOCK)\n\t\t\t\t\tON Contact_Hd_FS.Contact_Ref = Contact_Dt_FS.Contact_Ref\n\t\t\t\tON Contact_Dt_FS.Cnta_Det_Ref = FundSrc_Hd.Bank_Det_Ref\n\t\t\tJOIN Resident (NOLOCK)\n\t\t\t\tJOIN Contact_Dt AS Contact_Dt_Res (NOLOCK)\n\t\t\t\t\tJOIN Contact_Hd AS Contact_Hd_Res (NOLOCK)\n\t\t\t\t\t\tON Contact_Hd_Res.Contact_Ref = Contact_Dt_Res.Contact_Ref\n\t\t\t\t\tON Contact_Dt_Res.Cnta_Det_Ref = Resident.Cnta_Det_Ref\n\t\t\t\tJOIN Room_Dt (NOLOCK)\n\t\t\t\t\tJOIN Locations (NOLOCK)\n\t\t\t\t\t\tJOIN Site (NOLOCK)\n\t\t\t\t\t\t\tON Site.Site_Ref = Locations.Site_Ref\n\t\t\t\t\t\tON Locations.Loc_Ref = Room_Dt.Loc_Ref\n\t\t\t\t\tON Room_Dt.Room_Ref = Resident.Room_Ref\n\t\t\t\tON Resident.Res_Ref = FundSrc_Hd.Res_Ref\n\t\t\tON FundSrc_Hd.FS_Ref = DirectD_Dt.FS_Ref\n\tWHERE \n\t\tDirectD_Dt.Due_Date\n\t\tBETWEEN '17530101' AND '29991231'\n\t\tAND DirectD_Dt.Allocated != 'X'\n\t\tand DirectD_Dt.Submitted IS NULL\n\t\tand DirectD_Dt.DDTranType IN ( '01', '17', '18', '19' )\n\t\tAND Locations.Site_Ref = @{item().Site_ref}\n)\nSELECT \n\tDirectDebitData.[Debtor Name],\n\tDirectDebitData.[Debtor Sort Code],\n\tDirectDebitData.[Debtor Account Number],\n\tDirectDebitData.[Collection Details],\n\tSUM(DirectDebitData.[Debtor Amount]) AS [Debtor Amount],\n\tDirectDebitData.[Transaction Type]\n\n\t--,DirectDebitData.DUE_DATE\nFROM\n\tDirectDebitData\n--WHERE\n--\tDirectDebitData.[Collection Details] = 'MM0182'\nGROUP BY\n\tDirectDebitData.DDHd_Ref,\n\tDirectDebitData.DUE_DATE,\n\tDirectDebitData.[Debtor Name],\n\tDirectDebitData.[Debtor Sort Code],\n\tDirectDebitData.[Debtor Account Number],\n\tDirectDebitData.[Collection Details],\n\tDirectDebitData.[Transaction Type]",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_CH_IP",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Polestar_storage_csv_NoQuotes",
-											"type": "DatasetReference",
-											"parameters": {
-												"Container": "user",
-												"FileName": {
-													"value": "@concat(item().HomeName, ' - DD - ',formatDateTime(utcNow(), 'MMM yyyy'), '.txt')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Cold Harbour"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_ColdHarbour_Export_IP_Tables')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Exports CH IP tables to azure storage account",
-				"activities": [
-					{
-						"name": "Set vDirectory",
-						"description": "Todays date used for directory/storage location in storage account",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vToday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd') )",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vToday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vToday",
-							"value": {
-								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Lookup Table Export List",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT SchemaName, TableName FROM ColdHarbour.TableExportList",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "For Each Export Table",
-						"description": "For each table listed in ColdHarbour.TableExportList\nExport the table from CH to a CSV file, Create a Parquet file from the CSV file,\nThen Delete the csv file.",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Lookup Table Export List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Lookup Table Export List').output.value",
-								"type": "Expression"
-							},
-							"isSequential": true,
-							"activities": [
-								{
-									"name": "Create CSV",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"queryTimeout": "00:20:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"parallelCopies": 4,
-										"dataIntegrationUnits": 4,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_CH_IP",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": {
-													"value": "@item().SchemaName",
-													"type": "Expression"
-												},
-												"Table": {
-													"value": "@item().TableName",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_ColdHarbour_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Create Parquet from CSV",
-									"type": "Copy",
-									"dependsOn": [
-										{
-											"activity": "Create CSV",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "ParquetSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "ParquetWriteSettings"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_ColdHarbour_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_ColdHarbour_Parquet",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.parquet')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Delete CSV File",
-									"type": "Delete",
-									"dependsOn": [
-										{
-											"activity": "Create Parquet from CSV",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataset": {
-											"referenceName": "DS_ColdHarbour_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": "@variables('vDirectory')",
-												"FileName": {
-													"value": "@concat(item().TableName,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										},
-										"enableLogging": false,
-										"storeSettings": {
-											"type": "AzureBlobStorageReadSettings",
-											"recursive": false,
-											"enablePartitionDiscovery": false
-										}
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vDirectory": {
-						"type": "String"
-					},
-					"vToday": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Cold Harbour"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_Export_AllData')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "For Each Company Export Data to CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Company List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Company List').output.value",
-								"type": "Expression"
-							},
-							"isSequential": false,
-							"batchCount": 10,
-							"activities": [
-								{
-									"name": "Export Data to csv",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_Exchequer",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": {
-													"value": "@item().ExchCode",
-													"type": "Expression"
-												},
-												"Table": {
-													"value": "@pipeline().parameters.Exchequer_Table",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().ExchCode,'_',item().HomeName,'_',pipeline().parameters.Exchequer_Table,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Todays date used for directory/storage location in storage account",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vToday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/', pipeline().parameters.Exchequer_Table,'/alldata')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vToday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vToday",
-							"value": {
-								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Company List",
-						"description": "List company codes to be exported",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode\nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\t \n\tHomeId ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "Get FileList",
-						"type": "GetMetadata",
-						"dependsOn": [
-							{
-								"activity": "For Each Company Export Data to CSV",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_Polestar_Storage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "exchequer",
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									}
-								}
-							},
-							"fieldList": [
-								"childItems",
-								"itemName"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "BinaryReadSettings"
-							}
-						}
-					},
-					{
-						"name": "ForEach CSV FIle - Create a Parquet and Delete CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get FileList",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get FileList').output.childItems",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Create Parquet File",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "ParquetSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "ParquetWriteSettings"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@item().Name",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Exchequer_Parquet",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@replace(item().Name, '.csv', '.parquet' )",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Delete CSV file",
-									"type": "Delete",
-									"dependsOn": [
-										{
-											"activity": "Create Parquet File",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataset": {
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": "@item().Name"
-											}
-										},
-										"enableLogging": false,
-										"storeSettings": {
-											"type": "AzureBlobStorageReadSettings",
-											"recursive": false,
-											"enablePartitionDiscovery": false
-										}
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"Exchequer_Table": {
-						"type": "string"
-					}
-				},
-				"variables": {
-					"vToday": {
-						"type": "String"
-					},
-					"vDirectory": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Exchequer/Bronze Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_Export_AllData_MlocStk')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "For Each Company Export Data to CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Company List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Company List').output.value",
-								"type": "Expression"
-							},
-							"isSequential": false,
-							"batchCount": 10,
-							"activities": [
-								{
-									"name": "Export Data to csv",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "SELECT \n[RecPfix]\n      ,[SubType]\n      ,[varCode1]\n      ,[varCode2]\n      ,[varCode3]\n      ,[PositionId]\n      ,[LoAddr1]\n      ,[LoAddr2]\n      ,[LoAddr3]\n      ,[LoAddr4]\n      ,[LoAddr5]\n      ,[LoTel]\n      ,[LoFax]\n      ,[Loemail]\n      ,[LoModem]\n      ,[LoContact]\n      ,[LoCurrency]\n      ,[LoArea]\n      ,[LoRep]\n      ,[LoTag]\n      ,[LoNominal1]\n      ,[LoNominal2]\n      ,[LoNominal3]\n      ,[LoNominal4]\n      ,[LoNominal5]\n      ,[LoNominal6]\n      ,[LoNominal7]\n      ,[LoNominal8]\n      ,[LoNominal9]\n      ,[LoNominal10]\n      ,[LoDepartment]\n      ,[LoCostCentre]\n      ,[LoUsePrice]\n      ,[LoUseNom]\n      ,[LoUseCCDep]\n      ,[LoUseSupp]\n      ,[LoUseBinLoc]\n      ,[LoNLineCount]\n      ,[LoUseCPrice]\n      ,[LoUseRPrice]\n      ,[LoWOPWIPGL]\n      ,[LoReturnGL]\n      ,[LoPReturnGL]\n      ,[LsStkCode]\n      ,[LsStkFolio]\n      ,[LsLocCode]\n      ,[LsQtyInStock]\n      ,[LsQtyOnOrder]\n      ,[LsQtyAlloc]\n      ,[LsQtyPicked]\n      ,[LsQtyMin]\n      ,[LsQtyMax]\n      ,[LsQtyFreeze]\n      ,[LsRoQty]\n      ,[LsRoDate]\n      ,[LsRoDepartment]\n      ,[LsRoCostCentre]\n      ,[LsDepartment]\n      ,[LsCostCentre]\n      ,[LsBinLoc]\n      ,[Currency1]\n      ,[SalesPrice1]\n      ,[Currency2]\n      ,[SalesPrice2]\n      ,[Currency3]\n      ,[SalesPrice3]\n      ,[Currency4]\n      ,[SalesPrice4]\n      ,[Currency5]\n      ,[SalesPrice5]\n      ,[Currency6]\n      ,[SalesPrice6]\n      ,[Currency7]\n      ,[SalesPrice7]\n      ,[Currency8]\n      ,[SalesPrice8]\n      ,[Currency9]\n      ,[SalesPrice9]\n      ,[Currency10]\n      ,[SalesPrice10]\n      ,[LsRoPrice]\n      ,[LsRoCurrency]\n      ,[LsCostPrice]\n      ,[LsPCurrency]\n      ,[LsDefNom1]\n      ,[LsDefNom2]\n      ,[LsDefNom3]\n      ,[LsDefNom4]\n      ,[LsDefNom5]\n      ,[LsDefNom6]\n      ,[LsDefNom7]\n      ,[LsDefNom8]\n      ,[LsDefNom9]\n      ,[LsDefNom10]\n      ,[LsStkFlg]\n      ,[LsMinFlg]\n      ,[LsTempSupp]\n      ,[LsSupplier]\n      ,[LsLastUsed]\n      ,[LsQtyPosted]\n      ,[LsQtyTake]\n      ,[LsROFlg]\n      ,[LsLastTime]\n      ,[LsQtyAllocWOR]\n      ,[LsQtyIssueWOR]\n      ,[LsQtyPickWOR]\n      ,[LsWOPWIPGL]\n      ,[LsSWarranty]\n      ,[LsSWarrantyType]\n      ,[LsMWarranty]\n      ,[LsMWarrantyType]\n      ,[LsQtyPReturn]\n      ,[LsReturnGL]\n      ,[LsReStockPcnt]\n      ,[LsReStockGL]\n      ,[LsBOMDedComp]\n      ,[LsQtyReturn]\n      ,[LsPReturnGL]\n      ,[SdStkFolio]\n      ,[SdFolio]\n      ,[SdSuppCode]\n      ,[SdAltCode]\n      ,[SdROCurrency]\n      ,[SdRoPrice]\n      ,[SdNLineCount]\n      ,[SdLastUsed]\n      ,[SdOverRO]\n      ,[SdDesc]\n      ,[SdLastTime]\n      ,[SdOverMinEcc]\n      ,[SdMinEccQty]\n      ,[SdOverLineQty]\n      ,[SdLineQty]\n      ,[SdLineNo]\n      ,[CsCustCode]\n      ,[CsStockCode]\n      ,[CsStkFolio]\n      ,[CsSOQty]\n      ,[CsLastDate]\n      ,[CsLineNo]\n      ,[CsLastPrice]\n      ,[CsLPCurr]\n      ,[CsJobCode]\n      ,[CsJACode]\n      ,[CsLocCode]\n      ,[CsNomCode]\n      ,[CsDepartment]\n      ,[CsCostCentre]\n      ,[CsQty]\n      ,[CsNetValue]\n      ,[CsDiscount]\n      ,[CsVATCode]\n      ,[CsCost]\n      ,[CsDesc1]\n      ,[CsDesc2]\n      ,[CsDesc3]\n      ,[CsDesc4]\n      ,[CsDesc5]\n      ,[CsDesc6]\n      ,[CsVAT]\n      ,[CsPrxPack]\n      ,[CsQtyPack]\n      ,[CsQtyMul]\n      ,[CsDiscCh]\n      ,[CsEntered]\n      ,[CsUsePack]\n      ,[CsShowCase]\n      ,[CsLineType]\n      ,[CsPriceMulX]\n      ,[CsVATIncFlg]\n      ,[TcCustCode]\n      ,[TcDocType]\n      ,[TcCurr]\n      ,[TcCXCompanyRate]\n      ,[TcCXDailyRate]\n      ,[TcOldYourRef]\n      ,[TcLYRef]\n      ,[TcDepartment]\n      ,[TcCostCentre]\n      ,[TcLocCode]\n      ,[TcJobCode]\n      ,[TcJACode]\n      ,[TcDAddr1]\n      ,[TcDAddr2]\n      ,[TcDAddr3]\n      ,[TcDAddr4]\n      ,[TcDAddr5]\n      ,[TcTDate]\n      ,[TcDelDate]\n      ,[TcNetTotal]\n      ,[TcVATTotal]\n      ,[TcDiscTotal]\n      ,[TcLastOpo]\n      ,[TcInProg]\n      ,[TcTransNat]\n      ,[TcTransMode]\n      ,[TcDelTerms]\n      ,[TcCtrlCode]\n      ,[TcVATCode]\n      ,[TcOrdMode]\n      ,[TcScaleMode]\n      ,[TcLineCount]\n      ,[TcWasNew]\n      ,[TcUseORate]\n      ,[TcDefNomCode]\n      ,[TcVATIncFlg]\n      ,[TcSetDisc]\n      ,[TcGenMode]\n      ,[TcTagNo]\n      ,[TcLockAddr]\n      ,NULL AS [Spare2]\n      ,[TcYourRef]\n      ,[TcDeliveryPostCode]\n      ,[tcDeliveryCountry]\n      ,[TcSSDProcess]\n      ,[TcTaxRegion]\n      ,[EmWasCurr]\n      ,[EmWasCXRate1]\n      ,[EmWasCXRate2]\n      ,[EmNowRate1]\n      ,[EmNowRate2]\n      ,[EmDocRef]\n      ,[EmNomCode]\n      ,[EmOrigValue]\n      ,[PWExpMode]\n      ,[PWExPDays]\n      ,[PWExpDate]\n      ,[DirCust]\n      ,[DirSupp]\n      ,[MaxSalesA]\n      ,[MaxPurchA]\n      ,[Department]\n      ,[CostCentre]\n      ,[Loc]\n      ,[SalesBank]\n      ,[PurchBank]\n      ,[ReportPrn]\n      ,[FormPrn]\n      ,[OrPrns1]\n      ,[OrPrns2]\n      ,[CCDepRule]\n      ,[LocRule]\n      ,[EmailAddr]\n      ,[PWTimeOut]\n      ,[Loaded]\n      ,[UserName]\n      ,[UCPr]\n      ,[UCYr]\n      ,[UDispPrMnth]\n      ,[ShowGLCodes]\n      ,[ShowStockCode]\n      ,[ShowProductType]\n      ,[UserStatus]\n      ,NULL AS [PasswordSalt]\n      ,NULL AS [PasswordHash]\n      ,[WindowUserId]\n      ,NULL AS [SecurityQuestionId]\n      ,NULL AS [SecurityAnswer]\n      ,[ForcePasswordChange]\n      ,[LoginFailureCount]\n      ,[HighlightPIIFields]\n      ,[HighlightPIIColour]\n      ,[ArcBankNom]\n      ,[ArcCtrlNom]\n      ,[ArcPayCurr]\n      ,[ArcInvCurr]\n      ,NULL AS [Spare1]\n      ,[ArcDepartment]\n      ,[ArcCostCentre]\n      ,[ArcSortBy]\n      ,[ArcAutoTotal]\n      ,[ArcSDDaysOver]\n      ,[ArcFromTrans]\n      ,[ArcOldYourRef]\n      ,[ArcChequeNo2]\n      ,NULL AS [Spare3]\n      ,[ArcForceNew]\n      ,[ArcSort2By]\n      ,[ArcTotalOwn]\n      ,[ArcTransValue]\n      ,[ArcTagCount]\n      ,[ArcTagRunDate]\n      ,[ArcTagRunYr]\n      ,[ArcTagRunPr]\n      ,[ArcSRCPIRef]\n      ,[ArcIncSDisc]\n      ,[ArcTotal]\n      ,[ArcVariance]\n      ,[ArcSettleD]\n      ,[ArcTransDate]\n      ,[ArcUD1]\n      ,[ArcUD2]\n      ,[ArcUD3]\n      ,[ArcUD4]\n      ,[ArcJobCode]\n      ,[ArcAnalCode]\n      ,[ArcDelAddr1]\n      ,[ArcDelAddr2]\n      ,[ArcDelAddr3]\n      ,[ArcDelAddr4]\n      ,[ArcDelAddr5]\n      ,[ArcIncVar]\n      ,[ArcOurRef]\n      ,[ArcCompanyRate]\n      ,[ArcDailyRate]\n      ,[ArcOpoName]\n      ,[ArcStartDate]\n      ,[ArcStartTime]\n      ,[ArcWinLogIn]\n      ,[ArcLocked]\n      ,[ArcSalesMode]\n      ,[ArcCustCode]\n      ,[ArcUseOSNdx]\n      ,[ArcOwnTransValue]\n      ,[ArcOwnSettleD]\n      ,[ArcFinVar]\n      ,[ArcFinSetD]\n      ,[ArcSortD]\n      ,NULL AS [Spare4]\n      ,[ArcAllocFull]\n      ,[ArcCheckFail]\n      ,[ArcCharge1GL]\n      ,[ArcCharge2GL]\n      ,[ArcCharge1Amt]\n      ,[ArcCharge2Amt]\n      ,NULL AS [Spare]\n      ,[ArcYourRef]\n      ,[ArcUD5]\n      ,[ArcUD6]\n      ,[ArcUD7]\n      ,[ArcUD8]\n      ,[ArcUD9]\n      ,[ArcUD10]\n      ,[ArcUsePPD]\n      ,[BrInDoc]\n      ,[BrOutDoc]\n      ,[BrSold]\n      ,[BrDateIn]\n      ,[BrBinCost]\n      ,[BrBinCap]\n      ,NULL AS [Spare5]\n      ,[BrStkFolio]\n      ,[BrDateOut]\n      ,[BrSoldLine]\n      ,[BrBuyLine]\n      ,[BrBatchRec]\n      ,[BrBuyQty]\n      ,[BrQtyUsed]\n      ,[BrBatchChild]\n      ,[BrInMLoc]\n      ,[BrOutMLoc]\n      ,[BrOutOrdDoc]\n      ,[BrInOrdDoc]\n      ,[BrInOrdLine]\n      ,[BrOutOrdLine]\n      ,[BrCurCost]\n      ,[BrPriority]\n      ,[BrBinSell]\n      ,[brSerCompanyRate]\n      ,[brSerDailyRate]\n      ,[BrSUseORate]\n      ,[brSerTriRates]\n      ,[brSerTriEuro]\n      ,[brSerTriInvert]\n      ,[brSerTriFloat]\n      ,[brSerSpare]\n      ,[BrDateUseX]\n      ,[BrCurSell]\n      ,[BrUOM]\n      ,[BrHoldFlg]\n      ,[BrTagNo]\n      ,[BrReturnBin]\n      ,[BrStatDate]\n      ,[BrStatRef]\n      ,[BrBankAcc]\n      ,[BrBankCurrency]\n      ,[BrBankUserID]\n      ,[BrCreateDate]\n      ,[BrCreateTime]\n      ,[BrStatBal]\n      ,[BrOpenBal]\n      ,[BrCloseBal]\n      ,[BrStatus]\n      ,[BrIntRef]\n      ,[BrGLCode]\n      ,[BrStatFolio]\n      ,[BrReconDate]\n      ,[BrReconRef]\n      ,[BrInitSeq]\n      ,[BrGroupBy]\n      ,[BrPayRef]\n      ,[BrLineDate]\n      ,[BrMatchRef]\n      ,[BrValue]\n      ,[BrLineNo]\n      ,[BrStatId]\n      ,[BrStatLine]\n      ,[BrCustCode]\n      ,[BrPeriod]\n      ,[BrYear]\n      ,[brCompanyRate]\n      ,[brDailyRate]\n      ,[BrLUseORate]\n      ,[brCurTriRate]\n      ,[brCurTriEuro]\n      ,[brCurTriInvert]\n      ,[brCurTriFloat]\n      ,[brCurSpare]\n      ,[BrOldYourRef]\n      ,[BrTransValue]\n      ,[BrDepartment]\n      ,[BrCostCentre]\n      ,[BrNomCode]\n      ,[BrSRINomCode]\n      ,[BrFolioLink]\n      ,[BrVATCode]\n      ,[BrVATAmount]\n      ,[BrTransDate]\n      ,[BrIsNewTrans]\n      ,[BrLineStatus]\n      ,NULL AS [Spare6]\n      ,[BrYourRef]\n      ,[BrAccNOM]\n      ,[BrBankProd]\n      ,[BrPayPath]\n      ,[BrPayFileName]\n      ,[BrRecFileName]\n      ,[BrStatPath]\n      ,[BrSwiftRef1]\n      ,[BrSwiftRef2]\n      ,[BrSwiftRef3]\n      ,[BrSwiftBIC]\n      ,[BrRouteCode]\n      ,[BrChargeInst]\n      ,[BrRouteMethod]\n      ,[BrLastUseDate]\n      ,[BrOldSortCode]\n      ,[BrOldAccountCode]\n      ,[BrBankRef]\n      ,[BrBACSUserID]\n      ,[BrBACSCurrency]\n      ,[BrUserID2]\n      ,[BrSortCodeEx]\n      ,[BrAccountCodeEx]\n      ,[BrBankSortCode]\n      ,[BrBankAccountCode]\n      ,[brUserIdEx]\n      ,[brUserId2Ex]\n      ,[EbAccNOM]\n      ,[EbStatRef]\n      ,[EbStatInd]\n      ,[EbSourceFile]\n      ,[EbIntRef]\n      ,[EbStatDate]\n      ,[EbLineNo]\n      ,[EbLineDate]\n      ,[EbLineRef]\n      ,[EbLineValue]\n      ,[EbLineIntRef]\n      ,[EbMatchStr]\n      ,[EbGLCode]\n      ,[EbLineRef2]\n      ,[EbLineStatus]\n      ,[VarCode1Computed]\n      ,[VarCode2Computed]\n      ,[VarCode3Computed]\n      ,[smtpUserId]\n      ,NULL AS [smtpPassword]\n      ,[varCode1Trans1]\n      ,[varCode2Trans1]\n      ,[BrPayRefTrans1]\n  FROM \n      @{item().ExchCode}.[MLOCSTK]\nWHERE\n    RecPfix = 'P'\n",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_Exchequer",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "N/A",
-												"Table": "N/A"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().ExchCode,'_',item().HomeName,'_MLOCSTK_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Todays date used for directory/storage location in storage account",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vToday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/MLOCSTK/alldata')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vToday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vToday",
-							"value": {
-								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Company List",
-						"description": "List company codes to be exported",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT\n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode\nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\t \n\tHomeId ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "Get FileList",
-						"type": "GetMetadata",
-						"dependsOn": [
-							{
-								"activity": "For Each Company Export Data to CSV",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_Polestar_Storage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "exchequer",
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									}
-								}
-							},
-							"fieldList": [
-								"childItems",
-								"itemName"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "BinaryReadSettings"
-							}
-						}
-					},
-					{
-						"name": "ForEach CSV FIle - Create a Parquet and Delete CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get FileList",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get FileList').output.childItems",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Create Parquet File",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "ParquetSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "ParquetWriteSettings"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@item().Name",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Exchequer_Parquet",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@replace(item().Name, '.csv', '.parquet' )",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Delete CSV file",
-									"type": "Delete",
-									"dependsOn": [
-										{
-											"activity": "Create Parquet File",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataset": {
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": "@item().Name"
-											}
-										},
-										"enableLogging": false,
-										"storeSettings": {
-											"type": "AzureBlobStorageReadSettings",
-											"recursive": false,
-											"enablePartitionDiscovery": false
-										}
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"variables": {
-					"vToday": {
-						"type": "String"
-					},
-					"vDirectory": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Exchequer/Bronze Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_Export_CurrentYear')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "For Each Company Export Data to CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Company List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Company List').output.value",
-								"type": "Expression"
-							},
-							"isSequential": false,
-							"batchCount": 10,
-							"activities": [
-								{
-									"name": "Export Data to csv",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n    ,*\nFROM \n\t@{item().ExchCode}.@{pipeline().parameters.Exchequer_Table} AS T WITH (NOLOCK)\nWHERE\n\tT.@{pipeline().parameters.Exchequer_YearColumn} = '@{item().ExchequerYear}'\n",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_Exchequer",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().ExchCode,'_',item().HomeName,'_',pipeline().parameters.Exchequer_Table,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Todays date used for directory/storage location in storage account",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vToday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/', pipeline().parameters.Exchequer_Table,'/currentyear')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vToday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vToday",
-							"value": {
-								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Company List",
-						"description": "List company codes to be exported",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "DECLARE @Today AS DATE = GETDATE()\nDECLARE @CurrentPeriod AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)\n\nSELECT\n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode,\n    CompanyPeriods.ExchequerYear,\n    CompanyPeriods.PeriodYear,\n    CompanyPeriods.PeriodNo,\n    CompanyPeriods.CalendarFullDescription\nFROM \n\tAvery.HomeDetails\n\n    LEFT JOIN Exchequer.CompanyPeriods\n        ON CompanyPeriods.ExchCompanyCode = HomeDetails.ExchCode\n        AND CompanyPeriods.PeriodReportDate = @CurrentPeriod\nWHERE\n\tExchCode IS NOT NULL\n\tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "Get FileList",
-						"type": "GetMetadata",
-						"dependsOn": [
-							{
-								"activity": "For Each Company Export Data to CSV",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_Polestar_Storage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "exchequer",
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									}
-								}
-							},
-							"fieldList": [
-								"childItems",
-								"itemName"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "BinaryReadSettings"
-							}
-						}
-					},
-					{
-						"name": "ForEach CSV FIle - Create a Parquet and Delete CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get FileList",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get FileList').output.childItems",
-								"type": "Expression"
-							},
-							"batchCount": 25,
-							"activities": [
-								{
-									"name": "Create Parquet File",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "ParquetSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "ParquetWriteSettings"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@item().Name",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Exchequer_Parquet",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@replace(item().Name, '.csv', '.parquet' )",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Delete CSV file",
-									"type": "Delete",
-									"dependsOn": [
-										{
-											"activity": "Create Parquet File",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataset": {
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": "@item().Name"
-											}
-										},
-										"enableLogging": false,
-										"storeSettings": {
-											"type": "AzureBlobStorageReadSettings",
-											"recursive": false,
-											"enablePartitionDiscovery": false
-										}
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"Exchequer_Table": {
-						"type": "string"
-					},
-					"Exchequer_YearColumn": {
-						"type": "string"
-					}
-				},
-				"variables": {
-					"vToday": {
-						"type": "String"
-					},
-					"vDirectory": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Exchequer/Bronze Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyAccessAudit')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Transfer File to Blob Storage",
-						"description": "Copies the file generated on the VM from the file share to container in Blob Storage",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Fileshare",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Load CSV file to DB table",
-						"description": "Inserts the records in the csv file to the Avery DB on AH2",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Transfer File to Blob Storage",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Insert_ExchequerCompanyAccess",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-06-27T14:27:51Z"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_CompanyPeriods')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "ForEach Company",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Company List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Company List').output.value",
-								"type": "Expression"
-							},
-							"activities": [
-								{
-									"name": "Copy Company Period Data",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "SELECT \n    '@{item().ExchCode}' AS ExchCompanyCode,\n    PeriodKey,\n    ExchequerYear,\n    PeriodYear,\n    PeriodNo,\n    CalendarMonthLongName,\n    CalendarFullDescription,\n    QuarterNo,\n    PeriodDescription,\n    CONVERT(DATE, '01 ' + CalendarFullDescription, 103) AS PeriodReportDate,\n    HasTransactions,\n    IsCurrentPeriod,\n    IsCurrentYear\nFROM \n    @{item().ExchCode}.evw_Period",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "AzureSqlSink",
-											"writeBehavior": "upsert",
-											"upsertSettings": {
-												"useTempDB": true,
-												"keys": [
-													"ExchCompanyCode",
-													"PeriodKey"
-												]
-											},
-											"sqlWriterUseTableLock": false,
-											"disableMetricsCollection": false
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"mappings": [
-												{
-													"source": {
-														"name": "ExchCompanyCode"
-													},
-													"sink": {
-														"name": "ExchCompanyCode",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "PeriodKey"
-													},
-													"sink": {
-														"name": "PeriodKey",
-														"type": "Int32",
-														"physicalType": "int"
-													}
-												},
-												{
-													"source": {
-														"name": "ExchequerYear"
-													},
-													"sink": {
-														"name": "ExchequerYear",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "PeriodYear"
-													},
-													"sink": {
-														"name": "PeriodYear",
-														"type": "Int32",
-														"physicalType": "int"
-													}
-												},
-												{
-													"source": {
-														"name": "PeriodNo"
-													},
-													"sink": {
-														"name": "PeriodNo",
-														"type": "Int32",
-														"physicalType": "int"
-													}
-												},
-												{
-													"source": {
-														"name": "CalendarMonthLongName"
-													},
-													"sink": {
-														"name": "CalendarMonthLongName",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "QuarterNo"
-													},
-													"sink": {
-														"name": "QuarterNo",
-														"type": "Int32",
-														"physicalType": "int"
-													}
-												},
-												{
-													"source": {
-														"name": "PeriodDescription"
-													},
-													"sink": {
-														"name": "PeriodDescription",
-														"type": "String",
-														"physicalType": "varchar"
-													}
-												},
-												{
-													"source": {
-														"name": "PeriodReportDate"
-													},
-													"sink": {
-														"name": "PeriodReportDate",
-														"physicalType": "date"
-													}
-												},
-												{
-													"source": {
-														"name": "HasTransactions"
-													},
-													"sink": {
-														"name": "HasTransactions",
-														"type": "Boolean",
-														"physicalType": "bit"
-													}
-												},
-												{
-													"source": {
-														"name": "IsCurrentPeriod"
-													},
-													"sink": {
-														"name": "IsCurrentPeriod",
-														"type": "Boolean",
-														"physicalType": "bit"
-													}
-												},
-												{
-													"source": {
-														"name": "IsCurrentYear"
-													},
-													"sink": {
-														"name": "IsCurrentYear",
-														"type": "Boolean",
-														"physicalType": "bit"
-													}
-												},
-												{
-													"source": {
-														"name": "CalendarFullDescription"
-													},
-													"sink": {
-														"name": "CalendarFullDescription"
-													}
-												}
-											],
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_Exchequer",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_AH2_TRANSFORM_DB",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "Exchequer",
-												"Table": "CompanyPeriods"
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Company List",
-						"type": "Lookup",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderQuery": "SELECT \n\tHomeID, \n    IntranetID,\n\tHomename, \n\tExchCode \nFROM \n\tAvery.HomeDetails\nWHERE\n\tExchCode IS NOT NULL\n    \tAND ExchCode != 'KETT01' --Doesnt exist in Exchequer\nORDER BY\n\tHomeId ASC",
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Exchequer/Child Pipelines"
 				},
 				"annotations": []
 			},

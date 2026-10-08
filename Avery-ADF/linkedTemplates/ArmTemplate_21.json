@@ -7,6 +7,14 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "Avery-ADF"
 		},
+		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
+			"type": "int",
+			"defaultValue": 0
+		},
+		"SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType": {
+			"type": "string",
+			"defaultValue": "FullWeekData"
+		},
 		"SCH_Sona_WeeklyHrs_2Week_CatchUp_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack": {
 			"type": "int",
 			"defaultValue": 2
@@ -34,20 +42,458 @@
 		"SCH_Exchequer_Bronze_CUSTSUPP_properties_PL_Exchequer_Bronze_AllData_parameters_ExchequerTable": {
 			"type": "string",
 			"defaultValue": "CUSTSUPP"
-		},
-		"SCH_Exchequer_Bronze_Details_properties_PL_Exchequer_Bronze_AllData_parameters_ExchequerTable": {
-			"type": "string",
-			"defaultValue": "DETAILS"
-		},
-		"SCH_Exchequer_Bronze_Document_properties_PL_Exchequer_Bronze_AllData_parameters_ExchequerTable": {
-			"type": "string",
-			"defaultValue": "DOCUMENT"
 		}
 	},
 	"variables": {
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Sona_Absences')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get Sona Absences Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_API_Get_Data_ADFv",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EndPoint": "absences",
+								"PageSize": "1000",
+								"FileName": "All",
+								"MaxRequestLimit": "150",
+								"AdditionalAPIParams": "&order_by=starts_at_asc"
+							}
+						}
+					},
+					{
+						"name": "Stage Absence Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Get Sona Absences Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Stage_Absences",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Upsert Absence Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Stage Absence Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Sona_Upsert_Absences",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Sona"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Tribepad_MoveFiles')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Moves files to sub folders",
+				"activities": [
+					{
+						"name": "Move Files",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Today Var",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "BinarySource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": false,
+									"wildcardFileName": {
+										"value": "@concat('report-',variables('Today'),'_*.csv')",
+										"type": "Expression"
+									},
+									"deleteFilesAfterCompletion": true
+								},
+								"formatSettings": {
+									"type": "BinaryReadSettings"
+								}
+							},
+							"sink": {
+								"type": "BinarySink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_averyblob_tribepad_binary_source",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_averyblob_tribepad_binary_dest",
+								"type": "DatasetReference",
+								"parameters": {
+									"Directory": {
+										"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Set Today Var",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "Today",
+							"value": {
+								"value": "@formatDateTime(utcNow(), 'yyyyMMdd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"Today": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Tribepad"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_EveryDay_830am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_WeeklyHrs_3Days",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2026-06-19T13:24:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								8
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_EverySunday')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Jobs",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-09-03T15:21:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								20
+							],
+							"weekDays": [
+								"Sunday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Every_MWF_7pm')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_Emp_periods",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					},
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_All_Users",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-03T09:57:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								19,
+								7
+							],
+							"weekDays": [
+								"Monday",
+								"Wednesday",
+								"Friday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_MTWTF_5am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Stopped",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Exchequer_Users",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2025-11-11T09:44:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								5
+							],
+							"weekDays": [
+								"Monday",
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Monday_0830am')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Fusion_DataImportCheck",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-02-23T17:51:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								30
+							],
+							"hours": [
+								8
+							],
+							"weekDays": [
+								"Monday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/SCH_Sona_Current_WeeklyHrs')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Weekly hours for most recent week end (the latest Sunday)",
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "PL_Sona_WeeklyHrs_FullWeek",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"WeeksBack": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_WeeksBack')]",
+							"FileNameType": "[parameters('SCH_Sona_Current_WeeklyHrs_properties_PL_Sona_WeeklyHrs_FullWeek_parameters_FileNameType')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Week",
+						"interval": 1,
+						"startTime": "2026-07-14T15:03:00",
+						"timeZone": "GMT Standard Time",
+						"schedule": {
+							"minutes": [
+								35
+							],
+							"hours": [
+								21,
+								7
+							],
+							"weekDays": [
+								"Monday",
+								"Tuesday",
+								"Wednesday",
+								"Thursday",
+								"Friday",
+								"Saturday"
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SCH_Sona_OrgUnits')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
@@ -272,43 +718,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_1-30am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Every day at 1:30 AM",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_NurseCall_InterCall_Extract_Load",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Day",
-						"interval": 1,
-						"startTime": "2024-04-09T11:51:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								30
-							],
-							"hours": [
-								1
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_10pm')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -448,7 +857,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Tribepad_MoveFiles')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SCH_Exchequer_Bronze_CUSTSUPP')]",
@@ -481,96 +892,6 @@
 							],
 							"hours": [
 								21
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Thursday",
-								"Friday",
-								"Saturday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Exchequer_Bronze_Details')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_Bronze_AllData",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"ExchequerTable": "[parameters('SCH_Exchequer_Bronze_Details_properties_PL_Exchequer_Bronze_AllData_parameters_ExchequerTable')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-09-08T15:16:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								50
-							],
-							"hours": [
-								21
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Thursday",
-								"Friday",
-								"Saturday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_Exchequer_Bronze_Document')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_Bronze_AllData",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"ExchequerTable": "[parameters('SCH_Exchequer_Bronze_Document_properties_PL_Exchequer_Bronze_AllData_parameters_ExchequerTable')]"
-						}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-09-08T15:17:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								45
-							],
-							"hours": [
-								22
 							],
 							"weekDays": [
 								"Monday",
@@ -626,92 +947,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/SCH_MTTFS_Once_2am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_Details",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-02-18T16:29:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								2
-							],
-							"weekDays": [
-								"Thursday",
-								"Friday",
-								"Saturday",
-								"Tuesday",
-								"Monday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/SCH_MTTFS_Once_515am')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_Exchequer_Details_Retry",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2026-04-07T12:05:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								15
-							],
-							"hours": [
-								5
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Thursday",
-								"Friday",
-								"Saturday"
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/SCH_Sona_AbsenceData')]",
 			"type": "Microsoft.DataFactory/factories/triggers",
 			"apiVersion": "2018-06-01",
@@ -750,7 +985,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Absences')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_5am')]",
@@ -788,57 +1025,6 @@
 							],
 							"hours": [
 								5
-							]
-						}
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/Sch_MTWTF_Once_9pm')]",
-			"type": "Microsoft.DataFactory/factories/triggers",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Every M, T, W, T, F at 9pm",
-				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "PL_CH_Residents",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					},
-					{
-						"pipelineReference": {
-							"referenceName": "PL_CH_TransactionData",
-							"type": "PipelineReference"
-						},
-						"parameters": {}
-					}
-				],
-				"type": "ScheduleTrigger",
-				"typeProperties": {
-					"recurrence": {
-						"frequency": "Week",
-						"interval": 1,
-						"startTime": "2024-07-02T10:32:00",
-						"timeZone": "GMT Standard Time",
-						"schedule": {
-							"minutes": [
-								0
-							],
-							"hours": [
-								21
-							],
-							"weekDays": [
-								"Monday",
-								"Tuesday",
-								"Wednesday",
-								"Thursday",
-								"Friday"
 							]
 						}
 					}
