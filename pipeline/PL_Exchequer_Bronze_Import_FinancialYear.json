@@ -1,5 +1,5 @@
 {
-	"name": "PL_Exchequer_Bronze_Import_AllData",
+	"name": "PL_Exchequer_Bronze_Import_FinancialYear",
 	"properties": {
 		"activities": [
 			{
@@ -22,7 +22,7 @@
 				"typeProperties": {
 					"variableName": "vDirectory",
 					"value": {
-						"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/', pipeline().parameters.Exchequer_Table,'/alldata')",
+						"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/', pipeline().parameters.Exchequer_Table,'/previousyear')",
 						"type": "Expression"
 					}
 				}
@@ -32,7 +32,7 @@
 				"type": "SetVariable",
 				"dependsOn": [
 					{
-						"activity": "Truncate Table",
+						"activity": "Delete Previous Table",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -57,6 +57,12 @@
 				"dependsOn": [
 					{
 						"activity": "Set vDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ForEach Company Delete the Previous Year",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -129,15 +135,6 @@
 							"typeProperties": {
 								"source": {
 									"type": "ParquetSource",
-									"additionalColumns": [
-										{
-											"name": "ExchCompanyCode",
-											"value": {
-												"value": "@split(item().name, '_')[0]",
-												"type": "Expression"
-											}
-										}
-									],
 									"storeSettings": {
 										"type": "AzureBlobStorageReadSettings",
 										"recursive": true,
@@ -186,7 +183,7 @@
 									"parameters": {
 										"Schema": "Exchequer_Bronze",
 										"Table": {
-											"value": "@pipeline().parameters.Exchequer_Table",
+											"value": "Details",
 											"type": "Expression"
 										}
 									}
@@ -197,8 +194,10 @@
 				}
 			},
 			{
-				"name": "Truncate Table",
+				"name": "Delete Previous Table",
 				"type": "Script",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [],
 				"policy": {
 					"timeout": "0.12:00:00",
@@ -217,17 +216,110 @@
 						{
 							"type": "Query",
 							"text": {
-								"value": "TRUNCATE TABLE Exchequer_Bronze.@{pipeline().parameters.Exchequer_Table}",
+								"value": "TRUNCATE TABLE Exchequer_Bronze.DeleteDetails$Year",
 								"type": "Expression"
 							}
 						}
 					],
 					"scriptBlockExecutionTimeout": "02:00:00"
 				}
+			},
+			{
+				"name": "Lookup Companies and Year",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[Exchequer].[Get$CompanyListWithYearAndPeriod]",
+						"storedProcedureParameters": {
+							"FinancialYear": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.FinancialYear",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "n/a",
+							"Table": "n/a"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach Company Delete the Previous Year",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup Companies and Year",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup Companies and Year').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Delete Copanies Previous Year_copy1",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "AH2_TRANSFORM_DB",
+								"type": "LinkedServiceReference"
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "@concat(\r\n    'EXEC Exchequer_Bronze.Delete',\r\n    pipeline().parameters.Exchequer_Table,\r\n    '$CompanyAndYear @Year = ',\r\n    string(item().ExchequerYear),\r\n    ', @ExchCompanyCode = ''',\r\n    item().ExchCode,\r\n    ''''\r\n)",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
 			}
 		],
 		"parameters": {
 			"Exchequer_Table": {
+				"type": "string"
+			},
+			"FinancialYear": {
 				"type": "string"
 			}
 		},
@@ -240,7 +332,7 @@
 			}
 		},
 		"folder": {
-			"name": "Exchequer/Bronze AllData Child Pipelines"
+			"name": "Exchequer/Bronze FinancialYear Child Pipeline"
 		},
 		"annotations": []
 	}
