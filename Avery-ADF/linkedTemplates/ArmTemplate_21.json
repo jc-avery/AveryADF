@@ -49,42 +49,121 @@
 	},
 	"resources": [
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_Absences')]",
+			"name": "[concat(parameters('factoryName'), '/xPL_Exchequer_Details')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
 			"properties": {
+				"description": "Runs the child pipelines to import the previous financial year and the current financial year. Both clearing the data in Exchequer.Details for the year and company the table before inserting the new data",
 				"activities": [
 					{
-						"name": "Get Sona Absences Data",
+						"name": "Previous Fin Year",
 						"type": "ExecutePipeline",
-						"dependsOn": [],
+						"dependsOn": [
+							{
+								"activity": "Log Pipeline Start",
+								"dependencyConditions": [
+									"Completed"
+								]
+							}
+						],
 						"policy": {
 							"secureInput": false
 						},
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_API_Get_Data_ADFv",
+								"referenceName": "xPL_Exchequer_Details_PreviousYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Current FIN Year",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 60s",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "xPL_Exchequer_Details_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 60s",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Previous Fin Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 60
+						}
+					},
+					{
+						"name": "Prev Yr Email Notification",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Previous Fin Year",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
 							"parameters": {
-								"EndPoint": "absences",
-								"PageSize": "1000",
-								"FileName": "All",
-								"MaxRequestLimit": "150",
-								"AdditionalAPIParams": "&order_by=starts_at_asc"
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "The PL_Exchequer_Details Pipeline failed",
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Previous Fin Year"
 							}
 						}
 					},
 					{
-						"name": "Stage Absence Data",
+						"name": "Current Yr Email Notification",
 						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "Get Sona Absences Data",
+								"activity": "Current FIN Year",
 								"dependencyConditions": [
-									"Succeeded"
+									"Failed"
 								]
 							}
 						],
@@ -94,61 +173,97 @@
 						"userProperties": [],
 						"typeProperties": {
 							"pipeline": {
-								"referenceName": "PL_Sona_Stage_Absences",
+								"referenceName": "UT_Send_Email_Param",
 								"type": "PipelineReference"
 							},
 							"waitOnCompletion": true,
-							"parameters": {}
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "The PL_Exchequer_Details Pipeline failed",
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Current Fin Year"
+							}
 						}
 					},
 					{
-						"name": "Upsert Absence Data",
-						"type": "ExecutePipeline",
+						"name": "Log Pipeline Start",
+						"type": "Script",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "EXEC Exchequer.DetailsPipelineLog$Start"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Log Pipeline Failure",
+						"type": "Script",
 						"dependsOn": [
 							{
-								"activity": "Stage Absence Data",
+								"activity": "Prev Yr Email Notification",
 								"dependencyConditions": [
-									"Succeeded"
+									"Completed"
+								]
+							},
+							{
+								"activity": "Current Yr Email Notification",
+								"dependencyConditions": [
+									"Completed"
 								]
 							}
 						],
 						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
 							"secureInput": false
 						},
 						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
+						},
 						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Sona_Upsert_Absences",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "Exchequer.DetailsPipelineLog$Failure"
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
 						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Tribepad_MoveFiles')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"description": "Moves files to sub folders",
-				"activities": [
+					},
 					{
-						"name": "Move Files",
-						"type": "Copy",
+						"name": "Log Pipeline Completed",
+						"type": "Script",
 						"dependsOn": [
 							{
-								"activity": "Set Today Var",
+								"activity": "Current FIN Year",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -162,64 +277,166 @@
 							"secureInput": false
 						},
 						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "BinarySource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"wildcardFileName": {
-										"value": "@concat('report-',variables('Today'),'_*.csv')",
-										"type": "Expression"
-									},
-									"deleteFilesAfterCompletion": true
-								},
-								"formatSettings": {
-									"type": "BinaryReadSettings"
-								}
-							},
-							"sink": {
-								"type": "BinarySink",
-								"storeSettings": {
-									"type": "AzureBlobStorageWriteSettings"
-								}
-							},
-							"enableStaging": false
+						"linkedServiceName": {
+							"referenceName": "AH2_TRANSFORM_DB",
+							"type": "LinkedServiceReference"
 						},
-						"inputs": [
-							{
-								"referenceName": "DS_averyblob_tribepad_binary_source",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_averyblob_tribepad_binary_dest",
-								"type": "DatasetReference",
-								"parameters": {
-									"Directory": {
-										"value": "@concat(formatDateTime(utcNow(), 'yyyy'),'/',formatDateTime(utcNow(), 'MM'),'/',formatDateTime(utcNow(), 'dd') )",
-										"type": "Expression"
-									}
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": "Exchequer.DetailsPipelineLog$Complete"
 								}
-							}
-						]
-					},
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Exchequer/Archive"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Exchequer_Details_Retry')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Retries those companies that failed and were logged for a retry from the PL_Exchequer_Details Pipeline",
+				"activities": [
 					{
-						"name": "Set Today Var",
-						"type": "SetVariable",
+						"name": "Retry Previous Fin Year",
+						"type": "ExecutePipeline",
 						"dependsOn": [],
 						"policy": {
-							"secureOutput": false,
 							"secureInput": false
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"variableName": "Today",
-							"value": {
-								"value": "@formatDateTime(utcNow(), 'yyyyMMdd')",
-								"type": "Expression"
+							"pipeline": {
+								"referenceName": "xPL_Exchequer_Details_Retry_PreviousYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Retry Current FIN Year",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 60s",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "xPL_Exchequer_Details_Retry_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 60s",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Retry Previous Fin Year",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 60
+						}
+					},
+					{
+						"name": "Prev Yr Email Notification",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Retry Previous Fin Year",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Retry Previous Fin Year"
+							}
+						}
+					},
+					{
+						"name": "Current Yr Email Notification",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Retry Current FIN Year",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "UT_Send_Email_Param",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"EmailTo": "jon.crockett@averyhealthcare.co.uk",
+								"Message": "The PL_Exchequer_Details_Retry Pipeline failed",
+								"Colour": "Red",
+								"PipelineName": {
+									"value": "@pipeline().Pipeline",
+									"type": "Expression"
+								},
+								"PipelineRunID": {
+									"value": "@pipeline().RunId",
+									"type": "Expression"
+								},
+								"pStepFailed": "Retry Current Fin Year"
 							}
 						}
 					}
@@ -227,13 +444,8 @@
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
-				"variables": {
-					"Today": {
-						"type": "String"
-					}
-				},
 				"folder": {
-					"name": "Tribepad"
+					"name": "Exchequer/Archive"
 				},
 				"annotations": []
 			},
@@ -857,9 +1069,7 @@
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Tribepad_MoveFiles')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/SCH_Exchequer_Bronze_CUSTSUPP')]",
@@ -985,9 +1195,7 @@
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('factoryId'), '/pipelines/PL_Sona_Absences')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/Sch_EveryDay_Once_5am')]",

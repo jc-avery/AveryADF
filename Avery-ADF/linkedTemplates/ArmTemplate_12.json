@@ -13,6 +13,1077 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_MCM_GetData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Call AZ Function",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "Set Az Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set MCM API Key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:05:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"supportRFC5988": "true"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobStorageWriteSettings"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Data_Extract_CommunityId",
+								"type": "DatasetReference",
+								"parameters": {
+									"MCM_endPoint": {
+										"value": "@pipeline().parameters.EndPoint",
+										"type": "Expression"
+									},
+									"MCM_api_key": {
+										"value": "@variables('MCMAPIKey')",
+										"type": "Expression"
+									},
+									"FunctionCode": {
+										"value": "@variables('AzFuncCode')",
+										"type": "Expression"
+									},
+									"CommunityId": {
+										"value": "@pipeline().parameters.CommunityID",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": {
+										"value": "@pipeline().parameters.EndPoint",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Get AZ Func Code",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Set End Point",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMDataExtractAzFunc/9ad6bb869bce44809b76c700e88d789f?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set Az Func Code",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get AZ Func Code",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "AzFuncCode",
+							"value": {
+								"value": "@activity('Get AZ Func Code').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get MCM API key",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Set End Point",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://avery-adf-keyvault.vault.azure.net/secrets/MCMJonCrockettAPIKey/bde96b82a47a40628426ca459ee044ec?api-version=7.3",
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://vault.azure.net"
+							}
+						}
+					},
+					{
+						"name": "Set MCM API Key",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Get MCM API key",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": true,
+							"secureInput": true
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCMAPIKey",
+							"value": {
+								"value": "@activity('Get MCM API key').output.value",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set End Point",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "Set Community Id",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "MCMEndPoint",
+							"value": "nutritionreport"
+						}
+					},
+					{
+						"name": "Set Community Id",
+						"type": "SetVariable",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "CommunityId",
+							"value": "04b8b5cb-f680-4aa1-b3ec-12ddb04b8d7d"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"CommunityID": {
+						"type": "string"
+					},
+					"EndPoint": {
+						"type": "string"
+					}
+				},
+				"variables": {
+					"AzFuncCode": {
+						"type": "String"
+					},
+					"MCMAPIKey": {
+						"type": "String"
+					},
+					"MCMEndPoint": {
+						"type": "String"
+					},
+					"CommunityId": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "MCM/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_MCM_ImportData')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy data1",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobStorageReadSettings",
+									"recursive": true,
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "AzureSqlSink",
+								"writeBehavior": "insert",
+								"sqlWriterUseTableLock": false,
+								"tableOption": "autoCreate",
+								"disableMetricsCollection": false
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "$['criteria']['includeContacts']"
+										},
+										"sink": {
+											"name": "includeContacts"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includeImages']"
+										},
+										"sink": {
+											"name": "includeImages"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includeFullImages']"
+										},
+										"sink": {
+											"name": "includeFullImages"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includeDocuments']"
+										},
+										"sink": {
+											"name": "includeDocuments"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['UpdatedSince']"
+										},
+										"sink": {
+											"name": "UpdatedSince"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includeTrainingResidents']"
+										},
+										"sink": {
+											"name": "includeTrainingResidents"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includeChildCommunities']"
+										},
+										"sink": {
+											"name": "includeChildCommunities"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includeSocialImages']"
+										},
+										"sink": {
+											"name": "includeSocialImages"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['UpdatedSinceDateTimeOffset']"
+										},
+										"sink": {
+											"name": "UpdatedSinceDateTimeOffset"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['isAPICall']"
+										},
+										"sink": {
+											"name": "isAPICall"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['CommunityID']"
+										},
+										"sink": {
+											"name": "CommunityID"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['ConnectionID']"
+										},
+										"sink": {
+											"name": "ConnectionID"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['includePast']"
+										},
+										"sink": {
+											"name": "includePast"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['DateFrom']"
+										},
+										"sink": {
+											"name": "DateFrom"
+										}
+									},
+									{
+										"source": {
+											"path": "$['criteria']['DateTo']"
+										},
+										"sink": {
+											"name": "DateTo"
+										}
+									},
+									{
+										"source": {
+											"path": "[['location']"
+										},
+										"sink": {
+											"name": "location"
+										}
+									},
+									{
+										"source": {
+											"path": "[['community']"
+										},
+										"sink": {
+											"name": "community"
+										}
+									},
+									{
+										"source": {
+											"path": "[['firstName']"
+										},
+										"sink": {
+											"name": "firstName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['preferredName']"
+										},
+										"sink": {
+											"name": "preferredName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['lastName']"
+										},
+										"sink": {
+											"name": "lastName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['sex']"
+										},
+										"sink": {
+											"name": "sex"
+										}
+									},
+									{
+										"source": {
+											"path": "[['dateOfBirth']"
+										},
+										"sink": {
+											"name": "dateOfBirth"
+										}
+									},
+									{
+										"source": {
+											"path": "[['niNumber']"
+										},
+										"sink": {
+											"name": "niNumber"
+										}
+									},
+									{
+										"source": {
+											"path": "[['nhsNumber']"
+										},
+										"sink": {
+											"name": "nhsNumber"
+										}
+									},
+									{
+										"source": {
+											"path": "[['fileOpened']"
+										},
+										"sink": {
+											"name": "fileOpened"
+										}
+									},
+									{
+										"source": {
+											"path": "[['fileClosed']"
+										},
+										"sink": {
+											"name": "fileClosed"
+										}
+									},
+									{
+										"source": {
+											"path": "[['closedReason']"
+										},
+										"sink": {
+											"name": "closedReason"
+										}
+									},
+									{
+										"source": {
+											"path": "[['fileSuspended']"
+										},
+										"sink": {
+											"name": "fileSuspended"
+										}
+									},
+									{
+										"source": {
+											"path": "[['fileSuspendedChangeDate']"
+										},
+										"sink": {
+											"name": "fileSuspendedChangeDate"
+										}
+									},
+									{
+										"source": {
+											"path": "[['suspensionReason']"
+										},
+										"sink": {
+											"name": "suspensionReason"
+										}
+									},
+									{
+										"source": {
+											"path": "[['fileUpdated']"
+										},
+										"sink": {
+											"name": "fileUpdated"
+										}
+									},
+									{
+										"source": {
+											"path": "[['room']"
+										},
+										"sink": {
+											"name": "room"
+										}
+									},
+									{
+										"source": {
+											"path": "[['externalReference']"
+										},
+										"sink": {
+											"name": "externalReference"
+										}
+									},
+									{
+										"source": {
+											"path": "[['risksToBeAwareOf']"
+										},
+										"sink": {
+											"name": "risksToBeAwareOf"
+										}
+									},
+									{
+										"source": {
+											"path": "[['personID']"
+										},
+										"sink": {
+											"name": "personID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['connectionID']"
+										},
+										"sink": {
+											"name": "connectionID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['locationID']"
+										},
+										"sink": {
+											"name": "locationID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['communityID']"
+										},
+										"sink": {
+											"name": "communityID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['topLevelCommunityID']"
+										},
+										"sink": {
+											"name": "topLevelCommunityID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['folderID']"
+										},
+										"sink": {
+											"name": "folderID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['height']"
+										},
+										"sink": {
+											"name": "height"
+										}
+									},
+									{
+										"source": {
+											"path": "[['minimumStaff']"
+										},
+										"sink": {
+											"name": "minimumStaff"
+										}
+									},
+									{
+										"source": {
+											"path": "[['movedInDate']"
+										},
+										"sink": {
+											"name": "movedInDate"
+										}
+									},
+									{
+										"source": {
+											"path": "[['dnaCPR']"
+										},
+										"sink": {
+											"name": "dnaCPR"
+										}
+									},
+									{
+										"source": {
+											"path": "[['isRespite']"
+										},
+										"sink": {
+											"name": "isRespite"
+										}
+									},
+									{
+										"source": {
+											"path": "[['isDayCare']"
+										},
+										"sink": {
+											"name": "isDayCare"
+										}
+									},
+									{
+										"source": {
+											"path": "[['isPalliative']"
+										},
+										"sink": {
+											"name": "isPalliative"
+										}
+									},
+									{
+										"source": {
+											"path": "[['gsfStageColour']"
+										},
+										"sink": {
+											"name": "gsfStageColour"
+										}
+									},
+									{
+										"source": {
+											"path": "[['gsfStageNumber']"
+										},
+										"sink": {
+											"name": "gsfStageNumber"
+										}
+									},
+									{
+										"source": {
+											"path": "[['gsfStageDescription']"
+										},
+										"sink": {
+											"name": "gsfStageDescription"
+										}
+									},
+									{
+										"source": {
+											"path": "[['externalID']"
+										},
+										"sink": {
+											"name": "externalID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['medicalHistory']"
+										},
+										"sink": {
+											"name": "medicalHistory"
+										}
+									},
+									{
+										"source": {
+											"path": "[['medicalHistorySummary']"
+										},
+										"sink": {
+											"name": "medicalHistorySummary"
+										}
+									},
+									{
+										"source": {
+											"path": "[['likesToTalkAbout']"
+										},
+										"sink": {
+											"name": "likesToTalkAbout"
+										}
+									},
+									{
+										"source": {
+											"path": "[['socialInformation']"
+										},
+										"sink": {
+											"name": "socialInformation"
+										}
+									},
+									{
+										"source": {
+											"path": "[['thirdParty']['ThirdPartyOne']"
+										},
+										"sink": {
+											"name": "ThirdPartyOne"
+										}
+									},
+									{
+										"source": {
+											"path": "[['thirdParty']['ThirdPartyTwo']"
+										},
+										"sink": {
+											"name": "ThirdPartyTwo"
+										}
+									},
+									{
+										"source": {
+											"path": "[['otherIdentifiers']"
+										},
+										"sink": {
+											"name": "otherIdentifiers"
+										}
+									},
+									{
+										"source": {
+											"path": "[['diagnosis'][0]"
+										},
+										"sink": {
+											"name": "serviceUsers'][0]['diagnosis']["
+										}
+									},
+									{
+										"source": {
+											"path": "[['recordSupportType']"
+										},
+										"sink": {
+											"name": "recordSupportType"
+										}
+									},
+									{
+										"source": {
+											"path": "[['personalBelongings']"
+										},
+										"sink": {
+											"name": "personalBelongings"
+										}
+									},
+									{
+										"source": {
+											"path": "[['equipmentRequired']"
+										},
+										"sink": {
+											"name": "equipmentRequired"
+										}
+									},
+									{
+										"source": {
+											"path": "[['imageBase64']"
+										},
+										"sink": {
+											"name": "imageBase64"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['relationshipID']"
+										},
+										"sink": {
+											"name": "relationshipID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['toPersonID']"
+										},
+										"sink": {
+											"name": "toPersonID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['fromPersonID']"
+										},
+										"sink": {
+											"name": "fromPersonID"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['title']"
+										},
+										"sink": {
+											"name": "title"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['personName']"
+										},
+										"sink": {
+											"name": "personName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['foreName']"
+										},
+										"sink": {
+											"name": "foreName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['knownAs']"
+										},
+										"sink": {
+											"name": "knownAs"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['middleName']"
+										},
+										"sink": {
+											"name": "middleName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['surName']"
+										},
+										"sink": {
+											"name": "surName"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['relationshipType']"
+										},
+										"sink": {
+											"name": "relationshipType"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['emergencyContact']"
+										},
+										"sink": {
+											"name": "emergencyContact"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['nextOfKin']"
+										},
+										"sink": {
+											"name": "nextOfKin"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['isFinancePowerOfAttorney']"
+										},
+										"sink": {
+											"name": "isFinancePowerOfAttorney"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['addresses']"
+										},
+										"sink": {
+											"name": "addresses"
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['telephone'][0]"
+										},
+										"sink": {
+											"name": "serviceUsers'][0]['relationships'][0]['telephone']["
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['email'][0]"
+										},
+										"sink": {
+											"name": "serviceUsers'][0]['relationships'][0]['email']["
+										}
+									},
+									{
+										"source": {
+											"path": "[['relationships'][0]['notes']"
+										},
+										"sink": {
+											"name": "notes"
+										}
+									},
+									{
+										"source": {
+											"path": "[['documents']"
+										},
+										"sink": {
+											"name": "documents"
+										}
+									},
+									{
+										"source": {
+											"path": "[['tempStatus']"
+										},
+										"sink": {
+											"name": "tempStatus"
+										}
+									},
+									{
+										"source": {
+											"path": "[['MedicareReference']"
+										},
+										"sink": {
+											"name": "MedicareReference"
+										}
+									},
+									{
+										"source": {
+											"path": "[['MedicareExpiry']"
+										},
+										"sink": {
+											"name": "MedicareExpiry"
+										}
+									},
+									{
+										"source": {
+											"path": "[['DVANumber']"
+										},
+										"sink": {
+											"name": "DVANumber"
+										}
+									},
+									{
+										"source": {
+											"path": "[['DVAColour']"
+										},
+										"sink": {
+											"name": "DVAColour"
+										}
+									},
+									{
+										"source": {
+											"path": "[['DVAExpiry']"
+										},
+										"sink": {
+											"name": "DVAExpiry"
+										}
+									},
+									{
+										"source": {
+											"path": "[['NDISNumber']"
+										},
+										"sink": {
+											"name": "NDISNumber"
+										}
+									},
+									{
+										"source": {
+											"path": "[['socialImages']"
+										},
+										"sink": {
+											"name": "socialImages"
+										}
+									},
+									{
+										"source": {
+											"path": "$['SUIDs'][0]"
+										},
+										"sink": {
+											"name": "SUIDs']["
+										}
+									},
+									{
+										"source": {
+											"path": "$['Errors']"
+										},
+										"sink": {
+											"name": "Errors"
+										}
+									}
+								],
+								"collectionReference": "$['serviceUsers']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "DS_MCM_Json",
+								"type": "DatasetReference",
+								"parameters": {
+									"FileType": "serviceusers"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "DS_AH2_TRANSFORM_DB",
+								"type": "DatasetReference",
+								"parameters": {
+									"Schema": "MCM",
+									"Table": "ServiceUsers"
+								}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "MCM/Child Pipelines"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_MaintenanceApp_AH1Tables')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -6744,202 +7815,6 @@
 				},
 				"folder": {
 					"name": "Sona/Child Pipelines"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_AbsenceSubTypes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy data1",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": false,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "AbsenceSubTypeID",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['name']"
-										},
-										"sink": {
-											"name": "AbsenceSubTypeName",
-											"type": "String"
-										}
-									}
-								],
-								"collectionReference": "$['entries']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona Absence SubType Time in lieu - Unpaid.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "AbsenceSubType"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('factoryName'), '/PL_Sona_AbsenceTypes')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Copy data1",
-						"type": "Copy",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "JsonSource",
-								"storeSettings": {
-									"type": "AzureBlobStorageReadSettings",
-									"recursive": true,
-									"enablePartitionDiscovery": false
-								},
-								"formatSettings": {
-									"type": "JsonReadSettings"
-								}
-							},
-							"sink": {
-								"type": "AzureSqlSink",
-								"writeBehavior": "insert",
-								"sqlWriterUseTableLock": false,
-								"tableOption": "autoCreate",
-								"disableMetricsCollection": false
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "[['id']"
-										},
-										"sink": {
-											"name": "id",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['name']"
-										},
-										"sink": {
-											"name": "name",
-											"type": "String"
-										}
-									},
-									{
-										"source": {
-											"path": "[['is_holiday']"
-										},
-										"sink": {
-											"name": "is_holiday",
-											"type": "Boolean"
-										}
-									}
-								],
-								"collectionReference": "$['entries']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "DS_Sona_Initial_File",
-								"type": "DatasetReference",
-								"parameters": {
-									"Filename": "Sona Absence Types.json"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "Sona",
-									"Table": "AbsenceType"
-								}
-							}
-						]
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"folder": {
-					"name": "Sona/Initial API Files"
 				},
 				"annotations": []
 			},
