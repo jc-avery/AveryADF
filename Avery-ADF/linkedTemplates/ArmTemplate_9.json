@@ -93,29 +93,6 @@
 	},
 	"resources": [
 		{
-			"name": "[concat(parameters('factoryName'), '/DS_YourHippo_WebHook_Route_Files')]",
-			"type": "Microsoft.DataFactory/factories/datasets",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "PolestarStorageAcc",
-					"type": "LinkedServiceReference"
-				},
-				"folder": {
-					"name": "YourHippo"
-				},
-				"annotations": [],
-				"type": "Binary",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobStorageLocation",
-						"container": "yourhippo"
-					}
-				}
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/DS_polestar_storage_fileshare_binary')]",
 			"type": "Microsoft.DataFactory/factories/datasets",
 			"apiVersion": "2018-06-01",
@@ -6348,6 +6325,81 @@
 				},
 				"annotations": [],
 				"lastPublishTime": "2024-07-15T10:56:18Z"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Agency_WAC')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Pipeline used to build data used for average costs and ranking or agencies and rate using WAC.",
+				"activities": [
+					{
+						"name": "AgencyShiftClean table",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ClearAndPopulate_AgencyShiftClean",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "AgencyRanking",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 10",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_ClearAndPopulate_AgencyRanking",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 10",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "AgencyShiftClean table",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 10
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Agency"
+				},
+				"annotations": []
 			},
 			"dependsOn": []
 		}

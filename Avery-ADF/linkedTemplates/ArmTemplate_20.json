@@ -427,406 +427,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_Export_FinancialYear')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "For Each Company Export Data to CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Company List",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Company List').output.value",
-								"type": "Expression"
-							},
-							"isSequential": false,
-							"batchCount": 10,
-							"activities": [
-								{
-									"name": "Export Data to csv",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "SqlServerSource",
-											"sqlReaderQuery": {
-												"value": "SELECT\n\t'@{item().ExchCode}' AS ExchCompanyCode\n    ,*\nFROM \n\t@{item().ExchCode}.@{pipeline().parameters.Exchequer_Table} AS T WITH (NOLOCK)\nWHERE\n\tT.@{pipeline().parameters.Exchequer_YearColumn} = '@{item().ExchequerYear}'\n",
-												"type": "Expression"
-											},
-											"queryTimeout": "02:00:00",
-											"partitionOption": "None"
-										},
-										"sink": {
-											"type": "DelimitedTextSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "DelimitedTextWriteSettings",
-												"quoteAllText": true,
-												"fileExtension": ".txt"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_OnPrem_Exchequer",
-											"type": "DatasetReference",
-											"parameters": {
-												"Schema": "n/a",
-												"Table": "n/a"
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@concat(item().ExchCode,'_',item().HomeName,'_',pipeline().parameters.Exchequer_Table,'_Table_',variables('vToday'),'.csv')",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								}
-							]
-						}
-					},
-					{
-						"name": "Set vDirectory",
-						"description": "Todays date used for directory/storage location in storage account",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Set vToday",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vDirectory",
-							"value": {
-								"value": "@concat(formatDateTime(variables('vToday'), 'yyyy'),'/',formatDateTime(variables('vToday'), 'MM'),'/',formatDateTime(variables('vToday'), 'dd'), '/', pipeline().parameters.Exchequer_Table,'/previousyear')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Set vToday",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "vToday",
-							"value": {
-								"value": "@formatDateTime(utcNow(),'yyyy-MM-dd')",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "Company List",
-						"description": "List company codes to be exported",
-						"type": "Lookup",
-						"dependsOn": [
-							{
-								"activity": "Set vDirectory",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "AzureSqlSource",
-								"sqlReaderStoredProcedureName": "[[Exchequer].[Get$CompanyListWithYearAndPeriod]",
-								"storedProcedureParameters": {
-									"FinancialYear": {
-										"type": "String",
-										"value": {
-											"value": "@pipeline().parameters.FinancialYear",
-											"type": "Expression"
-										}
-									}
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "DS_AH2_TRANSFORM_DB",
-								"type": "DatasetReference",
-								"parameters": {
-									"Schema": "n/a",
-									"Table": "n/a"
-								}
-							},
-							"firstRowOnly": false
-						}
-					},
-					{
-						"name": "Get FileList",
-						"type": "GetMetadata",
-						"dependsOn": [
-							{
-								"activity": "For Each Company Export Data to CSV",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "DS_Polestar_Storage",
-								"type": "DatasetReference",
-								"parameters": {
-									"Container": "exchequer",
-									"Directory": {
-										"value": "@variables('vDirectory')",
-										"type": "Expression"
-									}
-								}
-							},
-							"fieldList": [
-								"childItems",
-								"itemName"
-							],
-							"storeSettings": {
-								"type": "AzureBlobStorageReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "BinaryReadSettings"
-							}
-						}
-					},
-					{
-						"name": "ForEach CSV FIle - Create a Parquet and Delete CSV",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Get FileList",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('Get FileList').output.childItems",
-								"type": "Expression"
-							},
-							"batchCount": 25,
-							"activities": [
-								{
-									"name": "Create Parquet File",
-									"type": "Copy",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"source": {
-											"type": "DelimitedTextSource",
-											"storeSettings": {
-												"type": "AzureBlobStorageReadSettings",
-												"recursive": false,
-												"enablePartitionDiscovery": false
-											},
-											"formatSettings": {
-												"type": "DelimitedTextReadSettings"
-											}
-										},
-										"sink": {
-											"type": "ParquetSink",
-											"storeSettings": {
-												"type": "AzureBlobStorageWriteSettings"
-											},
-											"formatSettings": {
-												"type": "ParquetWriteSettings"
-											}
-										},
-										"enableStaging": false,
-										"translator": {
-											"type": "TabularTranslator",
-											"typeConversion": true,
-											"typeConversionSettings": {
-												"allowDataTruncation": true,
-												"treatBooleanAsNumber": false
-											}
-										}
-									},
-									"inputs": [
-										{
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@item().Name",
-													"type": "Expression"
-												}
-											}
-										}
-									],
-									"outputs": [
-										{
-											"referenceName": "DS_Exchequer_Parquet",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": {
-													"value": "@replace(item().Name, '.csv', '.parquet' )",
-													"type": "Expression"
-												}
-											}
-										}
-									]
-								},
-								{
-									"name": "Delete CSV file",
-									"type": "Delete",
-									"dependsOn": [
-										{
-											"activity": "Create Parquet File",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataset": {
-											"referenceName": "DS_PolestarStorageAcc_Exchequer_CSV",
-											"type": "DatasetReference",
-											"parameters": {
-												"Directory": {
-													"value": "@variables('vDirectory')",
-													"type": "Expression"
-												},
-												"FileName": "@item().Name"
-											}
-										},
-										"enableLogging": false,
-										"storeSettings": {
-											"type": "AzureBlobStorageReadSettings",
-											"recursive": false,
-											"enablePartitionDiscovery": false
-										}
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"Exchequer_Table": {
-						"type": "string"
-					},
-					"Exchequer_YearColumn": {
-						"type": "string"
-					},
-					"FinancialYear": {
-						"type": "string"
-					}
-				},
-				"variables": {
-					"vToday": {
-						"type": "String"
-					},
-					"vDirectory": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Exchequer/Bronze FinancialYear Child Pipeline"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_CH_TransactionData')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -999,143 +599,6 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/xPL_Exchequer_Bronze_CurrentYear')]",
-			"type": "Microsoft.DataFactory/factories/pipelines",
-			"apiVersion": "2018-06-01",
-			"properties": {
-				"activities": [
-					{
-						"name": "Export Current Year Data",
-						"type": "ExecutePipeline",
-						"dependsOn": [],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Bronze_Export_CurrentYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"Exchequer_Table": {
-									"value": "@pipeline().parameters.ExchequerTable",
-									"type": "Expression"
-								},
-								"Exchequer_YearColumn": {
-									"value": "@pipeline().parameters.ExchequerYearColumn",
-									"type": "Expression"
-								}
-							}
-						}
-					},
-					{
-						"name": "Import Current Year Data To SQL",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 20s",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Bronze_Import_CurrentYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {
-								"Exchequer_Table": {
-									"value": "@pipeline().parameters.ExchequerTable",
-									"type": "Expression"
-								}
-							}
-						}
-					},
-					{
-						"name": "Wait 20s",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Export Current Year Data",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 1
-						}
-					},
-					{
-						"name": "Delete and Then Insert New Data",
-						"description": "Deletes the current year data and imports the newly exported and imported data",
-						"type": "ExecutePipeline",
-						"dependsOn": [
-							{
-								"activity": "Wait 20s Again",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"pipeline": {
-								"referenceName": "PL_Exchequer_Bronze_Delete_Insert_CurrentYear",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "Wait 20s Again",
-						"type": "Wait",
-						"dependsOn": [
-							{
-								"activity": "Import Current Year Data To SQL",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"waitTimeInSeconds": 1
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"ExchequerTable": {
-						"type": "string"
-					},
-					"ExchequerYearColumn": {
-						"type": "string"
-					}
-				},
-				"folder": {
-					"name": "Exchequer/Archive"
-				},
-				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_CurrentYear_x2Tables')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1283,6 +746,188 @@
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
+				},
+				"folder": {
+					"name": "Exchequer"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_Exchequer_Bronze_FinancialYear_x2Tables')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Previous Year Data DETAILS",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Export_FinancialYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": "DETAILS",
+								"Exchequer_YearColumn": "tlYear",
+								"FinancialYear": {
+									"value": "@pipeline().parameters.FinancialYear",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Import Previous Year DETAILS Data To SQL",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Export Previous Year Data DETAILS",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Import_FinancialYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": "DETAILS",
+								"FinancialYear": {
+									"value": "@pipeline().parameters.FinancialYear",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Delete and Then Insert New Data",
+						"description": "Deletes the current year data and imports the newly exported and imported data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Delete_Insert_FinancialYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"FinancialYear": {
+									"value": "@pipeline().parameters.FinancialYear",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Wait 20s",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Import Previous Year DETAILS Data To SQL",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Import Current Year DOCUMENT Data To SQL",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					},
+					{
+						"name": "Export Current Year Data DOCUMENT",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Export_FinancialYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": "DOCUMENT",
+								"Exchequer_YearColumn": "thYear",
+								"FinancialYear": {
+									"value": "@pipeline().parameters.FinancialYear",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Import Current Year DOCUMENT Data To SQL",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Export Current Year Data DOCUMENT",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Import_FinancialYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": "DOCUMENT",
+								"FinancialYear": {
+									"value": "@pipeline().parameters.FinancialYear",
+									"type": "Expression"
+								}
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"FinancialYear": {
+						"type": "string"
+					}
 				},
 				"folder": {
 					"name": "Exchequer"
@@ -1836,6 +1481,143 @@
 				},
 				"folder": {
 					"name": "Tribepad"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/xPL_Exchequer_Bronze_CurrentYear')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "Export Current Year Data",
+						"type": "ExecutePipeline",
+						"dependsOn": [],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Export_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": {
+									"value": "@pipeline().parameters.ExchequerTable",
+									"type": "Expression"
+								},
+								"Exchequer_YearColumn": {
+									"value": "@pipeline().parameters.ExchequerYearColumn",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Import Current Year Data To SQL",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Import_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"Exchequer_Table": {
+									"value": "@pipeline().parameters.ExchequerTable",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Wait 20s",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Export Current Year Data",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					},
+					{
+						"name": "Delete and Then Insert New Data",
+						"description": "Deletes the current year data and imports the newly exported and imported data",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Wait 20s Again",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "PL_Exchequer_Bronze_Delete_Insert_CurrentYear",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {}
+						}
+					},
+					{
+						"name": "Wait 20s Again",
+						"type": "Wait",
+						"dependsOn": [
+							{
+								"activity": "Import Current Year Data To SQL",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"waitTimeInSeconds": 1
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"ExchequerTable": {
+						"type": "string"
+					},
+					"ExchequerYearColumn": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "Exchequer/Archive"
 				},
 				"annotations": []
 			},
