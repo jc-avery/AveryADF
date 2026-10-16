@@ -1,0 +1,260 @@
+{
+	"name": "PL_BedStats_Export_ToAzureStorage",
+	"properties": {
+		"activities": [
+			{
+				"name": "Single BedStat File",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set vDirectory",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set vTodaysDate",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"sink": {
+						"type": "DelimitedTextSink",
+						"storeSettings": {
+							"type": "AzureBlobStorageWriteSettings"
+						},
+						"formatSettings": {
+							"type": "DelimitedTextWriteSettings",
+							"quoteAllText": true,
+							"fileExtension": ".txt"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "Bedstats",
+							"Table": "TestSource"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "DS_BedSats_AzureStorage_Csv",
+						"type": "DatasetReference",
+						"parameters": {
+							"Directory": {
+								"value": "@variables('vDirectory')",
+								"type": "Expression"
+							},
+							"FileName": {
+								"value": "@concat('Bedstat_',variables('vTodaysDate'),'.csv')",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Set vDirectory",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vDirectory",
+					"value": {
+						"value": "@utcNow('yyyy/MM/dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set vTodaysDate",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vTodaysDate",
+					"value": {
+						"value": "@utcNow('yyyy-MM-dd')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Home Lookup",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Single BedStat File",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": "SELECT DISTINCT SiteID, SiteName FROM Bedstats.TestSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_AH2_TRANSFORM_DB",
+						"type": "DatasetReference",
+						"parameters": {
+							"Schema": "N/A",
+							"Table": "N/A"
+						}
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "For Each Home",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Home Lookup",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Home Lookup').output.value",
+						"type": "Expression"
+					},
+					"activities": [
+						{
+							"name": "Export Indv Home BedStat File",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "SELECT *\nFROM\nBedstats.TestSource\nWHERE\nSiteID = '@{item().SiteID}'\n",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobStorageWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_AH2_TRANSFORM_DB",
+									"type": "DatasetReference",
+									"parameters": {
+										"Schema": "N/A",
+										"Table": "N/A"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_BedSats_AzureStorage_Csv",
+									"type": "DatasetReference",
+									"parameters": {
+										"Directory": {
+											"value": "@concat(variables('vDirectory'),'/',item().SiteID)",
+											"type": "Expression"
+										},
+										"FileName": {
+											"value": "@concat(item().SiteName,'_BedStat_',variables('vTodaysDate'),'.csv')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"vDirectory": {
+				"type": "String"
+			},
+			"vTodaysDate": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "BedStats"
+		},
+		"annotations": []
+	}
+}
