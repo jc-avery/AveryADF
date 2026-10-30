@@ -103,6 +103,10 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'password' of 'Softworks_API'"
 		},
+		"AZFunc_Bedstat_Excel_Generation_functionKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'functionKey' of 'AZFunc_Bedstat_Excel_Generation'"
+		},
 		"AH2_Agency_properties_typeProperties_server": {
 			"type": "string",
 			"defaultValue": "averyhealthcare2.database.windows.net"
@@ -2309,6 +2313,10 @@
 		"AveryAzureBlobStorageAccountPrivateEndPoint_properties_groupId": {
 			"type": "string",
 			"defaultValue": "blob"
+		},
+		"AZFunc_Bedstat_Excel_Generation_properties_typeProperties_functionAppUrl": {
+			"type": "string",
+			"defaultValue": "https://bedstat-excel-generation-g9bufmc2bmcyhpg8.uksouth-01.azurewebsites.net/"
 		}
 	},
 	"variables": {
@@ -13092,7 +13100,7 @@
 										"type": "Expression"
 									},
 									"FileName": {
-										"value": "@concat('Bedstat_',variables('vTodaysDate'),'.csv')",
+										"value": "@concat('All_Homes_Bedstat_',variables('vTodaysDate'),'.csv')",
 										"type": "Expression"
 									}
 								}
@@ -13247,7 +13255,7 @@
 											"type": "DatasetReference",
 											"parameters": {
 												"Directory": {
-													"value": "@concat(variables('vDirectory'),'/',item().SiteID)",
+													"value": "@concat(variables('vDirectory'),'/',item().SiteName)",
 													"type": "Expression"
 												},
 												"FileName": {
@@ -115978,6 +115986,303 @@
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/managedVirtualNetworks/default')]"
 			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_BedStats_Generate_ExcelFile')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Calls the AZ Func Bedstats-Excel-Creation to generate an excel file using the csv blob passed to it",
+				"activities": [
+					{
+						"name": "Az Func Bedstat-Excel-Creation",
+						"type": "AzureFunctionActivity",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set vTodaysDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"functionName": "GenerateBedStatExcel",
+							"body": {
+								"value": "@concat('{\"csvBlobPath\": \"',variables('vDirectory'),'/All_Homes_Bedstat_',variables('vTodaysDate'),'.csv\"}')",
+								"type": "Expression"
+							},
+							"headers": {
+								"Content-Type": "application/json"
+							},
+							"method": "POST"
+						},
+						"linkedServiceName": {
+							"referenceName": "AZFunc_Bedstat_Excel_Generation",
+							"type": "LinkedServiceReference"
+						}
+					},
+					{
+						"name": "Set vDirectory",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@utcNow('yyyy/MM/dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vTodaysDate",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vTodaysDate",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vTodaysDate": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "BedStats"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AZFunc_Bedstat_Excel_Generation')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/AZFunc_Bedstat_Excel_Generation')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"description": "Bedstat-Excel-Generation function to create excel bedstat file from csv files in polestar storage",
+				"annotations": [],
+				"type": "AzureFunction",
+				"typeProperties": {
+					"functionAppUrl": "[parameters('AZFunc_Bedstat_Excel_Generation_properties_typeProperties_functionAppUrl')]",
+					"authentication": "Anonymous",
+					"functionKey": {
+						"type": "SecureString",
+						"value": "[parameters('AZFunc_Bedstat_Excel_Generation_functionKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/PL_BedStats_Upload_Excel_ToSharePoint')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "BedStat-SharePoint-Upload Logic App",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "Set vblobPath",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "POST",
+							"headers": {},
+							"url": "https://prod-30.uksouth.logic.azure.com:443/workflows/bdc7d6b0bf8a4b509d557534d66b0e93/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=9EFt_Oz8tLOpvamW4yW_Ckckw9GKHLXdZlBuwpV7yEo",
+							"body": {
+								"value": "{\n  \"blobPath\": \"@{variables('vblobPath')}\",\n  \"sharePointDirectory\": \"@{variables('vsharePointDirectory')}\",\n  \"fileName\": \"@{variables('vfileName')}\",\n  \"home\": null\n}",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vDirectory",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vsharePointDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDirectory",
+							"value": {
+								"value": "@concat('excel/',variables('vsharePointDirectory'),'/')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vTodaysDate",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vTodaysDate",
+							"value": {
+								"value": "@utcNow('yyyy-MM-dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vfileName",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vTodaysDate",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vfileName",
+							"value": {
+								"value": "@concat('All_Homes_Bedstat_',variables('vTodaysDate'),'.xlsx')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vblobPath",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set vDirectory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set vfileName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vblobPath",
+							"value": {
+								"value": "@concat(variables('vDirectory'),variables('vfileName'))",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set vsharePointDirectory",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vsharePointDirectory",
+							"value": {
+								"value": "@utcNow('yyyy/MM/dd')",
+								"type": "Expression"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"variables": {
+					"vDirectory": {
+						"type": "String"
+					},
+					"vTodaysDate": {
+						"type": "String"
+					},
+					"vblobPath": {
+						"type": "String"
+					},
+					"vfileName": {
+						"type": "String"
+					},
+					"vsharePointDirectory": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "BedStats"
+				},
+				"annotations": []
+			},
+			"dependsOn": []
 		}
 	]
 }
